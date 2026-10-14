@@ -1,0 +1,407 @@
+<title>Reactor BO Benchmark</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one reading column (max 1080px) of report sections; charts get the full column width. */
+:root {
+  --bg: #f6f7f8;          /* page plane, faint cool bias */
+  --surface: #fcfcfb;     /* chart / card surface */
+  --ink: #0e1116;
+  --ink-2: #4a505a;
+  --muted: #858b94;
+  --rule: #dfe2e6;
+  --grid: #e7e9ec;
+  --axis: #c3c7cd;
+  --accent: #2a78d6;
+  --good: #0f7a2d; --good-bg: #e3f3e7;
+  --bad: #b42323;  --bad-bg: #fbe7e7;
+  --neutral-bg: #eceef1;
+  --warn-bg: #fdf3dc; --warn-ink: #7a5300;
+  --s-gp_ei: #2a78d6; --s-random: #eb6834; --s-bo_v1: #1baf7a; --s-nn_ei: #eda100;
+  --s-simplex: #e87ba4; --s-lhs: #008300; --s-gp_ucb: #6250d6; --s-gp_ts: #e34948;
+  --s-gp_pi: #008300; --s-gp_ei_q4: #e87ba4; --s-gp_ei_raw: #1baf7a; --s-nn_ts: #eda100; --s-cgp_ei: #6250d6; --s-gp_ei_logw: #6250d6; --s-gp_ei_logall: #e34948;
+  --font-display: "Instrument Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-body: "Instrument Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1114; --surface: #17191d; --ink: #eef0f2; --ink-2: #b9bec6; --muted: #8a9099;
+    --rule: #2a2e34; --grid: #23272c; --axis: #3a3f46; --accent: #3987e5;
+    --good: #4cc26a; --good-bg: #13291a; --bad: #f07d7d; --bad-bg: #321717; --neutral-bg: #22262b;
+    --warn-bg: #2e2510; --warn-ink: #f2c25c;
+    --s-gp_ei: #3987e5; --s-random: #d95926; --s-bo_v1: #199e70; --s-nn_ei: #c98500;
+    --s-simplex: #d55181; --s-lhs: #008300; --s-gp_ucb: #9085e9; --s-gp_ts: #e66767;
+    --s-gp_pi: #008300; --s-gp_ei_q4: #d55181; --s-gp_ei_raw: #199e70; --s-nn_ts: #c98500; --s-cgp_ei: #9085e9; --s-gp_ei_logw: #9085e9; --s-gp_ei_logall: #e66767;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1114; --surface: #17191d; --ink: #eef0f2; --ink-2: #b9bec6; --muted: #8a9099;
+  --rule: #2a2e34; --grid: #23272c; --axis: #3a3f46; --accent: #3987e5;
+  --good: #4cc26a; --good-bg: #13291a; --bad: #f07d7d; --bad-bg: #321717; --neutral-bg: #22262b;
+  --warn-bg: #2e2510; --warn-ink: #f2c25c;
+  --s-gp_ei: #3987e5; --s-random: #d95926; --s-bo_v1: #199e70; --s-nn_ei: #c98500;
+  --s-simplex: #d55181; --s-lhs: #008300; --s-gp_ucb: #9085e9; --s-gp_ts: #e66767;
+  --s-gp_pi: #008300; --s-gp_ei_q4: #d55181; --s-gp_ei_raw: #199e70; --s-nn_ts: #c98500; --s-cgp_ei: #9085e9; --s-gp_ei_logw: #9085e9; --s-gp_ei_logall: #e66767;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.55; }
+.wrap { max-width: 1080px; margin: 0 auto; padding-block: 40px 64px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex; flex-direction: column; gap: 44px; }
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; letter-spacing: -0.01em; }
+h1 { font-size: clamp(28px, 4.2vw, 40px); font-weight: 700; line-height: 1.1; }
+h2 { font-size: 21px; font-weight: 600; }
+h3 { font-size: 15px; font-weight: 600; }
+p { margin: 0; max-width: 68ch; }
+.eyebrow { font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.lede { font-size: 17px; color: var(--ink-2); }
+header { display: flex; flex-direction: column; gap: 14px; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px 20px; font-family: var(--font-mono); font-size: 12.5px; color: var(--ink-2); }
+.meta b { color: var(--ink); font-weight: 500; }
+.notice { background: var(--warn-bg); color: var(--warn-ink); border-radius: 6px; padding: 10px 14px; font-size: 13.5px; max-width: 80ch; }
+section { display: flex; flex-direction: column; gap: 16px; }
+.section-head { display: flex; flex-direction: column; gap: 6px; }
+.section-head p { color: var(--ink-2); }
+
+/* findings */
+.findings { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1px; background: var(--rule); border: 1px solid var(--rule); border-radius: 8px; overflow: hidden; }
+.finding { background: var(--surface); padding: 18px 18px 20px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.finding .num { font-family: var(--font-display); font-size: 30px; font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums; }
+.finding .num small { font-size: 15px; font-weight: 500; color: var(--ink-2); }
+.finding p { font-size: 13.5px; color: var(--ink-2); }
+
+/* controls */
+.controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; }
+.tabs { display: flex; flex-wrap: wrap; gap: 4px; background: var(--neutral-bg); padding: 3px; border-radius: 7px; }
+.tabs button { font: 500 13px var(--font-body); color: var(--ink-2); background: transparent; border: 0; padding: 6px 11px; border-radius: 5px; cursor: pointer; }
+.tabs button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,0.12); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { display: inline-flex; align-items: center; gap: 7px; font: 500 12.5px var(--font-body); color: var(--ink-2); background: var(--surface); border: 1px solid var(--rule); border-radius: 999px; padding: 4px 10px 4px 8px; cursor: pointer; }
+.chip i { width: 14px; height: 3px; border-radius: 2px; display: inline-block; }
+.chip[aria-pressed="false"] { opacity: 0.45; }
+.chip[aria-pressed="false"] i { background: var(--muted) !important; }
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* chart */
+.chart-card { background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; padding: 14px 10px 8px; position: relative; }
+.chart-card svg { display: block; width: 100%; height: auto; overflow: visible; }
+.chart-card text { font-family: var(--font-body); }
+.tick { font-size: 11px; fill: var(--muted); font-variant-numeric: tabular-nums; }
+.axis-title { font-size: 11.5px; fill: var(--ink-2); }
+.endlabel { font-size: 11px; fill: var(--ink-2); }
+.tooltip { position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; box-shadow: 0 4px 14px rgba(0,0,0,0.12); padding: 8px 10px; font-size: 12px; min-width: 190px; display: flex; flex-direction: column; gap: 3px; }
+.tooltip .row { display: flex; align-items: center; gap: 8px; justify-content: space-between; }
+.tooltip .row span:first-child { display: inline-flex; align-items: center; gap: 6px; color: var(--ink-2); }
+.tooltip .row i { width: 10px; height: 3px; border-radius: 2px; display: inline-block; }
+.tooltip .row b { font-family: var(--font-mono); font-weight: 500; font-variant-numeric: tabular-nums; }
+.caption { font-size: 12.5px; color: var(--muted); max-width: 90ch; }
+
+/* tables */
+.table-wrap { overflow-x: auto; border: 1px solid var(--rule); border-radius: 8px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--rule); white-space: nowrap; }
+th { font: 500 11.5px var(--font-mono); text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); background: var(--surface); }
+td.num, th.num { text-align: right; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+tr:last-child td { border-bottom: 0; }
+td .sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 8px; vertical-align: -1px; }
+.bar { display: inline-block; height: 6px; border-radius: 3px; background: var(--accent); vertical-align: middle; margin-left: 8px; opacity: 0.7; }
+.pill { display: inline-block; font-size: 12px; font-weight: 500; padding: 2px 9px; border-radius: 999px; }
+.pill.good { background: var(--good-bg); color: var(--good); }
+.pill.bad { background: var(--bad-bg); color: var(--bad); }
+.pill.neutral { background: var(--neutral-bg); color: var(--ink-2); }
+
+.two-col { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+.two-col > * { min-width: 0; }
+.figure-card { background: #ffffff; border: 1px solid var(--rule); border-radius: 8px; padding: 8px; }
+.figure-card img { display: block; width: 100%; height: auto; }
+ul.plain { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; max-width: 80ch; }
+code { font-family: var(--font-mono); font-size: 0.92em; background: var(--neutral-bg); padding: 1px 5px; border-radius: 4px; }
+.cmd { font-family: var(--font-mono); font-size: 13px; background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; padding: 12px 14px; overflow-x: auto; white-space: pre; color: var(--ink); }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <span class="eyebrow">ACOD310 · Digital reactor twin</span>
+    <h1>Bayesian optimisation vs conventional search on the fixed-bed reactor twin</h1>
+    <p class="lede" id="lede"></p>
+    <div class="meta" id="meta"></div>
+    <p class="notice">All kinetic parameters and all prices are placeholders. The method comparison is the result here; the operating points and money values will change once real kinetics are agreed.</p>
+  </header>
+
+  <section>
+    <div class="section-head">
+      <span class="eyebrow">Headline</span>
+      <h2>What the benchmark shows</h2>
+    </div>
+    <div class="findings" id="findings"></div>
+  </section>
+
+  <section id="convergence">
+    <div class="section-head">
+      <span class="eyebrow">Convergence</span>
+      <h2>How fast each method closes the gap to the true optimum</h2>
+      <p>Regret is how far the recommended operating point is from the true best, scaled so 0 is the optimum and 1 is a typical random operating point. Line is the median over seeds, band is the middle 50 %. Lower is better; the axis is logarithmic.</p>
+    </div>
+    <div class="controls">
+      <div class="tabs" id="setting-tabs" role="group" aria-label="Problem setting"></div>
+      <div class="tabs" id="group-tabs" role="group" aria-label="Method group"></div>
+    </div>
+    <div class="chips" id="chips"></div>
+    <div class="chart-card" id="chart-card">
+      <svg id="chart" viewBox="0 0 960 420" role="img" aria-label="Median regret against number of experiments"></svg>
+      <div class="tooltip" id="tooltip" hidden></div>
+    </div>
+    <p class="caption" id="setting-caption"></p>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <span class="eyebrow">Results table</span>
+      <h2 id="table-title">Final results after 50 experiments</h2>
+      <p>Sorted best first. "Hit 1 %" is the share of seeds that got within 1 % of the optimum within the budget; "Experiments to 1 %" is the median number needed (a dash means most seeds never got there).</p>
+    </div>
+    <div class="table-wrap"><table id="summary-table"></table></div>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <span class="eyebrow">Statistics</span>
+      <h2>Is the upgraded BO significantly better?</h2>
+      <p>Every method is compared with GP + EI on final regret. BO variants share the same starting experiments per seed, so they use a paired Wilcoxon signed-rank test; the rest use a Mann-Whitney U test. P-values are Holm-corrected within each setting. A12 is the probability that a GP + EI run ends with lower regret than a run of the other method (0.5 = no difference).</p>
+    </div>
+    <div class="table-wrap"><table id="tests-table"></table></div>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <span class="eyebrow">Surrogate models</span>
+      <h2>GP vs neural-network ensemble as a model of the twin</h2>
+      <p>Same training data for every model, scored on 1,000 random test points and on 500 points near the optimum. NRMSE is prediction error divided by the spread of the test values (0 = perfect, 1 = useless). Coverage is how often the true value falls inside the model's 95 % interval; 0.95 is ideal, lower means over-confident.</p>
+    </div>
+    <div class="controls"><div class="tabs" id="sur-tabs" role="group" aria-label="Surrogate study objective"></div></div>
+    <div class="two-col">
+      <div class="chart-card"><svg id="sur-nrmse" viewBox="0 0 470 300" role="img" aria-label="Prediction error against training size"></svg></div>
+      <div class="chart-card"><svg id="sur-cov" viewBox="0 0 470 300" role="img" aria-label="Interval coverage against training size"></svg></div>
+    </div>
+    <p class="caption" id="sur-caption"></p>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <span class="eyebrow">How it works</span>
+      <h2>Bayesian optimisation, one step at a time</h2>
+      <p>One knob (temperature), objective = yield. Left: the GP's best guess and its uncertainty band after each experiment. Right: the acquisition function that picks the next experiment. EI targets the peak once the GP is confident about where it is.</p>
+    </div>
+    <div class="figure-card"><img id="fig-1d" alt="Four rows showing the GP fit and acquisition function after 4 to 7 experiments"></div>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <span class="eyebrow">Limits</span>
+      <h2>What this does not show yet</h2>
+    </div>
+    <ul class="plain" id="limits"></ul>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <span class="eyebrow">Reproduce</span>
+      <h2>Commands</h2>
+    </div>
+    <div class="cmd">python test_bo.py              # 29 checks of the BO package
+python run_benchmark.py         # all settings x strategies x 20 seeds (resumable)
+python analyse_benchmark.py     # tables, tests, figures
+python surrogate_study.py       # GP vs NN accuracy
+python make_report.py           # rebuilds this page</div>
+  </section>
+</div>
+
+<script id="data" type="application/json">__DATA__</script>
+<script>
+(function () {
+  const D = JSON.parse(document.getElementById("data").textContent);
+  const L = D.labels;
+  const css = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const col = (s) => `var(--s-${s})`;
+  const fmt = (v, d = 4) => (v == null || isNaN(v)) ? "–" : (v < 0.0001 && v > 0 ? "<0.0001" : Number(v).toFixed(d));
+  const NS = "http://www.w3.org/2000/svg";
+  const el = (tag, attrs = {}, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; };
+
+  // ------------------------------------------------------------- header
+  document.getElementById("lede").textContent = D.lede;
+  document.getElementById("meta").innerHTML = D.meta.map(([k, v]) => `<span>${k} <b>${v}</b></span>`).join("");
+  document.getElementById("findings").innerHTML = D.findings.map(f =>
+    `<div class="finding"><span class="eyebrow">${f.label}</span><span class="num">${f.num}${f.unit ? ` <small>${f.unit}</small>` : ""}</span><p>${f.text}</p></div>`).join("");
+  document.getElementById("limits").innerHTML = D.limits.map(t => `<li>${t}</li>`).join("");
+  document.getElementById("fig-1d").src = D.fig1d;
+
+  // ------------------------------------------------------------- convergence chart
+  const SETTINGS = D.setting_order.filter(s => D.curves[s]);
+  const GROUPS = D.groups;
+  let state = { setting: SETTINGS.includes("margin") ? "margin" : SETTINGS[0], group: "main", hidden: new Set() };
+  try { const saved = JSON.parse(localStorage.getItem("bo-report-state") || "null"); if (saved && SETTINGS.includes(saved.setting)) { state.setting = saved.setting; state.group = saved.group; } } catch (e) {}
+
+  function groupFor(setting) { return setting === "margin_spec" ? "constrained" : (state.group === "constrained" ? "main" : state.group); }
+  function methods() {
+    const g = groupFor(state.setting);
+    return GROUPS[g].methods.filter(m => D.curves[state.setting][m]);
+  }
+
+  function renderTabs() {
+    const st = document.getElementById("setting-tabs");
+    st.innerHTML = SETTINGS.map(s => `<button type="button" aria-pressed="${s === state.setting}" data-s="${s}">${D.settings_short[s]}</button>`).join("");
+    st.querySelectorAll("button").forEach(b => b.onclick = () => { state.setting = b.dataset.s; state.hidden.clear(); save(); renderAll(); });
+    const gt = document.getElementById("group-tabs");
+    const g = groupFor(state.setting);
+    const keys = state.setting === "margin_spec" ? ["constrained"] : Object.keys(GROUPS).filter(k => k !== "constrained");
+    gt.innerHTML = keys.map(k => `<button type="button" aria-pressed="${k === g}" data-g="${k}">${GROUPS[k].label}</button>`).join("");
+    gt.querySelectorAll("button").forEach(b => b.onclick = () => { state.group = b.dataset.g; state.hidden.clear(); save(); renderAll(); });
+    const ch = document.getElementById("chips");
+    ch.innerHTML = methods().map(m => `<button type="button" class="chip" aria-pressed="${!state.hidden.has(m)}" data-m="${m}"><i style="background:${col(m)}"></i>${L[m]}</button>`).join("");
+    ch.querySelectorAll("button").forEach(b => b.onclick = () => { const m = b.dataset.m; state.hidden.has(m) ? state.hidden.delete(m) : state.hidden.add(m); renderTabs(); drawChart(); });
+    document.getElementById("setting-caption").textContent = D.setting_captions[state.setting];
+  }
+  function save() { try { localStorage.setItem("bo-report-state", JSON.stringify({ setting: state.setting, group: state.group })); } catch (e) {} }
+
+  const W = 960, H = 420, M = { l: 64, r: 150, t: 14, b: 46 };
+  const FLOOR = 1e-4;
+  function drawChart() {
+    const svg = document.getElementById("chart");
+    svg.innerHTML = "";
+    const C = D.curves[state.setting];
+    const ms = methods().filter(m => !state.hidden.has(m));
+    const n = C[methods()[0]].median.length;
+    const x = (t) => M.l + (t - 1) / (n - 1) * (W - M.l - M.r);
+    const lmin = Math.log10(FLOOR), lmax = 0.2;
+    const y = (v) => { const lv = Math.log10(Math.max(v, FLOOR)); return M.t + (lmax - lv) / (lmax - lmin) * (H - M.t - M.b); };
+    // grid + ticks
+    [1, 0.1, 0.01, 0.001, 0.0001].forEach(v => {
+      el("line", { x1: M.l, x2: W - M.r, y1: y(v), y2: y(v), stroke: "var(--grid)", "stroke-width": 1 }, svg);
+      el("text", { x: M.l - 8, y: y(v) + 4, "text-anchor": "end", class: "tick" }, svg).textContent = v >= 0.01 ? v : v.toExponential(0).replace("e-", "e−");
+    });
+    [1, 10, 20, 30, 40, 50].filter(t => t <= n).forEach(t => {
+      el("text", { x: x(t), y: H - M.b + 18, "text-anchor": "middle", class: "tick" }, svg).textContent = t;
+    });
+    el("line", { x1: M.l, x2: W - M.r, y1: H - M.b, y2: H - M.b, stroke: "var(--axis)" }, svg);
+    el("text", { x: (M.l + W - M.r) / 2, y: H - 6, "text-anchor": "middle", class: "axis-title" }, svg).textContent = "Experiments run";
+    const yt = el("text", { x: 14, y: (M.t + H - M.b) / 2, "text-anchor": "middle", class: "axis-title", transform: `rotate(-90 14 ${(M.t + H - M.b) / 2})` }, svg);
+    yt.textContent = "Normalised regret (log)";
+    // BO start marker
+    el("line", { x1: x(10.5), x2: x(10.5), y1: M.t, y2: H - M.b, stroke: "var(--axis)", "stroke-dasharray": "3 4" }, svg);
+    el("text", { x: x(10.5) + 6, y: M.t + 12, class: "tick" }, svg).textContent = "BO starts after 10 starting experiments";
+    // bands then lines
+    const path = (arr) => arr.map((v, i) => `${i ? "L" : "M"}${x(i + 1).toFixed(1)},${y(v).toFixed(1)}`).join("");
+    ms.forEach(m => {
+      const c = C[m];
+      const d = path(c.q75) + c.q25.slice().reverse().map((v, i) => `L${x(n - i).toFixed(1)},${y(v).toFixed(1)}`).join("") + "Z";
+      el("path", { d, fill: col(m), "fill-opacity": 0.1, stroke: "none" }, svg);
+    });
+    ms.forEach(m => el("path", { d: path(C[m].median), fill: "none", stroke: col(m), "stroke-width": 2, "stroke-linejoin": "round", "stroke-dasharray": (m === "gp_ei_raw" || m === "nn_ts") ? "6 4" : "none" }, svg));
+    // end labels, de-collided
+    const ends = ms.map(m => ({ m, v: C[m].median[n - 1] })).sort((a, b) => y(a.v) - y(b.v));
+    let last = -1e9;
+    ends.forEach(e => {
+      let ly = Math.max(y(e.v), last + 15); last = ly;
+      el("line", { x1: x(n) + 3, x2: x(n) + 12, y1: y(e.v), y2: ly, stroke: col(e.m), "stroke-width": 1 }, svg);
+      el("text", { x: x(n) + 15, y: ly + 4, class: "endlabel" }, svg).textContent = L[e.m].replace(/ \(.*\)/, "");
+    });
+    // hover layer
+    const guide = el("line", { y1: M.t, y2: H - M.b, stroke: "var(--ink-2)", "stroke-width": 1, opacity: 0 }, svg);
+    const dots = ms.map(m => el("circle", { r: 4, fill: col(m), stroke: "var(--surface)", "stroke-width": 2, opacity: 0 }, svg));
+    const hit = el("rect", { x: M.l, y: M.t, width: W - M.l - M.r, height: H - M.t - M.b, fill: "transparent" }, svg);
+    const tip = document.getElementById("tooltip");
+    const card = document.getElementById("chart-card");
+    function move(evt) {
+      const r = svg.getBoundingClientRect();
+      const px = (evt.clientX - r.left) / r.width * W;
+      const t = Math.min(n, Math.max(1, Math.round((px - M.l) / (W - M.l - M.r) * (n - 1) + 1)));
+      guide.setAttribute("x1", x(t)); guide.setAttribute("x2", x(t)); guide.setAttribute("opacity", 0.35);
+      ms.forEach((m, i) => { dots[i].setAttribute("cx", x(t)); dots[i].setAttribute("cy", y(C[m].median[t - 1])); dots[i].setAttribute("opacity", 1); });
+      const rows = ms.map(m => ({ m, v: C[m].median[t - 1] })).sort((a, b) => a.v - b.v);
+      tip.innerHTML = `<div style="color:var(--muted);font-size:11.5px">After ${t} experiment${t > 1 ? "s" : ""} · median regret</div>` +
+        rows.map(r => `<div class="row"><span><i style="background:${col(r.m)}"></i>${L[r.m].replace(/ \(.*\)/, "")}</span><b>${fmt(r.v)}</b></div>`).join("");
+      tip.hidden = false;
+      const cr = card.getBoundingClientRect();
+      let left = evt.clientX - cr.left + 14; const tw = tip.offsetWidth;
+      if (left + tw > cr.width - 8) left = evt.clientX - cr.left - tw - 14;
+      tip.style.left = Math.max(8, left) + "px"; tip.style.top = "12px";
+    }
+    function leave() { tip.hidden = true; guide.setAttribute("opacity", 0); dots.forEach(d => d.setAttribute("opacity", 0)); }
+    hit.addEventListener("pointermove", move); hit.addEventListener("pointerdown", move); hit.addEventListener("pointerleave", leave);
+  }
+
+  // ------------------------------------------------------------- tables
+  function renderTables() {
+    const rows = D.summary.filter(r => r.setting === state.setting).sort((a, b) => a.median_final_regret - b.median_final_regret);
+    document.getElementById("table-title").textContent = `Final results after ${rows[0].budget} experiments · ${D.settings_short[state.setting]}`;
+    const maxR = Math.max(...rows.map(r => r.median_final_regret), 1e-9);
+    document.getElementById("summary-table").innerHTML =
+      `<thead><tr><th>Method</th><th class="num">Median regret</th><th class="num">Middle 50 %</th><th class="num">Hit 1 %</th><th class="num">Experiments to 1 %</th><th class="num">Compute / run</th></tr></thead><tbody>` +
+      rows.map(r => `<tr><td><span class="sw" style="background:${col(r.strategy)}"></span>${r.label}</td>
+        <td class="num">${fmt(r.median_final_regret)}<span class="bar" style="width:${Math.max(2, 70 * r.median_final_regret / maxR)}px;background:${col(r.strategy)}"></span></td>
+        <td class="num">${fmt(r.q25)} – ${fmt(r.q75)}</td>
+        <td class="num">${Math.round(100 * r["success_0.01"])} %</td>
+        <td class="num">${r["median_evals_0.01"] == null ? "–" : r["median_evals_0.01"].toFixed(0)}</td>
+        <td class="num">${r.mean_time_s.toFixed(1)} s</td></tr>`).join("") + "</tbody>";
+    const tests = D.tests.filter(t => t.setting === state.setting).sort((a, b) => a.p_holm - b.p_holm);
+    document.getElementById("tests-table").innerHTML =
+      `<thead><tr><th>Compared with GP + EI</th><th class="num">Median regret (GP + EI / other)</th><th class="num">A12</th><th class="num">p (Holm)</th><th>Test</th><th>Verdict</th></tr></thead><tbody>` +
+      tests.map(t => {
+        const cls = t.verdict.startsWith("GP+EI") ? "good" : (t.verdict.startsWith("no") ? "neutral" : "bad");
+        const txt = t.verdict.startsWith("GP+EI") ? "GP + EI better" : t.verdict;
+        return `<tr><td><span class="sw" style="background:${col(t.strategy)}"></span>${t.label}</td>
+        <td class="num">${fmt(t.median_ref)} / ${fmt(t.median_other)}</td><td class="num">${t.A12_ref_better.toFixed(2)}</td>
+        <td class="num">${t.p_holm < 0.001 ? "<0.001" : t.p_holm.toFixed(3)}</td><td>${t.test.replace(" (paired by seed)", ", paired")}</td>
+        <td><span class="pill ${cls}">${txt}</span></td></tr>`; }).join("") + "</tbody>";
+  }
+
+  // ------------------------------------------------------------- surrogate study
+  let surObj = "margin";
+  const SCOL = { "GP v1 (fixed RBF)": "var(--s-bo_v1)", "GP (fitted Matern ARD)": "var(--s-gp_ei)", "NN ensemble": "var(--s-nn_ei)" };
+  function drawSur(id, metric, logy, ideal) {
+    const svg = document.getElementById(id); svg.innerHTML = "";
+    const S = D.surrogate[surObj];
+    const w = 470, h = 300, m = { l: 52, r: 16, t: 30, b: 40 };
+    const sizes = S.sizes;
+    const lx = (v) => m.l + (Math.log(v) - Math.log(sizes[0])) / (Math.log(sizes[sizes.length - 1]) - Math.log(sizes[0])) * (w - m.l - m.r);
+    const all = []; Object.values(S.models).forEach(o => ["whole box", "near optimum"].forEach(ts => all.push(...o[ts][metric])));
+    let lo, hi, yf;
+    if (logy) { lo = Math.floor(Math.log10(Math.min(...all))); hi = Math.ceil(Math.log10(Math.max(...all))); yf = (v) => m.t + (hi - Math.log10(v)) / (hi - lo) * (h - m.t - m.b); }
+    else { lo = 0; hi = 1; yf = (v) => m.t + (hi - v) / (hi - lo) * (h - m.t - m.b); }
+    const ticks = logy ? Array.from({ length: hi - lo + 1 }, (_, i) => Math.pow(10, lo + i)) : [0, 0.25, 0.5, 0.75, 1];
+    ticks.forEach(v => { el("line", { x1: m.l, x2: w - m.r, y1: yf(v), y2: yf(v), stroke: "var(--grid)" }, svg);
+      el("text", { x: m.l - 6, y: yf(v) + 4, "text-anchor": "end", class: "tick" }, svg).textContent = logy ? (v >= 1 ? v : v.toString()) : v; });
+    sizes.forEach(v => el("text", { x: lx(v), y: h - m.b + 16, "text-anchor": "middle", class: "tick" }, svg).textContent = v);
+    el("text", { x: (m.l + w - m.r) / 2, y: h - 6, "text-anchor": "middle", class: "axis-title" }, svg).textContent = "Training experiments";
+    el("text", { x: m.l, y: 16, class: "axis-title" }, svg).textContent = metric === "nrmse" ? "Prediction error, NRMSE (log, lower is better)" : "95 % interval coverage (ideal 0.95)";
+    if (ideal != null) el("line", { x1: m.l, x2: w - m.r, y1: yf(ideal), y2: yf(ideal), stroke: "var(--ink-2)", "stroke-dasharray": "3 4" }, svg);
+    Object.entries(S.models).forEach(([name, o]) => {
+      ["whole box", "near optimum"].forEach(ts => {
+        const vals = o[ts][metric];
+        el("path", { d: vals.map((v, i) => `${i ? "L" : "M"}${lx(sizes[i])},${yf(Math.max(v, logy ? Math.pow(10, lo) : 0))}`).join(""), fill: "none", stroke: SCOL[name], "stroke-width": 2, "stroke-dasharray": ts === "near optimum" ? "5 4" : "none" }, svg);
+        vals.forEach((v, i) => { const c = el("circle", { cx: lx(sizes[i]), cy: yf(Math.max(v, logy ? Math.pow(10, lo) : 0)), r: 4, fill: ts === "near optimum" ? "var(--surface)" : SCOL[name], stroke: SCOL[name], "stroke-width": 2 }, svg);
+          el("title", {}, c).textContent = `${name}, ${ts}, n=${sizes[i]}: ${metric === "nrmse" ? "NRMSE" : "coverage"} ${v.toFixed(3)}`; });
+      });
+    });
+  }
+  function renderSur() {
+    if (!D.surrogate) { document.getElementById("sur-caption").textContent = "Surrogate study not run yet."; return; }
+    const t = document.getElementById("sur-tabs");
+    t.innerHTML = Object.keys(D.surrogate).map(k => `<button type="button" aria-pressed="${k === surObj}" data-k="${k}">${k === "yield" ? "Yield" : "Process margin"}</button>`).join("");
+    t.querySelectorAll("button").forEach(b => b.onclick = () => { surObj = b.dataset.k; renderSur(); });
+    drawSur("sur-nrmse", "nrmse", true, null);
+    drawSur("sur-cov", "coverage", false, 0.95);
+    document.getElementById("sur-caption").innerHTML = Object.entries(SCOL).map(([n, c]) => `<span style="display:inline-flex;align-items:center;gap:6px;margin-right:16px"><i style="display:inline-block;width:14px;height:3px;border-radius:2px;background:${c}"></i>${n}</span>`).join("") +
+      `<br>Solid line, filled dots: whole box. Dashed line, open dots: near the optimum. Points show the median of ${D.surrogate[surObj].repeats} repeats; hover a point for its value.`;
+  }
+
+  function renderAll() { renderTabs(); drawChart(); renderTables(); }
+  renderAll(); renderSur();
+})();
+</script>

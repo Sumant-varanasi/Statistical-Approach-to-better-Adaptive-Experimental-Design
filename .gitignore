@@ -1,2 +1,5 @@
 __pycache__/
 results/
+demo_experiments.csv
+suggestions.csv
+bo/optima.json.tmp
