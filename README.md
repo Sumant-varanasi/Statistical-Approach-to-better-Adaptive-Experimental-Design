@@ -1,79 +1,97 @@
-# ACOD310 — Digital reactor twin + Bayesian optimisation
+# ACOD310 — Smart optimisation of a catalytic fixed-bed reactor
 
 Team: Sumant Varanasi & Parva Chaudhary. Supervisors: Prof. Rachit Khare, Prof. Rahul Singh.
-Project plan: see `gDoc-link`. Reactor model derivation: `digital-twin-fixed-bed-reactor.md`.
+Project plan: the Google Doc linked in `gDoc-link`. Reactor model: `digital-twin-fixed-bed-reactor.md`
+(Prof. Khare's formulation) and `smart-advisor-model.md` (what the advisor adds).
 
-The repo has two halves that are compared against each other:
+**What this is.** A digital twin of the Micromeritics gas-phase fixed-bed reactor, and a study of
+how to find its best operating point in as few experiments as possible. It grew in three stages:
+a packed-bed twin with a first Bayesian optimiser (v1), a properly benchmarked Bayesian-optimisation
+package (v2), and a **physics-informed advisor** that learns the reaction kinetics from the GC
+readings and tells an operator what to run next, in plain English, through a web page (v3/v4).
 
-| Half | What it does | Scripts |
-|---|---|---|
-| **Digital twin (simulation)** | Solves the packed-bed reactor equations for one experiment, and can be run thousands of times to brute-force the best operating point. | `reactor_twin.py`, `test_reactor_twin.py`, `sweeps.py`, `simulation_campaign.py` |
-| **Bayesian optimisation (BO)** | Treats the twin as an expensive black box and tries to find the best operating point in as few experiments as possible. | `bo_basic.py`, `bo_5knobs.py` |
-| **Comparison** | Overlays the two on one figure. | `compare.py` |
-| **Smart reactor advisor (V3)** | Physics-informed optimiser run the way the reactor is run: catalyst fixed, inert flow as a knob, step limits between runs. Learns the kinetics from GC readings and tells an operator what to run next, in plain English, in a web page or on the command line. Compared with a chemist's rules of thumb on the simple network and a complex one. | `reactor_ui.py` + `ui/`, `reactor_advisor.py`, `khare_demo.py`, `smart/`, `smart-advisor-model.md` |
+**Headline result** (simulated reactor, placeholder kinetics and prices, 10 campaigns of 25 runs):
+the advisor reaches 90 % of the best possible profit in a median of **9–10 runs**, against **21 or
+more** for an experienced chemist's rules of thumb and **more than 25** for black-box Bayesian
+optimisation (only 2 of its 20 campaigns got there at all), on both a simple and a complex reaction
+network, under the real operating protocol (catalyst loaded once, step limits between runs, five
+shared screening runs).
 
-> All kinetic parameters in `reactor_twin.py` are **placeholders**. Every number and
-> figure below will change once the real kinetics are agreed with Prof. Khare.
+> Every kinetic parameter, price and noise level in this repository is a **placeholder**. The
+> numbers and figures will change once the real kinetics and prices are agreed with Prof. Khare
+> and a real GC log is available.
 
 ---
 
-## V3. The smart reactor advisor (physics-informed, run the way the reactor is run)
-
-**The problem it solves.** Someone runs a small catalytic fixed-bed reactor (a lab, a pilot
-plant, a small chemicals business) and wants it to make more money. Every run costs a day,
-feed gas and reactor time, so they can afford perhaps 10–25 runs, and they do not know
-kinetics or machine learning. Today they tune by rules of thumb. The advisor takes the run
-log they already keep (set points + GC printout) and tells them, in plain English, what to
-run next, why, what profit to expect, where this is heading and whether another run is worth
-its cost.
-
-**It follows the real operating protocol** (`smart-advisor-model.md`):
-
-- the catalyst is loaded once; its mass and BET area are campaign settings, never a suggestion;
-- five knobs can change between runs: pressure, the flows of A, B **and the inert**, temperature;
-- no knob may change more than a set amount between consecutive runs (defaults 10 bar,
-  10 mL/min per flow, 30 K; `--max-step`), so every suggestion is viable;
-- the GC needs ≥ 10 mL/min of feed and ≥ 2 mL/min of inert (internal standard);
-- the bed is integrated over the **catalyst surface area** S = a_BET · W_cat with rates per m²,
-  so the learned kinetics are properties of the catalyst material and carry over to another
-  loading or batch.
+## 1. Quick start
 
 ```bash
-python reactor_ui.py                                   # the web interface: opens http://localhost:8765 (no extra packages)
-python reactor_advisor.py --demo                       # the same tool on the command line: 5 screening runs, then advice
-python reactor_advisor.py --demo --simulate-days 10    # watch it run the (virtual) reactor for 10 days
-python reactor_advisor.py my_reactor_log.csv --surface-area 120 --max-step temperature=20 --limit pressure=1:40
-python reactor_advisor.py my_reactor_log.csv --trial-cost 500 --hours 6000
-python khare_demo.py                                   # the full demo / evidence (~10 min first time, then cached)
-python test_smart.py                                   # 34 checks (~2 min)
+pip install -r requirements.txt        # numpy, scipy, matplotlib, scikit-learn
+python reactor_ui.py                   # the web interface: opens http://localhost:8765
+python khare_demo.py                   # the evidence: 4-part demo; first run ~10 min on 20 cores, ~1 h on 4, then cached
+python reactor_advisor.py --demo       # the same advisor on the command line (writes demo_log.csv)
 ```
 
-Log format (`my_reactor_log.csv`, rows in the order run): `pressure_bar, flow_A_mL_min,
-flow_B_mL_min, flow_I_mL_min, temperature_C, catalyst_g, gc_A, gc_B, gc_C, gc_D, [gc_E,] gc_I`
-(GC as mole fractions or %). Profit is computed from the GC reading via the internal standard.
+Run everything from inside the repo folder. Python 3.10+ (developed on 3.14, Windows 11).
+Outputs go to `figures/` (committed) and `results/` (git-ignored, regenerated by the scripts).
 
-### The web interface (`reactor_ui.py`)
+To check the installation:
 
-One page, for a chemist or operator who never opens a terminal. `python reactor_ui.py` starts a
-small server on your own machine (Python's own `http.server`, nothing is installed, nothing
-leaves the machine) and opens the page. Left: the campaign (chemistry, catalyst mass and BET
-area, largest change per run, safety ranges and fixed knobs, economics, prices). Main column:
+```bash
+python test_reactor_twin.py            # 11 checks, 1 s
+python test_reactor_ui.py              # 36 checks, ~1 min
+python test_smart.py                   # 34 checks, ~2 min
+python test_bo.py                      # 29 checks, ~5 min
+```
 
-| Card | What it does |
-|---|---|
-| **What to run next** | the five set points as tiles with the change from the last run, expected profit with a likely range, why this run; *where this is heading* (predicted best settings, how many runs away); *is another run worth it?* (in money when a cost per run is given); *if you must run the plant today*. Buttons: get advice, run it on the virtual reactor, simulate 5 days, download `next_run.csv`. |
-| **Your runs** | type a run (set points in °C, bar, mL/min; GC as % or fractions; catalyst mass per run), edit or delete rows, import / export the CSV log, load the 5 screening runs on the virtual reactor. Conversion, selectivity and profit are worked out from the GC. |
-| **What the model learned** | a card per reaction (activation energy with its likely range, how much faster per +10 °C), the plain-English notes, the Arrhenius plot with the uncertainty band, and every GC number against the model. On the virtual reactor the true chemistry is drawn too; on a real one it is not known and not shown. |
-| **Explore** | profit of every run with the model's estimate, and *what-if* charts: expected profit as each knob moves while the others stay at the next run, your best run or the predicted best, with the one-step reachable band shaded. |
+---
 
-Light and dark themes, keyboard-navigable, works on a phone. `python test_reactor_ui.py` runs
-26 checks of the campaign logic (validation, °C/K, GC in %, round trips, step limits, fixed knobs).
+## 2. The three stages
 
-### Why it is "smart": it knows the physics and learns only what it does not know
+| Stage | What it is | What it showed | Scripts |
+|---|---|---|---|
+| **v1 — twin + basic BO** | Packed-bed mole balances for A + B → C, A → D; a hand-written Gaussian-process optimiser with Expected Improvement over 5 knobs; brute-force comparison. | BO reached yield ≥ 0.99 in 17 experiments where random search needed 285 (one seed; over 10 seeds the gap is 22 vs ~104). Yield turned out to be too easy an objective: a broad plateau. | `reactor_twin.py`, `sweeps.py`, `bo_basic.py`, `bo_5knobs.py`, `simulation_campaign.py`, `compare.py` |
+| **v2 — BO package and benchmark** | `bo/`: fitted Matérn GP, four acquisition functions, batch mode, a neural-network surrogate, constrained BO, a harder profit objective, 20-seed benchmark with significance tests. | BO beats random, Latin-hypercube and Nelder–Mead (p < 0.001); constrained BO is essential when there is a product spec; ~25 % of plain-BO runs get stuck in a second optimum on the profit objective. | `bo/`, `run_benchmark.py`, `analyse_benchmark.py`, `surrogate_study.py`, `suggest_next.py`, `make_report.py` |
+| **v3/v4 — smart advisor + web UI** | `smart/`: the advisor knows the reactor physics, learns the kinetics from every GC reading, plans where the best profit is and walks there within the step limits a real reactor allows. A chemist's-rules baseline. A web page and a command-line tool for the operator. | Under the real protocol the advisor is 2–3× faster than a good chemist to 90 % of the best profit, and black-box BO cannot plan beyond one step. It still works with one reaction missing from its model. | `smart/`, `reactor_ui.py` + `ui/`, `reactor_advisor.py`, `khare_demo.py` |
 
-Plain BO (v1, v2) sees **one number per run** (profit) and learns the landscape from scratch,
-and under step limits it cannot see further than one step. The advisor sees the **full GC
-composition** and reasons with a reactor model:
+Sections 3–5 describe the advisor (the current work); sections 6–7 keep the v2 and v1 material,
+which still runs unchanged.
+
+---
+
+## 3. The smart reactor advisor
+
+### 3.1 The problem it solves
+
+Someone runs a small catalytic fixed-bed reactor (a lab, a pilot plant, a small chemicals business)
+and wants it to make more money. Every run costs a day, feed gas and reactor time, so they can
+afford perhaps 10–25 runs, and they do not know kinetics or machine learning. Today they tune by
+rules of thumb. The advisor takes the run log they already keep (set points + GC printout) and
+tells them what to run next, why, what profit to expect, where this is heading and whether another
+run is worth its cost.
+
+### 3.2 It follows the real operating protocol
+
+Details in `smart-advisor-model.md`.
+
+- The **catalyst is loaded once**; its mass and BET surface area are campaign settings, never a
+  suggestion (changing the bed means shutting down and repacking).
+- **Five knobs** can change between runs: pressure, the flows of A, B **and the inert**, and
+  temperature. The inert is a real knob: it dilutes the feed and lowers every partial pressure.
+- **Step limits.** No knob may change more than a set amount between consecutive runs (defaults
+  10 bar, 10 mL/min per flow, 30 K; configurable), so every suggestion is viable on the hardware.
+- The GC needs ≥ 10 mL/min of total feed and ≥ 2 mL/min of inert (the internal standard).
+- The bed is integrated over the **catalyst surface area** S = a_BET · W_cat with rates per m², so
+  the learned kinetics are properties of the catalyst material and carry over to another loading
+  or batch (checked: 0.5 g at 200 m²/g gives the same outlet as 1 g at 100 m²/g).
+- Every campaign starts with the **same 5 screening runs** an operator would do (a temperature
+  ladder, then pressure up, then more B); from run 6 on the method chooses.
+
+### 3.3 Why it is "smart": it knows the physics and learns only what it does not know
+
+Plain BO sees **one number per run** (profit) and learns the landscape from scratch; under step
+limits it cannot see further than one step. The advisor sees the **full GC composition** and
+reasons with a reactor model:
 
 | Built in (physics) | Learned from the runs |
 |---|---|
@@ -82,34 +100,35 @@ composition** and reasons with a reactor model:
 | equilibrium limit from thermodynamics (ΔH, ΔS) | a Gaussian-process correction for whatever the physics misses |
 | economics (prices) | |
 
-Each round: (1) fit the kinetics to all GC readings (Bayesian least squares, wide prior,
-`smart/kinetics.py`); (2) draw plausible versions of the chemistry; (3) **plan**: predict profit
-over the whole box and find where the model expects the best profit and how many runs away it
-is; (4) add the GP correction (noise floor from the GC error); (5) choose, among the runs
-reachable in one step, the one with the highest Expected Improvement, or, when nothing within
-reach beats the best run yet but the model is confident a better region exists, take the
-**purposeful step**: a full step on the bottleneck knob with the other knobs set to the best
-predicted values at that step.
+Each round: (1) fit the kinetics to all GC readings (Bayesian least squares with a wide prior,
+`smart/kinetics.py`), with their uncertainty; (2) draw plausible versions of the chemistry;
+(3) **plan**: predict profit over the whole box, find where the model expects the best profit and
+how many runs away it is; (4) add the GP correction (its noise floor comes from the GC error, so
+noise is never mistaken for chemistry); (5) choose, among the runs reachable in one step, the one
+with the highest Expected Improvement, or, when nothing within reach beats the best run yet but
+the model is confident a better region exists, take the **purposeful step**: a full step on the
+bottleneck knob with the other knobs set to the best predicted values at that step.
 
-The physics is **deliberately imperfect**: the virtual reactor has product inhibition and 1 %
-GC noise that the advisor's model does not contain. A stress test also removes a whole
-reaction from the advisor's model.
+The physics is **deliberately imperfect**: the virtual reactor used for testing has product
+inhibition and 1 % GC noise that the advisor's model does not contain, as any textbook model
+differs from a real reactor. A stress test also removes a whole reaction from the advisor's model.
 
-### Two chemistries
+### 3.4 Two chemistries
 
 | | Simple (the project's network) | Complex |
 |---|---|---|
 | reactions | A + B → C, A → D | A + B ⇌ C (reversible, exothermic), C + B → E (over-reaction), A → D (cracking) |
+| unknowns learned | 2 rate constants, 2 activation energies | 3 and 3 |
 | best possible profit at 1 g (placeholder prices) | 28.8 /h at 97 bar, 50/49/2 mL/min, 624 K | 22.4 /h at 43 bar, 50/49/2 mL/min, 529 K |
 | temperature window keeping ≥ 90 % of best profit | 72 K | 32 K |
 | share of the operating box that makes any profit | 5.5 % | 2.0 % |
 
-On the complex network everything competes: hotter is faster but the equilibrium and the
-cracking take product away; more B converts more A but the over-reaction eats the product;
-pressure helps the equilibrium but costs compression; inert dilutes everything. The
-profitable window is narrow (`figures/smart_1_operating_window.png`).
+On the complex network everything competes: hotter is faster but the equilibrium and the cracking
+take product away; more B converts more A but the over-reaction eats the product; pressure helps
+the equilibrium but costs compression; inert dilutes everything. The profitable window is narrow
+(`figures/smart_1_operating_window.png`).
 
-### Results
+### 3.5 Results
 
 From `python khare_demo.py`: 10 campaigns per method and chemistry, each from a different
 plausible base case, 25 runs each (five weeks at one run per day). All methods see the same
@@ -129,89 +148,171 @@ would recommend, as % of the best possible profit at that catalyst loading.
 | complex | Random walk | −20 % | −20 % | −20 % | > 25 (0/10) |
 | complex | Smart advisor, **C + B → E missing from its model** | 62 % | 95 % | 99 % | 12 (10/10) |
 
-- **A good chemist gets there too, given enough runs**: after 25 runs the rules of thumb
-  reach 96 % (simple) and 87 % (complex). After 25 runs smart and chemist are tied on the
-  simple reaction (5/10 paired campaigns, p = 0.92); on the complex one smart is still ahead
-  (9/10, p = 0.004).
-- **The advisor's value is speed.** It reaches 90 % of the best profit in a median of 9.5
-  runs (simple) and 9 runs (complex), against 21 and "not within 25" for the chemist. After
-  10 and 15 runs it beats the chemist in **10/10 paired campaigns** on both chemistries
-  (Wilcoxon p = 0.002). Each run saved is a day of reactor time, feed gas and operator time.
-- **Why it is faster**: it learns each reaction's temperature response from the screening
-  ladder alone (full GC composition, not one profit number), predicts where the best profit
-  is over the whole box, and walks there one allowed step at a time; the chemist probes a
-  knob or two per run; plain BO, which sees only profit, cannot plan beyond one step.
-- **Wrong network.** With the over-reaction removed from its model the advisor is slower
-  (62 % after 10, 95 % after 15) but still ends at 99 %: the GP correction learns the missing
-  product loss.
+- **A good chemist gets there too, given enough runs**: after 25 runs the rules of thumb reach
+  96 % (simple) and 87 % (complex). After 25 runs smart and chemist are tied on the simple
+  reaction (5/10 paired campaigns, p = 0.92); on the complex one smart is still ahead (9/10,
+  p = 0.004).
+- **The advisor's value is speed.** It reaches 90 % of the best profit in a median of 9.5 runs
+  (simple) and 9 runs (complex), against 21 and "not within 25" for the chemist. After 10 and 15
+  runs it beats the chemist in **10/10 paired campaigns** on both chemistries (Wilcoxon
+  p = 0.002). Each run saved is a day of reactor time, feed gas and operator time.
+- **Why it is faster**: it learns each reaction's temperature response from the screening ladder
+  alone (full GC composition, not one profit number), predicts where the best profit is over the
+  whole box, and walks there one allowed step at a time; the chemist probes a knob or two per run;
+  plain BO, which sees only profit, cannot plan beyond one step.
+- **Wrong network.** With the over-reaction removed from its model the advisor is slower (62 %
+  after 10, 95 % after 15) but still ends at 99 %: the GP correction learns the missing product loss.
 - **What it learned** (live run, complex, 15 runs, 517–625 K covered): the ordering of the
-  activation energies (side reactions higher than the main one) comes out right, which is
-  what decides the best temperature; the absolute values are biased high by ~30 kJ/mol
-  because the fit absorbs the product inhibition the model lacks. Recommended settings
-  within 2 % of the best possible.
-- **Operator view** (`reactor_advisor.py --demo --simulate-days 10`): screening runs made
-  1.2 /h at best; day 1 is a planned stepping stone, day 5 reaches the optimum (24.8 /h
-  measured, true 22.4), and on day 10 the tool says another run is not worth its cost.
+  activation energies (side reactions higher than the main one) comes out right, which is what
+  decides the best temperature; the absolute values are biased high by ~30 kJ/mol because the fit
+  absorbs the product inhibition the model lacks. Recommended settings within 2 % of the best
+  possible.
+- **Operator view** (`reactor_advisor.py --demo --simulate-days 10`): the screening runs made
+  1.2 /h at best; day 1 is a planned stepping stone, day 5 reaches the optimum (25.4 /h measured,
+  above the true best of 22.4 because of GC noise), and on day 10 the tool says the remaining gain
+  is under 2 % of the current profit, so another run is not worth it.
 
-Figures: `figures/smart_1_operating_window.png` (margin for error at 1 g),
-`smart_2_progress.png` (profit vs runs, shared screening band), `smart_3_runs_needed.png`,
-`smart_4_learned_chemistry.png` (learned vs true Arrhenius lines; GC parity).
-Tables: `results/smart_demo_summary.md` (git-ignored, rebuilt by the demo).
+Figures: `figures/smart_1_operating_window.png` (margin for error at 1 g), `smart_2_progress.png`
+(profit vs runs, shared screening band), `smart_3_runs_needed.png`, `smart_4_learned_chemistry.png`
+(learned vs true Arrhenius lines; GC parity). Tables: `results/smart_demo_summary.md` (rebuilt by
+the demo). The 90 campaigns take about 200 CPU-minutes in all: ~10 min of wall time on 20 cores,
+~50 min on 4, ~100 min on 2 (the benchmark uses `cpu_count − 2` processes; `--workers N` changes
+that, `--seeds 5` halves the work). They are cached in `results/smart_bench/`, one file per
+campaign and budget (git-ignored, so a fresh clone builds them once); the demo then reruns in
+under a minute. Delete `results/smart_bench/*/smart*.npz` after changing the advisor.
 
-### Files
+### 3.6 Baselines (all under the same step limits)
 
-| File | What it does |
-|---|---|
-| `reactor_ui.py`, `ui/` | the web interface (server + page); `test_reactor_ui.py` checks it |
-| `reactor_advisor.py` | the same tool on the command line: reads a run log, plain-English advice, step-limited suggestion, plan, `next_run.csv` |
-| `khare_demo.py` | the 4-part demo: operating windows, head-to-head benchmark, live run, bottom line |
-| `smart-advisor-model.md` | the model and protocol: surface-area coordinate, inert knob, constraints, economics, advisor, baselines |
-| `smart/systems.py` | both reaction networks; batch simulator (vectorised adaptive Rosenbrock solver, plus exact LSODA); knobs, step limits, screening runs |
-| `smart/kinetics.py` | kinetic parameter estimation from GC readings, with uncertainty (Laplace), per m² of catalyst |
-| `smart/advisor.py` | the advisor (plan + step-limited choice), the virtual reactor, the chemist / plain-BO / random-walk policies, true optima (`smart/optima.json`) |
-| `smart/benchmark.py` | resumable multi-seed benchmark (`results/smart_bench/`) |
-| `test_smart.py` | 34 checks: matches `reactor_twin.py`, surface-area invariance, solver accuracy, atom balances, equilibrium, GC→profit, kinetics recovery, step limits for every method, safety box, log format |
+- **Chemist's rules of thumb** (`ChemistPolicy`): read conversion and selectivity off the GC.
+  Selectivity poor → cooler with more pressure, then more B, then dilute; conversion poor → hotter
+  with more pressure, then less flow, then less inert; both fine → more throughput, then pressure,
+  then hotter. Repeat what worked, restart the rules from a new best, never repeat an experiment,
+  random allowed step when every rule has been tried.
+- **Plain BO**: v2's fitted GP (Matérn, one length-scale per knob, log P, rank output transform)
+  + Expected Improvement on the profit numbers only, candidates within the step box.
+- **Random walk**: a random allowed step each run.
 
-### Limits (honest list)
+### 3.7 Limits (honest list)
 
-- The advisor needs the **reaction network** (which reactions happen). The stress test shows
-  it still works when one reaction is missing, but slower; with a badly wrong network the GP
-  correction has to do the work and the advantage shrinks.
-- It wins partly because it **uses more information** (the whole GC composition, not one
-  profit number) and because it can **plan beyond one step**. Both are the point, but neither
-  is a like-for-like test of surrogates.
-- One suggestion takes ~5–10 s. Irrelevant next to a day-long run.
-- Kinetics, prices, GC noise, the inhibition and the step limits are placeholders. The next
-  step is to run it on real GC data from the Micromeritics reactor.
-- Suggestions only: every run still needs a safety check (`--limit` keeps suggestions inside
-  safe ranges, `--max-step` sets what the hardware allows).
+- The advisor needs the **reaction network** (which reactions happen). With one reaction missing
+  it still works, but more slowly; with a badly wrong network the GP correction has to do the
+  work and the advantage shrinks.
+- It wins partly because it **uses more information** (the whole GC composition, not one profit
+  number) and because it can **plan beyond one step**. Both are the point, but neither is a
+  like-for-like test of surrogates.
+- Under step limits the runs cover a narrow temperature range, so absolute activation energies are
+  poorly pinned down; their ordering, which sets the best temperature, is.
+- One suggestion takes 5–20 s (a few thousand reactor simulations). Irrelevant next to a day-long run.
+- Kinetics, prices, GC noise, the inhibition and the step limits are placeholders.
+- Suggestions only: every run still needs a safety check (safety ranges and fixed knobs keep
+  suggestions inside what is allowed; step limits set what the hardware allows).
 
 ---
 
-## 0. Version 2: upgraded Bayesian optimisation (branch `bo-upgrade`)
+## 4. Using the advisor
 
-Everything below section 0 describes the original (v1) scripts, which are unchanged and
-still run. Version 2 adds a reusable `bo/` package, a harder and more realistic objective,
-a 20-seed benchmark with statistics, a neural-network surrogate, constrained BO, and a
-next-experiment tool. Open `report/results.html` for the interactive results page.
+### 4.1 The web interface (`reactor_ui.py`)
 
-### 0.1 What changed and why
+```bash
+python reactor_ui.py                   # opens http://localhost:8765
+python reactor_ui.py --port 9000 --no-browser
+```
+
+One page for a chemist or operator who never opens a terminal. It starts a small server on your
+own machine (Python's own `http.server`; nothing is installed, nothing leaves the machine).
+
+| Part of the page | What it does |
+|---|---|
+| **Campaign** (left) | chemistry (the reactions written out), catalyst mass and BET area, largest change per run, safety ranges and fixed knobs, cost per run and operating hours, prices, the virtual-reactor seed. Settings are all-or-nothing: a rejected value changes nothing. |
+| **What to run next** | the five set points as tiles with the change from the last run, expected profit with a likely range, why this run; *where this is heading* (predicted best settings, how many runs away); *is another run worth it?* (in money when a cost per run is given); *if you must run the plant today*. Buttons: get advice, run it on the virtual reactor, simulate 5 days, download `next_run.csv`. |
+| **Your runs** | type a run (set points in °C, bar, mL/min; GC as % or fractions; catalyst mass per run), edit or delete rows, import / export the CSV log, load the 5 screening runs on the virtual reactor. Conversion, selectivity and profit are worked out from the GC with the inert as internal standard. |
+| **What the model learned** | a card per reaction (activation energy with its likely range, how much faster per +10 °C), the plain-English notes, the Arrhenius plot with the uncertainty band, every GC number against the model. On the virtual reactor the true chemistry is drawn too; on a real one it is not known and not shown. |
+| **Explore** | profit of every run with the model's estimate; *what-if* charts: expected profit as each knob moves while the others stay at the next run, your best run or the predicted best, with the one-step reachable band shaded. |
+
+Light and dark themes, keyboard-navigable, works on a phone. The server keeps the fitted model
+between calls (a refit after one more run takes a few seconds), restores the advice when the page
+is reloaded, runs one fit at a time, and discards a fit if the runs change while it is computing.
+The campaign lives in memory: **export the CSV before stopping the server** and import it next
+time. The server does not reload its own code; restart it after editing `reactor_ui.py`.
+
+### 4.2 The command-line tool (`reactor_advisor.py`)
+
+```bash
+python reactor_advisor.py --demo                                      # 5 screening runs on the virtual reactor -> demo_log.csv, then advice
+python reactor_advisor.py --demo --simulate-days 10                   # watch it run the virtual reactor for 10 days (demo_log.csv grows)
+python reactor_advisor.py my_reactor_log.csv                          # advise on your own log
+python reactor_advisor.py my_reactor_log.csv --system simple --surface-area 120
+python reactor_advisor.py my_reactor_log.csv --limit temperature=200:300 --fix flow_I=10
+python reactor_advisor.py my_reactor_log.csv --max-step temperature=20 --max-step pressure=5
+python reactor_advisor.py my_reactor_log.csv --trial-cost 500 --hours 6000
+```
+
+It prints how each run went, what it learned about the chemistry in plain words, the next run
+(one allowed step from the last), where this is heading, whether another run is worth it, and the
+best proven settings, and writes `next_run.csv`. `--demo` writes its example runs to `demo_log.csv`
+(or to the log named on the command line, overwriting it), never to `my_reactor_log.csv`.
+
+**Log format** (`my_reactor_log.csv`, one row per run in the order they were run; GC as mole
+fractions or %):
+
+```
+pressure_bar, flow_A_mL_min, flow_B_mL_min, flow_I_mL_min, temperature_C, catalyst_g, gc_A, gc_B, gc_C, gc_D, [gc_E,] gc_I
+```
+
+The same file is what the web page imports and exports.
+
+### 4.3 The demo for the supervisors (`khare_demo.py`)
+
+Four parts, printing as it goes and saving one figure per part: (1) the two chemistries and how
+much room for error each leaves; (2) the head-to-head benchmark; (3) a live campaign on the
+complex reactor where the advisor explains every choice, then what it learned; (4) the bottom
+line in money and runs. Options: `--seeds 5` (quicker), `--workers N` (benchmark processes, default
+`cpu_count − 2`), `--budget 30` (longer campaigns; cached separately from the 25-run ones),
+`--skip-live`.
+
+---
+
+## 5. How the advisor is built (`smart/`)
+
+| File | What it does |
+|---|---|
+| `smart/systems.py` | both reaction networks (true kinetics for the virtual reactor and a chemist's guess for the advisor); the batch reactor simulator: a vectorised adaptive Rosenbrock solver (ROS2, L-stable, each experiment with its own step size; ~10× faster than LSODA for thousands of experiments, within 2·10⁻³ of it) plus the exact LSODA solver for the virtual reactor; surface-area coordinate; knobs, box, step limits, screening runs; economics |
+| `smart/kinetics.py` | kinetic parameter estimation from GC readings: Bayesian least squares (wide prior around the guess), Laplace uncertainty inflated when the physics fits worse than the GC noise explains; the experiments and their perturbed copies share integration steps so the derivatives are smooth |
+| `smart/advisor.py` | the advisor (`SmartAdvisor`: fit, plan, step-limited choice, purposeful step), the virtual reactor with inhibition and GC noise, profit and KPIs from a GC reading, the chemist / plain-BO / random-walk policies, campaigns, true optima for scoring (`smart/optima.json`) |
+| `smart/benchmark.py` | resumable multi-seed benchmark, one `.npz` per campaign in `results/smart_bench/` |
+| `smart-advisor-model.md` | the model and protocol in equations: surface-area coordinate, inert knob, constraints, economics, the advisor's loop, the baselines |
+
+The advisor reuses `bo/gp.py` (the fitted Matérn GP) for its correction term and `bo/loop.py`'s
+log-input wrapper and rank transform for the plain-BO baseline.
+
+---
+
+## 6. Version 2: the Bayesian-optimisation package (`bo/`)
+
+Everything the project plan asked of the black-box optimiser: a reusable package, a harder
+objective, a 20-seed benchmark with statistics, a neural-network surrogate, constrained BO and a
+next-experiment tool. `report/results.html` is the interactive results page.
+
+### 6.1 What changed from v1 and why
 
 | Change | Why |
 |---|---|
 | **Fitted GP** (`bo/gp.py`): Matérn-5/2 kernel, one length-scale per knob, fitted noise, all chosen by maximising the marginal likelihood (analytic gradients, restarts) | v1 fixed one length-scale at 0.3 by hand and assumed no noise. The fitted GP learns which knobs matter. Checked against scikit-learn: identical predictions for the same settings. |
-| **Rank output transform** (`copula_transform` in `bo/loop.py`) | Margin values run from about −150 to +29. Without the transform the GP spends its accuracy on the huge-loss region. With it, median regret drops 46× on yield (significant). |
+| **Rank output transform** (`copula_transform` in `bo/loop.py`) | Margin values run from about −150 to +29. Without the transform the GP spends its accuracy on the huge-loss region. With it, median regret drops ~55× on yield (0.0092 → 0.00017, significant). |
 | **Better acquisition maximisation** (`bo/acquisition.py`) | Sobol candidates plus points near the best experiments, then L-BFGS-B polishing. v1 only scored 5,000 random points. |
 | **Four acquisition functions**: EI, UCB (GP-UCB schedule), PI, Thompson sampling | The plan requires at least two. |
 | **Batch mode** (kriging believer, 4 experiments per round) | For running several experiments in parallel. |
 | **NN surrogate** (`bo/nn.py`): deep ensemble of 5 small networks, bootstrap resampling | The plan's GP-vs-NN comparison. Uncertainty = disagreement between networks. |
 | **Constrained BO** (`cgp_ei`): second GP on the selectivity spec, score = EI × P(meets spec) | Real plants have product specs. |
 | **Log-scaled model inputs** (`LogInputs`): the GP sees P and W_cat on a log scale | Both span 100× ranges; fixes some runs that got stuck at near-zero catalyst. |
-| **New objective "margin"** (`bo/problem.py`) | The yield objective is too easy (broad plateau), so random search keeps up. See 0.2. |
+| **New objective "margin"** (`bo/problem.py`) | The yield objective is too easy (broad plateau), so random search keeps up. See 6.2. |
 | **Measurement noise option** | Imitates GC error; BO then recommends the point with the best *predicted* value, not the luckiest reading. |
 | **Baselines**: random search, Latin hypercube, Nelder-Mead simplex, and v1 BO itself | The plan asks for conventional baselines. |
 
-### 0.2 The two objectives
+### 6.2 The two objectives
+
+In v2 the knobs are P, V_A, V_B, T and W_cat (the inert fixed at 10 mL/min; catalyst mass is a
+knob here because the twin is free to vary it; the advisor in section 3 fixes it).
 
 | Objective | Formula | Difficulty | True optimum (P, V_A, V_B, T, W_cat) |
 |---|---|---|---|
@@ -219,28 +320,27 @@ next-experiment tool. Open `report/results.html` for the interactive results pag
 | `margin` | 1.0·C made − 0.20·(A + B fed) − 0.03·feed·ln P − 3.0·W_cat, flows in mmol/h | hard: ~90 % of the box loses money | 29.34 at 100 bar, 50, 49.3 mL/min, 589 K, 0.76 g |
 | `margin` + spec S_C ≥ 0.97 | same, only in-spec points count | hard, constrained | 26.82 at 100 bar, 50, 50 mL/min, 547 K, 1.58 g |
 
-**Prices are placeholders.** Replace `PRICES` in `bo/problem.py` with agreed values. True
-optima are found by differential evolution and cached in `bo/optima.json`.
+**Prices are placeholders.** Replace `PRICES` in `bo/problem.py` with agreed values. True optima
+are found by differential evolution and cached in `bo/optima.json`.
 
-### 0.3 How to run
+### 6.3 How to run
 
 ```bash
-pip install -r requirements.txt
 python test_bo.py              # 29 checks of the BO package (~5 min)
 python run_benchmark.py        # 4 settings x up to 14 strategies x 20 seeds, resumable (~1.5 h on 2 cores)
 python analyse_benchmark.py    # tables, significance tests, figures/bench_*.png
 python surrogate_study.py      # GP vs NN prediction accuracy (~15 min)
 python demo_bo_1d.py           # teaching figure: BO step by step on temperature
 python make_report.py          # rebuilds report/results.html from the results
-python suggest_next.py --demo  # next-experiment tool (see 0.6)
+python suggest_next.py --demo  # next-experiment tool (see 6.6)
 ```
 `run_benchmark.py --seeds 5 --settings margin` for a quick run. Results go in `results/`
 (git-ignored); figures in `figures/`.
 
-**Regret**, used everywhere: how far the point a method would recommend is from the true
+**Regret**, used everywhere in v2: how far the point a method would recommend is from the true
 optimum, scaled so 0 = optimum and 1 = a typical random point.
 
-### 0.4 Results (20 seeds, 50 experiments each, placeholder kinetics and prices)
+### 6.4 Results (20 seeds, 50 experiments each, placeholder kinetics and prices)
 
 Median final regret (lower is better), with the share of seeds that got within 1 % of the optimum:
 
@@ -260,72 +360,65 @@ Median final regret (lower is better), with the share of seeds that got within 1
 | Nelder-Mead simplex | 0.0306 (0 %) | 0.2212 (0 %) | 0.3188 (0 %) | – |
 
 Full tables with spread, timing and Holm-corrected tests: `results/analysis.txt`,
-`results/bench_summary.csv`, `results/bench_tests.csv`.
+`results/bench_summary.csv`, `results/bench_tests.csv` (regenerated by `analyse_benchmark.py`).
 
 What holds up statistically (Holm-corrected, vs GP + EI):
 
 - **BO beats every conventional baseline** on the yield, margin and noisy-margin settings
-  (p < 0.001, A12 ≥ 0.90). With the selectivity spec, only constrained BO does (see below). On the
-  margin problem random search ends a median 16.8 money units/h below the best profit;
-  GP + EI ends 0.64 below it.
-- **The upgrade beats our original BO on yield** (46× lower median, p < 0.001). On the margin
-  problems the median is 2–5× lower but **not significant**: about a quarter of GP + EI runs
-  get stuck in a second local optimum (almost no catalyst, ~675 K), while v1 is consistently
-  mediocre (0 % of runs within 1 %).
+  (p < 0.001, A12 ≥ 0.90). With the selectivity spec, only constrained BO does. On the margin
+  problem random search ends a median 16.8 money units/h below the best profit; GP + EI ends
+  0.64 below it.
+- **The upgrade beats the original BO on yield** (46× lower median, p < 0.001). On the margin
+  problems the median is 2–5× lower but **not significant**: about a quarter of GP + EI runs get
+  stuck in a second local optimum (almost no catalyst, ~675 K), while v1 is consistently mediocre.
 - **Constrained BO is essential when there is a spec**: 0.041 vs 0.711 (p < 0.001). Plain BO
-  spends its budget on out-of-spec points (only ~4 % of its experiments met the spec in a
-  check run, vs ~74 % for constrained BO).
-- **EI is the best acquisition function here**, significantly better than PI. Its edge over
-  UCB and Thompson sampling is not significant.
-- **Batch of 4 costs accuracy**: significantly worse than one-at-a-time on yield and margin,
-  in exchange for a quarter of the rounds.
-- **The rank output transform matters on yield** (p < 0.001); on margin it is 8× better in
-  the median but not significant.
-- **GP vs NN**: as BO surrogates they tie on the margin problems; on yield GP + EI is
-  slightly but significantly better (p = 0.03). The NN is 4–5× slower. As pure predictors (`surrogate_study.py`) the NN ensemble is as accurate as the
-  fitted GP over the whole box and more accurate near the optimum, with better-calibrated
-  intervals there. Prediction accuracy alone does not decide which surrogate optimises best.
+  spends its budget on out-of-spec points (only ~4 % of its experiments met the spec in a check
+  run, vs ~74 % for constrained BO).
+- **EI is the best acquisition function here**, significantly better than PI. Its edge over UCB
+  and Thompson sampling is not significant.
+- **Batch of 4 costs accuracy**: significantly worse than one-at-a-time on yield and margin, in
+  exchange for a quarter of the rounds.
+- **The rank output transform matters on yield** (p < 0.001); on margin it is 8× better in the
+  median but not significant.
+- **GP vs NN**: as BO surrogates they tie on the margin problems; on yield GP + EI is slightly but
+  significantly better (p = 0.047 Holm-corrected, 0.009 uncorrected; A12 = 0.78). The NN is 4–5× slower. As pure predictors (`surrogate_study.py`)
+  the NN ensemble is as accurate as the fitted GP over the whole box and more accurate near the
+  optimum, with better-calibrated intervals there.
 - Nelder-Mead starts from the centre of the box, so it is identical for every seed on the
   noise-free problems.
 
-### 0.5 Files added in v2
+### 6.5 Files
 
 | File | What it does |
 |---|---|
 | `bo/gp.py` | GP with fitted hyper-parameters, posterior sampling, fantasy conditioning |
 | `bo/acquisition.py` | EI, PI, UCB, Thompson, constrained EI, and the acquisition maximiser |
-| `bo/nn.py` | deep-ensemble NN surrogate |
+| `bo/nn.py` | deep-ensemble NN surrogate (needs scikit-learn) |
 | `bo/loop.py` | every strategy, the BO loop, output transform, log-input wrapper |
 | `bo/problem.py` | objectives, noise, product spec, true optima (`bo/optima.json`) |
 | `test_bo.py` | 29 checks: gradients, match with scikit-learn, ARD, sampling, every strategy runs |
-| `run_benchmark.py`, `analyse_benchmark.py` | multi-seed benchmark and its statistics/figures |
-| `surrogate_study.py` | GP vs NN prediction accuracy and calibration |
+| `run_benchmark.py`, `analyse_benchmark.py` | multi-seed benchmark and its statistics/figures (`figures/bench_*.png`) |
+| `surrogate_study.py` | GP vs NN prediction accuracy and calibration (`figures/surrogate_study.png`) |
 | `demo_bo_1d.py` | `figures/bo_1d_steps.png`, BO explained one step at a time |
 | `suggest_next.py` | next-experiment recommender for a CSV of real or simulated experiments |
 | `make_report.py`, `report/template.html` | builds `report/results.html` |
 
-### 0.6 Next-experiment tool
+### 6.6 Next-experiment tool (v2, black-box)
 
 ```bash
 python suggest_next.py experiments.csv --y Y_C --batch 4         # columns: P, V_A, V_B, T, Wcat, Y_C
 python suggest_next.py experiments.csv --y Y_C --fix T=600       # hold a knob fixed
 ```
 It prints which knobs the result is most sensitive to, the best experiment so far, and the
-suggested batch with predicted value and 95 % range, and writes `suggestions.csv`.
-Suggestions only: any physical experiment still needs expert review, a safety check and
-supervisor approval.
+suggested batch with predicted value and 95 % range, and writes `suggestions.csv`. The advisor
+in section 4 supersedes it for the reactor (it uses the GC composition and the step limits); this
+one stays as the black-box version for any single-objective CSV.
 
 ---
 
----
+## 7. Version 1: the digital twin and the first optimiser
 
-## 1. How to run
-
-```bash
-pip install -r requirements.txt
-```
-
-Run from inside the repo folder, in this order (each step is independent of the ones after it):
+### 7.1 How to run
 
 | Step | Command | Time | Produces |
 |---|---|---|---|
@@ -337,14 +430,12 @@ Run from inside the repo folder, in this order (each step is independent of the 
 | 6 | `python compare.py` | 1 s | `figures/overlay_bo_vs_simulation.png`, `figures/evaluations_to_target.png` + summary table |
 
 Options: `python simulation_campaign.py --n 5000` for a quicker campaign, `--seed 2` for a
-different random draw, `--grid 20` for coarser heat maps. Step 5 reads step 4's CSV so it
-can mark the BO best on the heat maps; step 6 needs both CSVs.
+different random draw, `--grid 20` for coarser heat maps. Step 5 reads step 4's CSV so it can
+mark the BO best on the heat maps; step 6 needs both CSVs.
 
----
+### 7.2 Symbols used everywhere
 
-## 2. Symbols used everywhere
-
-### Species and reactions
+**Species and reactions**
 
 | Symbol | Meaning |
 |---|---|
@@ -352,21 +443,21 @@ can mark the BO best on the heat maps; step 6 needs both CSVs.
 | C | desired product, A + B → C (reaction 1) |
 | D | unwanted by-product, A → D (reaction 2, side reaction) |
 | I | inert gas (dilutes the feed, does not react) |
-| r₁, r₂ | rate of reaction 1 and 2, mol per gram of catalyst per second |
+| r₁, r₂ | rate of reaction 1 and 2, mol per gram of catalyst per second (per m² of catalyst in `smart/`) |
 | ν (`NU`) | stoichiometric matrix: how many moles of each species each reaction makes (+) or consumes (−) |
 
-### Inputs to one experiment (the 5 "knobs" plus the inert)
+**Inputs to one experiment**
 
 | Code name | Symbol | Units | Allowed range | Meaning |
 |---|---|---|---|---|
-| `V_A` | V̇ₐ | mL/min (standard) | 0–50 (BO uses 1–50) | MFC flow of reactant A |
-| `V_B` | V̇ʙ | mL/min | 0–50 (BO uses 1–50) | MFC flow of reactant B |
-| `V_I` | V̇ɪ | mL/min | 0–50 (fixed at 10 in BO) | MFC flow of inert |
-| `Wcat` | W_cat | g | 0–5 (BO uses 0.05–5) | catalyst mass in the bed |
-| `T` | T | K | 298–1073 (BO uses 450–850) | reactor temperature (isothermal) |
+| `V_A` | V̇ₐ | mL/min (standard) | 0–50 (optimisers use 1–50) | MFC flow of reactant A |
+| `V_B` | V̇ʙ | mL/min | 0–50 (optimisers use 1–50) | MFC flow of reactant B |
+| `V_I` | V̇ɪ | mL/min | 0–50 (fixed at 10 in v1/v2; a knob, 2–50, in the advisor) | MFC flow of inert |
+| `Wcat` | W_cat | g | 0–5 (v1/v2 use 0.05–5; a fixed campaign setting in the advisor) | catalyst mass in the bed |
+| `T` | T | K | 298–1073 (optimisers use 450–850) | reactor temperature (isothermal) |
 | `P` | P | bar | 1–100 | reactor pressure (set by the back-pressure regulator) |
 
-### Internal quantities
+**Internal quantities**
 
 | Code name | Symbol | Meaning |
 |---|---|---|
@@ -377,22 +468,20 @@ can mark the BO best on the heat maps; step 6 needs both CSVs.
 | `W` | W | catalyst mass coordinate, 0 at inlet → W_cat at outlet |
 | `k1_ref`, `k2_ref` | k_ref | rate constants at the reference temperature `T_REF` = 573.15 K |
 | `Ea1`, `Ea2` | E_a | activation energies, J/mol (Ea2 > Ea1 so the side reaction wins at high T) |
-| `theta` | θ | the four kinetic parameters together: [k₁,ref, E_a1, k₂,ref, E_a2] |
+| `theta` | θ | the kinetic parameters together: [k₁,ref, E_a1, k₂,ref, E_a2] |
 | `R` | R | gas constant 8.314 J/(mol·K) |
 | `P_STD`, `T_STD` | | MFC reference conditions (1 atm, 273.15 K) used to convert mL/min → mol/s |
 
-### Outputs of one experiment
+**Outputs of one experiment**
 
 | Code name | Symbol | Formula | Meaning |
 |---|---|---|---|
 | `X_A` | X_A | (F_A,0 − F_A,out) / F_A,0 | conversion: fraction of A that reacted |
 | `S_C` | S_C | F_C,out / (F_C,out + F_D,out) | selectivity: fraction of product that is the one we want |
-| `Y_C` | Y_C | F_C,out / F_A,0 = X_A · S_C | **yield of C — the objective every optimiser maximises** |
+| `Y_C` | Y_C | F_C,out / F_A,0 = X_A · S_C | yield of C: the v1 objective |
 | `V_out_actual_mL_min` | V̇_out | F_T,out R T / P | actual outlet volumetric flow at reactor T and P |
 
----
-
-## 3. `reactor_twin.py` — the digital twin
+### 7.3 `reactor_twin.py` — the digital twin
 
 Solves the five packed-bed mole balances dF_i/dW = Σ_j ν_ij r_j from W = 0 to W = W_cat
 (sections 5–13 of the model document). Isothermal, isobaric, ideal gas, no pressure drop.
@@ -406,21 +495,20 @@ Solves the five packed-bed mole balances dF_i/dW = Σ_j ν_ij r_j from W = 0 to 
 | `_check_inputs(...)` | raises `ValueError` if any input is outside `LIMITS` or V_A ≤ 0 |
 | `simulate(V_A, V_B, V_I, Wcat, T, P, theta=None, return_profile=False)` | **one experiment.** Builds the inlet vector, integrates with `scipy.integrate.solve_ivp` (LSODA, handles stiffness), returns a dict with `F0`, `F_out`, `FT_0`, `FT_out`, `y_out`, `X_A`, `S_C`, `Y_C`, `V_out_actual_mL_min`. With `return_profile=True` it also returns the solver object so you can evaluate F(W) anywhere in the bed. |
 
-Module constants: `LIMITS` (allowed input ranges), `DEFAULT_THETA` (placeholder kinetics),
-`NU` (stoichiometry), `SPECIES` (name order A, B, C, D, I).
+Module constants: `LIMITS` (allowed input ranges), `DEFAULT_THETA` (placeholder kinetics), `NU`
+(stoichiometry), `SPECIES` (name order A, B, C, D, I). One simulation costs about 1 ms, so
+"expensive experiment" is a simulation of the real situation, not a property of this code.
+`smart/systems.py` reproduces this twin to 10⁻⁹ for the simple network (checked in `test_smart.py`).
 
-One simulation costs about 1 ms, so "expensive experiment" is a simulation of the real
-situation, not a property of this code.
+### 7.4 `test_reactor_twin.py` — validation
 
-## 4. `test_reactor_twin.py` — validation
+Runs 11 checks and prints PASS/FAIL. Atom balances (all A ends up as A, C or D; all B as B or
+C), inert unchanged, mole fractions sum to 1, Y_C = X_A · S_C, total flow drops by exactly the C
+formed, zero catalyst → zero conversion, conversion rises with catalyst, an exact analytical
+solution when reaction 1 is switched off (F_A = F_A,0 · exp(−k₂ P W / F_T,0)), and the input-range
+guard.
 
-Runs 11 checks and prints PASS/FAIL. Atom balances (all A ends up as A, C or D; all B as
-B or C), inert unchanged, mole fractions sum to 1, Y_C = X_A · S_C, total flow drops by
-exactly the C formed, zero catalyst → zero conversion, conversion rises with catalyst, an
-exact analytical solution when reaction 1 is switched off (F_A = F_A,0 · exp(−k₂ P W / F_T,0)),
-and the input-range guard.
-
-## 5. `sweeps.py` — single-knob sweeps of the twin
+### 7.5 `sweeps.py` — single-knob sweeps of the twin
 
 Base case: P = 10 bar, V_A = V_B = 20, V_I = 10 mL/min, T = 600 K, W_cat = 1 g.
 
@@ -431,26 +519,21 @@ Base case: P = 10 bar, V_A = V_B = 20, V_I = 10 mL/min, T = 600 K, W_cat = 1 g.
 | `3_yield_map_T_W.png` | heat map of Y_C over T and W_cat, best grid point starred |
 | `4_pressure_sweep.png` | X_A, S_C, Y_C vs P |
 
-Also prints the mean time per simulation.
+### 7.6 Bayesian optimisation — the idea in one paragraph
 
----
-
-## 6. Bayesian optimisation — the idea in one paragraph
-
-We have a function f(x) = Y_C(x) that is expensive to evaluate (a real experiment). BO
-keeps a **Gaussian process (GP)** surrogate: given the experiments done so far it predicts,
-for any untested x, a mean yield **μ(x)** and an uncertainty **σ(x)**. An **acquisition
-function** turns (μ, σ) into "how worthwhile is testing x next"; we use **Expected
-Improvement (EI)**, which rewards points that are either predicted to be good (high μ) or
-uncertain (high σ). The point with the highest EI is run on the twin, the GP is updated,
-and the loop repeats.
+We have a function f(x) = Y_C(x) that is expensive to evaluate (a real experiment). BO keeps a
+**Gaussian process (GP)** surrogate: given the experiments done so far it predicts, for any
+untested x, a mean yield **μ(x)** and an uncertainty **σ(x)**. An **acquisition function** turns
+(μ, σ) into "how worthwhile is testing x next"; v1 uses **Expected Improvement (EI)**, which
+rewards points that are either predicted to be good (high μ) or uncertain (high σ). The point with
+the highest EI is run on the twin, the GP is updated, and the loop repeats.
 
 | Symbol in code | Meaning |
 |---|---|
 | `X` | experiments done so far, each knob scaled to 0–1 |
 | `Y` | measured yields of those experiments; `Ys` = Y standardised to mean 0, std 1 |
 | `kernel(a, b)`, `k`, `K` | RBF kernel k(a,b) = exp(−‖a−b‖² / 2ℓ²); `K` = kernel between done experiments, `k` = kernel between done experiments and candidates |
-| `length` / `LENGTH` (ℓ) | length-scale: how far (in scaled units) two points can be and still have similar yields. Fixed by hand, not fitted (yet) |
+| `length` / `LENGTH` (ℓ) | length-scale: how far (in scaled units) two points can be and still have similar yields. Fixed by hand in v1, fitted in v2 |
 | `JITTER` | 1e-6 added to K's diagonal so the linear solve is numerically stable |
 | `mu` (μ) | GP predicted yield at each candidate = kᵀ K⁻¹ Ys |
 | `sigma` (σ) | GP predicted uncertainty = √(1 − kᵀ K⁻¹ k) |
@@ -459,15 +542,12 @@ and the loop repeats.
 | `cand` / `grid` | candidate points that EI is evaluated at (a 500-point grid in 1-D, 5000 random points in 5-D) |
 | `x_next`, `y_next` | the candidate with the highest EI and the yield the twin returns for it |
 
-### `bo_basic.py` — 1 knob (temperature only)
+**`bo_basic.py` — 1 knob (temperature only).** The simplest possible BO, kept as the teaching
+version. Everything else is fixed at the base case. Starts from 3 experiments, runs 10 BO
+iterations, then checks against a 500-point brute-force sweep. It keeps re-sampling the optimum
+once converged (runs 11–13 land on the same T); a stop rule on EI is the fix.
 
-The simplest possible BO, kept as the teaching version. Everything else is fixed at the
-base case. Starts from 3 experiments, runs 10 BO iterations, then checks against a
-500-point brute-force sweep. `f(T)` is the black box, `kernel` the RBF, and the loop
-body computes μ, σ, EI and picks the next T. Note it keeps re-sampling the optimum once
-converged (runs 11–13 land on the same T); a stop rule on EI is the fix.
-
-### `bo_5knobs.py` — all 5 knobs
+**`bo_5knobs.py` — all 5 knobs.**
 
 | Function | What it does |
 |---|---|
@@ -479,19 +559,16 @@ converged (runs 11–13 land on the same T); a stop rule on EI is the fix.
 | `run_bo(n_init, n_iter, n_cand, length, seed)` | the loop: `N_INIT` = 10 random experiments, then `N_ITER` = 40 BO-chosen ones. Returns the full history |
 | `save_history(X, Y, n_init, path)` | writes `results/bo_history.csv` (run, phase, 5 knobs, Y_C, best_so_far) |
 | `plot_progress(X, Y, n_init, path)` | draws `figures/bo_progress.png` |
-| `main()` | runs everything and prints the best point |
 
-Settings at the top of the file: `N_INIT`, `N_ITER`, `N_CAND`, `LENGTH`, `JITTER`, `SEED`.
-The random seed is fixed so results are reproducible.
+Settings at the top of the file: `N_INIT`, `N_ITER`, `N_CAND`, `LENGTH`, `JITTER`, `SEED`. The
+random seed is fixed so results are reproducible.
 
----
+### 7.7 `simulation_campaign.py` — brute force on the twin
 
-## 7. `simulation_campaign.py` — brute force on the twin
-
-The "just simulate a lot" side of the comparison. Draws `--n` random points (default
-20,000) uniformly from the same 5-knob box as BO, simulates all of them, and keeps the
-best. Imports the problem definition (`LOW`, `HIGH`, `f`, `unscale`) from `bo_5knobs.py`
-so both halves are guaranteed to search the same space.
+The "just simulate a lot" side of the comparison. Draws `--n` random points (default 20,000)
+uniformly from the same 5-knob box as BO, simulates all of them, and keeps the best. Imports the
+problem definition (`LOW`, `HIGH`, `f`, `unscale`) from `bo_5knobs.py` so both halves search the
+same space.
 
 | Function | What it does |
 |---|---|
@@ -500,12 +577,11 @@ so both halves are guaranteed to search the same space.
 | `load_bo_best()` | reads the BO CSV (if present) to mark BO's best point on the heat maps |
 | `plot_progress(Y, path)` | `figures/simulation_progress.png`: best-so-far vs number of simulations, log x-axis |
 | `yield_maps(x_ref, marks, grid, path)` | `figures/twin_5param_maps.png`: 5×5 "corner" figure. Diagonal = Y_C vs one knob; below the diagonal = heat map of Y_C over a pair of knobs. In every panel the knobs not shown are held at `x_ref` (the best simulated point). Orange star = brute-force best, blue circle = BO best |
-| `unscale_axis(i, v)` | helper for axis labels in physical units |
 | `sensitivity_oat(base, n)` | one-at-a-time swing: sweep each knob alone across its range at the base case; swing = max Y_C − min Y_C |
 | `sensitivity_global(X, Y, bins)` | first-order Sobol-style index from the random campaign: bin each knob, take the mean yield per bin, variance of those means ÷ total variance = share of yield variance that knob explains on its own |
-| `plot_sensitivity(swing, s_glob, path)` | `figures/sensitivity_bar.png` (reference only, not part of the comparison) |
+| `plot_sensitivity(swing, s_glob, path)` | `figures/sensitivity_bar.png` (reference only) |
 
-## 8. `compare.py` — the overlay
+### 7.8 `compare.py` — the overlay
 
 | Function | What it does |
 |---|---|
@@ -513,69 +589,79 @@ so both halves are guaranteed to search the same space.
 | `evaluations_to_target(best, target)` | first run at which best-so-far ≥ target (None if never) |
 | `plot_overlay(bo, sim, path)` | `figures/overlay_bo_vs_simulation.png`: both best-so-far curves on one log-x axis, with annotations for BO's best, random search at the same 50-run budget, and the brute-force best |
 | `plot_targets(bo, sim, path)` | `figures/evaluations_to_target.png`: bars of how many evaluations each method needed to first reach Y_C ≥ 0.90, 0.95, 0.98, 0.99 |
-| `main()` | draws both and prints the summary table and the best operating point of each method |
 
----
+How to read the v1 figures: `bo_progress.png` (top: yield of each experiment and the best so far,
+shaded = the 10 random starting experiments; bottom: the knob settings BO picked at each step),
+`simulation_progress.png` (best-so-far for brute force, log x-axis, dotted line = BO's 50-run
+budget), `overlay_bo_vs_simulation.png` (both curves together), `evaluations_to_target.png` (bars
+per target yield), `twin_5param_maps.png` (the yield landscape around the optimum; BO's point
+sits in the same high-yield region as the brute-force point), `sensitivity_bar.png` (which knobs
+matter: swing at the base case, share of variance over the box).
 
-## 9. How to read the figures
-
-- **`bo_progress.png`** — top: dot = yield of each experiment, line = best so far, shaded = the 10 random starting experiments. Bottom: the knob settings BO picked at each step (dark = near the upper bound). You can see BO settle on high P, low V_A, high V_B, moderate T.
-- **`simulation_progress.png`** — same best-so-far idea for brute force; the x-axis is log so 50 and 20,000 fit on one plot. The dotted line marks the 50-run budget BO used.
-- **`overlay_bo_vs_simulation.png`** — the two curves together. The point of the project in one picture: how many evaluations each approach needs to get to a given yield.
-- **`evaluations_to_target.png`** — the same information as a bar chart per target yield.
-- **`twin_5param_maps.png`** — what the yield landscape looks like around the optimum across all five knobs, and that the BO point (circle) sits in the same high-yield region as the brute-force point (star).
-- **`sensitivity_bar.png`** — which knobs matter. Left: swing at the base case. Right: share of variance over the whole box. Reference only.
-
-## 10. Current results (placeholder kinetics, seed 0 for BO, seed 1 for simulation)
-
-> **Superseded by section 0.4.** These are single-seed numbers. Over 10 seeds the
-> "17 vs 285 evaluations to reach 0.99" result shrinks to a median of 22 vs ~104, and at
-> 0.95 random search is as fast as BO. Use the 20-seed results above.
+### 7.9 v1 results (single seed; superseded by section 6.4)
 
 | | BO | brute-force random simulation |
 |---|---|---|
 | reactor evaluations run | 50 | 20,000 |
 | best Y_C after 50 evaluations | **0.9920** | 0.9860 |
 | best Y_C after all evaluations | 0.9920 | 0.9964 |
-| evaluations to first reach Y_C ≥ 0.90 | 6 | 4 |
-| evaluations to first reach Y_C ≥ 0.95 | 13 | 8 |
-| evaluations to first reach Y_C ≥ 0.98 | 17 | 17 |
-| evaluations to first reach Y_C ≥ 0.99 | **17** | **285** |
+| evaluations to first reach Y_C ≥ 0.90 / 0.95 / 0.98 / 0.99 | 6 / 13 / 17 / **17** | 4 / 8 / 17 / **285** |
 
-Best operating point found by each (both sit on the same high-yield plateau):
+Best operating point found by each (both on the same high-yield plateau): BO 84.2 bar, 3.2 / 48.5
+mL/min, 533 K, 4.0 g (Y_C 0.9920); random simulation 95.5 bar, 4.2 / 36.1 mL/min, 483 K, 4.8 g
+(Y_C 0.9964). Both methods find the plateau quickly because it is large (about 7 % of the box has
+Y_C > 0.95); the difference shows at the top. Over 10 seeds the "17 vs 285" result shrinks to a
+median of 22 vs ~104, and at 0.95 random search is as fast as BO, which is why v2 moved to the
+profit objective and 20 seeds.
 
-| Knob | BO | random simulation |
+---
+
+## 8. Repository map
+
+| Path | Stage | What it is |
 |---|---|---|
-| P (bar) | 84.2 | 95.5 |
-| V_A (mL/min) | 3.2 | 4.2 |
-| V_B (mL/min) | 48.5 | 36.1 |
-| T (K) | 533 | 483 |
-| W_cat (g) | 4.0 | 4.8 |
-| Y_C | 0.9920 | 0.9964 |
+| `reactor_twin.py`, `test_reactor_twin.py`, `sweeps.py` | v1 | the twin, its 11 checks, single-knob sweeps |
+| `bo_basic.py`, `bo_5knobs.py`, `simulation_campaign.py`, `compare.py` | v1 | first BO, brute force, overlay |
+| `bo/` (`gp.py`, `acquisition.py`, `nn.py`, `loop.py`, `problem.py`, `optima.json`) | v2 | the BO package |
+| `test_bo.py`, `run_benchmark.py`, `analyse_benchmark.py`, `surrogate_study.py`, `demo_bo_1d.py`, `suggest_next.py`, `make_report.py`, `report/` | v2 | checks, benchmark, studies, black-box next-experiment tool, results page |
+| `smart/` (`systems.py`, `kinetics.py`, `advisor.py`, `benchmark.py`, `optima.json`) | v3/v4 | the smart advisor |
+| `reactor_ui.py`, `ui/` (`index.html`, `app.css`, `app.js`) | v4 | the web interface |
+| `reactor_advisor.py` | v3/v4 | the command-line advisor |
+| `khare_demo.py` | v3/v4 | the 4-part demo for the supervisors |
+| `test_smart.py`, `test_reactor_ui.py` | v3/v4 | 34 + 36 checks |
+| `digital-twin-fixed-bed-reactor.md`, `smart-advisor-model.md` | docs | the reactor model and what the advisor adds |
+| `figures/` | all | every figure referenced above (committed) |
+| `results/` | all | CSVs, benchmark caches, demo output (git-ignored; regenerated by the scripts) |
+| `requirements.txt`, `.claude/launch.json` | | dependencies; the dev-server entry used to preview the UI |
 
-Reading: both methods find the plateau quickly because it is large (about 7 % of the box
-has Y_C > 0.95). The difference shows at the top: BO reaches Y_C ≥ 0.99 in 17 evaluations,
-random sampling needs 285. The remaining gap between 0.992 and 0.996 is BO stopping at 50
-runs while random search kept going to 20,000.
+---
 
-Sensitivity (reference): pressure has the largest one-at-a-time swing at the base case;
-over the whole box V_B and P explain the most yield variance and W_cat the least, because
-once there is enough catalyst, adding more changes little.
+## 9. Tests
 
-## 11. Known limitations / next steps
+| Command | Checks | Time | What is checked |
+|---|---|---|---|
+| `python test_reactor_twin.py` | 11 | 1 s | atom balances, inert, mole fractions, yield identity, analytical solution, input guard |
+| `python test_smart.py` | 34 | ~2 min | `smart/systems.py` matches `reactor_twin.py`; surface-area invariance; fast solver vs LSODA; atom balances on both networks; dilution; equilibrium from thermodynamics; GC → flows → profit; kinetics recovered from clean data; screening runs and every policy within the step limits; safety box, fixed knobs, custom step limits; log round trip |
+| `python test_reactor_ui.py` | 36 | ~1 min | the web server's campaign logic: validation messages, °C/K, GC in %, cold runs, export/import round trip, settings all-or-nothing, fixed knobs and step limits honoured, virtual reactor uses the table's catalyst mass, one fit at a time, a change during a fit discards it |
+| `python test_bo.py` | 29 | ~5 min | likelihood gradients, match with scikit-learn, ARD, posterior sampling, every v2 strategy runs, GP + EI converges on a toy problem |
 
-Done in v2: fitted GP length-scales (one per knob), UCB and a third acquisition function,
-repeated seeds, a harder objective, the NN surrogate.
+---
 
-Still open, in priority order:
-- **Real kinetics and prices.** Everything is placeholder. Re-run sections 0.3 once agreed.
-- **Stuck runs on the margin problem.** About a quarter of GP + EI runs settle in a second
-  local optimum. Candidates: a trust-region method (TuRBO), a larger initial design, or a
-  portfolio of acquisition functions. Test with the existing benchmark.
-- **More seeds** for the margin comparisons with v1 and between acquisition functions,
-  which are not significant at 20 seeds.
-- **Constrained + noisy** combined, and a constraint on safety limits as well as product spec.
-- **Inert flow** is still fixed at 10 mL/min; adding it as a sixth knob is a one-line change
-  in `bo/problem.py` plus the twin call.
-- **Uncertainty calibration in BO**: the fitted GP's 95 % intervals cover only ~75–85 % of
-  points near the margin optimum (over-confident there).
+## 10. What is placeholder, and what comes next
+
+Placeholder: the kinetics of both networks (`smart/systems.py`, `reactor_twin.py`), the prices
+(`smart/systems.py`, `bo/problem.py`), the GC noise, the product inhibition of the virtual reactor,
+the step limits and the flow minimum. They are plausible numbers, not measured ones.
+
+Next, in order:
+
+1. **Real kinetics and prices** agreed with Prof. Khare; rerun `khare_demo.py` (delete
+   `results/smart_bench` first) and the v2 benchmark.
+2. **A real GC log** from the Micromeritics reactor: `reactor_ui.py` imports it as is. The first
+   question is how far the learned kinetics are from a textbook fit, and whether the GP correction
+   stays small.
+3. **Hardware constraints** from the instrument spec: MFC reference conditions, the real step
+   limits of the furnace and back-pressure regulator, the GC's minimum flow.
+4. Still open from v2: the stuck runs on the profit objective (a trust-region method would help),
+   more seeds for the comparisons that are not significant at 20, and the GP's over-confidence near
+   the optimum.

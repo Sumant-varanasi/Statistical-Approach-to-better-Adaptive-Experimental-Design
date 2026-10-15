@@ -2,9 +2,11 @@
 DEMO FOR PROF. KHARE - a reactor model that knows the physics, run the way the reactor is
 really run, against what an experienced chemist would do by hand.
 
-Run:   python khare_demo.py                 full demo (first run ~10 min on 20 cores,
-                                            then cached in results/smart_bench/)
+Run:   python khare_demo.py                 full demo (first run ~10 min on 20 cores, ~1 h on
+                                            4 cores; then cached in results/smart_bench/)
        python khare_demo.py --seeds 5       quicker, fewer repeats
+       python khare_demo.py --workers 4     benchmark processes (default: cpu_count - 2)
+       python khare_demo.py --budget 30     longer campaigns (cached separately per budget)
        python khare_demo.py --skip-live     no live campaign (part 3)
 
 How every campaign is run (the realistic protocol, same for every method):
@@ -149,8 +151,8 @@ def part1():
 
 
 # =================================================================================== PART 2
-def curves(system, method, seeds):
-    H = B.load(system, method, seeds)
+def curves(system, method, seeds, budget=25):
+    H = B.load(system, method, seeds, budget)
     if not H:
         return None
     f = true_optimum(system)["f_opt"]
@@ -180,7 +182,7 @@ def part2(seeds, budget, workers):
         ms = methods + (["smart_missing_E"] if system == "complex" else [])
         ends = []
         for m in ms:
-            rel = curves(system, m, seeds)
+            rel = curves(system, m, seeds, budget)
             if rel is None:
                 continue
             res[(system, m)] = rel

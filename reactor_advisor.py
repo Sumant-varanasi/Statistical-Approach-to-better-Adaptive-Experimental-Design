@@ -34,7 +34,7 @@ What it gives back
     It saves the suggestion to next_run.csv.
 
 Usage
-    python reactor_advisor.py --demo                       # 5 example screening runs, then advice
+    python reactor_advisor.py --demo                       # 5 example screening runs -> demo_log.csv, then advice
     python reactor_advisor.py my_reactor_log.csv           # advise on your own log
     python reactor_advisor.py my_reactor_log.csv --system simple --surface-area 120
     python reactor_advisor.py my_reactor_log.csv --limit temperature=200:300 --fix pressure=30
@@ -349,7 +349,8 @@ def simulate_days(args, S, user, gc):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("log", nargs="?", default="my_reactor_log.csv", help="your run log (CSV)")
+    ap.add_argument("log", nargs="?", default=None,
+                    help="your run log (CSV); default my_reactor_log.csv, or demo_log.csv with --demo")
     ap.add_argument("--system", default="complex", choices=list(SYSTEMS),
                     help="which reaction network your reactor runs (default: complex)")
     ap.add_argument("--surface-area", type=float, default=A_SPEC, help="BET area of the catalyst, m2/g")
@@ -366,6 +367,8 @@ def main():
     ap.add_argument("--hours", type=float, default=8000, help="operating hours per year (default 8000)")
     ap.add_argument("--seed", type=int, default=0)
     args = ap.parse_args()
+    if args.log is None:                       # never overwrite a real log with demo data
+        args.log = "demo_log.csv" if args.demo else "my_reactor_log.csv"
 
     S = SYSTEMS[args.system]
     if args.demo:

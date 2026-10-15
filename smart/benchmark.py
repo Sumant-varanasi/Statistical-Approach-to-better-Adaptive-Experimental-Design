@@ -13,8 +13,8 @@ Stress test (complex system only)
 
 Every method sees the same virtual reactor, the same GC noise and the SAME 5 screening runs
 for a given seed; profit is always computed from the noisy GC reading.  Each campaign is
-saved to results/smart_bench/<system>/<method>_s<seed>.npz, so the benchmark can be stopped
-and resumed.
+saved to results/smart_bench/<system>/<method>_s<seed>_b<budget>.npz, so the benchmark can be
+stopped and resumed, and campaigns of different budgets never get mixed up.
 """
 import os
 os.environ.setdefault("OMP_NUM_THREADS", "1")
@@ -39,13 +39,13 @@ SYSTEM_LABEL = {"simple": "Simple reaction  (A+B->C, A->D)",
 N_SCREEN = 5
 
 
-def path_for(system, method, seed):
-    return os.path.join(OUT, system, f"{method}_s{seed}.npz")
+def path_for(system, method, seed, budget=25):
+    return os.path.join(OUT, system, f"{method}_s{seed}_b{budget}.npz")
 
 
 def job(args):
     system, method, seed, budget = args
-    p = path_for(system, method, seed)
+    p = path_for(system, method, seed, budget)
     if os.path.exists(p):
         return args, None
     warnings.filterwarnings("ignore")
@@ -68,7 +68,7 @@ def run_all(systems=("simple", "complex"), methods=tuple(LABELS), seeds=10, budg
     from multiprocessing import Pool
     jobs = [(s, m, k, budget) for k in range(seeds) for s in systems for m in methods
             if m not in STRESS or s == "complex"]
-    todo = [j for j in jobs if not os.path.exists(path_for(*j[:3]))]
+    todo = [j for j in jobs if not os.path.exists(path_for(*j))]
     if not todo:
         return
     workers = workers or max(1, min(len(todo), (os.cpu_count() or 2) - 2))
@@ -85,10 +85,10 @@ def run_all(systems=("simple", "complex"), methods=tuple(LABELS), seeds=10, budg
                       f"  final profit {r[0]:7.2f}  ({r[1]:.0f}s)", flush=True)
 
 
-def load(system, method, seeds):
+def load(system, method, seeds, budget=25):
     out = []
     for k in range(seeds):
-        p = path_for(system, method, k)
+        p = path_for(system, method, k, budget)
         if os.path.exists(p):
             d = np.load(p, allow_pickle=True)
             out.append({key: d[key] for key in d.files})
