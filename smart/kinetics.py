@@ -20,10 +20,13 @@ The chi2/dof factor inflates the uncertainty when the model fits worse than the 
 explains, which happens when the model's physics is incomplete (it always is a little).
 Draws from N(theta_hat, Cov) are plausible versions of the chemistry; the advisor plans
 the next experiment by asking all of them.
+
+Rate constants are per m2 of catalyst surface (systems.py), so a fit made with one catalyst
+loading carries over to another loading or to a batch with a different BET area.
 """
 import numpy as np
 from scipy.optimize import least_squares
-from .systems import V_I
+from .systems import A_SPEC
 
 GC_REL, GC_ABS = 0.02, 0.002          # weights in the fit: GC error + allowance for model error
 GC_NOISE_REL, GC_NOISE_ABS = 0.01, 0.0005   # the GC's own repeatability (used to propagate noise)
@@ -32,15 +35,16 @@ PRIOR_SD_A, PRIOR_SD_B = 3.0, 10.0     # prior sd of ln k_ref and of Ea / (R T_r
 
 class KineticFit:
     """
-    kf = KineticFit(system)
-    kf.fit(phys, y_gc)              phys: (n, 5) P, V_A, V_B, T, Wcat;  y_gc: (n, ns) mole fractions
+    kf = KineticFit(system, a_spec)
+    kf.fit(phys, y_gc)              phys: (n, 6) P, V_A, V_B, V_I, T, Wcat;  y_gc: (n, ns) mole fractions
     kf.theta, kf.cov                best estimate and its covariance
     kf.samples(m, rng)              m plausible kinetics, (m, p)
     kf.predict_gc(phys)             model outlet mole fractions at the best estimate
     """
 
-    def __init__(self, system, seed=0):
+    def __init__(self, system, a_spec=A_SPEC, seed=0):
         self.S = system
+        self.a_spec = float(a_spec)
         self.p = 2 * system.nr
         self.guess = system.theta_guess.copy()
         self.prior_sd = np.tile([PRIOR_SD_A, PRIOR_SD_B], system.nr)
@@ -48,11 +52,12 @@ class KineticFit:
         self.cov = np.diag(self.prior_sd ** 2)
         self.rng = np.random.default_rng(seed)
         self.n_fits = 0
+        self.chi2_dof = np.nan
 
     # ------------------------------------------------------------------ model output
     def _gc(self, phys, theta, groups=None):
-        P, VA, VB, T, W = np.asarray(phys).T
-        F, _ = self.S.simulate(P, VA, VB, V_I, W, T, theta=theta, groups=groups)
+        P, VA, VB, VI, T, W = np.asarray(phys, float).T
+        F, _ = self.S.simulate(P, VA, VB, VI, W, T, theta=theta, groups=groups, a_spec=self.a_spec)
         return F / F.sum(1, keepdims=True)
 
     def predict_gc(self, phys, theta=None):
@@ -70,13 +75,13 @@ class KineticFit:
         ph_rows = np.tile(phys, (p + 1, 1))
         grp = np.tile(np.arange(n), p + 1)
         Y = self._gc(ph_rows, th_rows, groups=grp).reshape(p + 1, n, -1)[..., :-1]   # drop inert (redundant)
-        r0 = ((Y[0] - y[:, :-1]) / sig).ravel()
-        Jd = ((Y[1:] - Y[0][None]) / eps / sig[None]).reshape(p, -1).T
+        r0 = np.nan_to_num(((Y[0] - y[:, :-1]) / sig).ravel(), nan=1e3)        # failed row = terrible fit
+        Jd = np.nan_to_num(((Y[1:] - Y[0][None]) / eps / sig[None]).reshape(p, -1).T, nan=0.0)
         rp = (theta - self.guess) / self.prior_sd
         return np.r_[r0, rp], np.vstack([Jd, np.diag(1.0 / self.prior_sd)])
 
     def fit(self, phys, y_gc, n_starts=None):
-        phys, y = np.atleast_2d(phys), np.atleast_2d(y_gc)
+        phys, y = np.atleast_2d(np.asarray(phys, float)), np.atleast_2d(y_gc)
         sig = GC_REL * y[:, :-1] + GC_ABS
         cache = {}
 

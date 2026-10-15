@@ -1,10 +1,34 @@
 """
-Reaction systems and a fast batch reactor simulator.
+Reaction systems and a fast batch reactor simulator for the smart advisor.
 
-The model is the same packed-bed reactor as reactor_twin.py (isothermal, isobaric, ideal gas,
-no pressure drop, plug flow), written so that MANY experiments are solved in one call.  The
-smart advisor needs this: to decide on the next experiment it simulates thousands of
-candidate operating points for several plausible versions of the chemistry.
+The reactor is the Micromeritics fixed bed described in digital-twin-fixed-bed-reactor.md
+(plug flow, isothermal, isobaric, ideal gas), written so that MANY experiments are solved in
+one call: to choose the next experiment the advisor simulates thousands of candidate
+operating points for several plausible versions of the chemistry.
+
+How a campaign is run on the real reactor, and therefore here
+--------------------------------------------------------------
+* Five set points can be changed between runs: the pressure (back-pressure regulator), the
+  three MFC flows (A, B and the INERT, which dilutes the feed and lowers every partial
+  pressure) and the bed temperature.  These are the knobs.
+* The catalyst mass is loaded once and stays fixed for the whole campaign: changing it means
+  shutting down, unloading and repacking the bed.  It is a campaign setting, not a knob.
+* Set points cannot jump arbitrarily from one run to the next (furnace ramping, pressure
+  equilibration, keeping the catalyst in a known state): MAX_STEP is the largest change of
+  each knob between consecutive runs.  Every method in this package respects it.
+* The GC needs enough gas: total feed >= MIN_TOTAL_FLOW, and inert >= 2 mL/min so that it can
+  serve as the internal standard.
+
+Catalyst surface area
+---------------------
+The reaction happens on the catalyst SURFACE, so the bed is integrated over the catalyst
+surface area  S = a_s * W_cat  (a_s = specific surface area from a BET measurement, m2/g):
+
+        dF_i/dS = sum_j nu_ij r_j,      r_j in mol m^-2 s^-1,     0 <= S <= a_s W_cat
+
+Rate constants are then properties of the catalyst material, not of the amount loaded, and
+transfer to another loading or to a batch with a different BET area.  With a_s = 100 m2/g
+and 1 g of catalyst this is identical to the per-gram model in reactor_twin.py.
 
 Two reaction systems
 --------------------
@@ -27,7 +51,7 @@ advisor's power-law model does NOT contain: the advisor's physics is deliberatel
 exactly as it would be on a real reactor.
 
 Kinetic parameters are written per reaction j as
-    a_j = ln k_j(T_REF)                 (rate constant at the reference temperature)
+    a_j = ln k_j(T_REF)                 (rate constant per m2 at the reference temperature)
     b_j = Ea_j / (R T_REF)              (dimensionless activation energy)
 so that  ln k_j(T) = a_j - b_j (T_REF / T - 1).  theta = [a_1, b_1, a_2, b_2, ...].
 
@@ -44,21 +68,63 @@ T_REF = 573.15
 P_STD, T_STD = 101325.0, 273.15
 MMOL_H = 3.6e6                         # mol/s -> mmol/h
 
+# ------------------------------------------------------------------ the knobs (scaled to [0, 1] in the optimisers)
+KEYS = ["P", "V_A", "V_B", "V_I", "T"]
+NAMES = ["P (bar)", "V_A (mL/min)", "V_B (mL/min)", "V_I (mL/min)", "T (K)"]
+UNITS = ["bar", "mL/min", "mL/min", "mL/min", "K"]
+LOW = np.array([1.0, 1.0, 1.0, 2.0, 450.0])       # MFC minimum ~2 % of full scale; inert >= 2 for the GC
+HIGH = np.array([100.0, 50.0, 50.0, 50.0, 850.0])
+MAX_STEP = np.array([10.0, 10.0, 10.0, 10.0, 30.0])   # largest change of each knob between consecutive runs
+MIN_TOTAL_FLOW = 10.0                                  # mL/min: below this the GC / BPR cannot be run reliably
+DIM = 5
+
+# ------------------------------------------------------------------ campaign settings (fixed while the bed is loaded)
+WCAT = 1.0          # g of catalyst in the bed
+A_SPEC = 100.0      # m2/g, BET surface area of the catalyst
+
+
+def unscale(x):
+    return LOW + np.clip(np.atleast_2d(x), 0, 1) * (HIGH - LOW)
+
+
+def scale(phys):
+    return (np.atleast_2d(phys) - LOW) / (HIGH - LOW)
+
+
+def step_scaled(max_step=None):
+    """Step limits in scaled units."""
+    s = MAX_STEP if max_step is None else np.asarray(max_step, float)
+    return s / (HIGH - LOW)
+
+
+def physical(X, wcat=WCAT):
+    """Scaled knobs (n x 5) -> physical rows (n x 6): P, V_A, V_B, V_I, T, Wcat."""
+    ph = unscale(X)
+    W = np.broadcast_to(np.asarray(wcat, float), (len(ph),))
+    return np.column_stack([ph, W])
+
+
+def feasible(phys):
+    """Operating constraints of the real set-up: enough total flow for the GC."""
+    ph = np.atleast_2d(phys)
+    return ph[:, 1] + ph[:, 2] + ph[:, 3] >= MIN_TOTAL_FLOW - 1e-9
+
 
 def mfc_to_molar(v_ml_min):
     """Standard mL/min -> mol/s (same as reactor_twin.mfc_to_molar)."""
     return P_STD * (np.asarray(v_ml_min, float) * 1e-6 / 60.0) / (R * T_STD)
 
 
-def theta_from(k_ref, Ea):
-    """(k_ref list, Ea list in J/mol) -> theta vector [a1, b1, a2, b2, ...]."""
-    return np.ravel([[np.log(k), E / (R * T_REF)] for k, E in zip(k_ref, Ea)])
+def theta_from(k_ref_per_g, Ea, a_spec=A_SPEC):
+    """(k_ref per GRAM of a catalyst with a_spec m2/g, Ea in J/mol) -> theta [a1, b1, a2, b2, ...]
+    with the rate constants stored per m2 of catalyst surface."""
+    return np.ravel([[np.log(k / a_spec), E / (R * T_REF)] for k, E in zip(k_ref_per_g, Ea)])
 
 
-def theta_to_physical(theta):
-    """theta -> (k_ref array, Ea array in kJ/mol), for printing."""
+def theta_to_physical(theta, a_spec=A_SPEC):
+    """theta -> (k_ref per gram of a catalyst with a_spec m2/g, Ea in kJ/mol), for printing."""
     th = np.asarray(theta).reshape(-1, 2)
-    return np.exp(th[:, 0]), th[:, 1] * R * T_REF / 1000.0
+    return np.exp(th[:, 0]) * a_spec, th[:, 1] * R * T_REF / 1000.0
 
 
 class ReactionSystem:
@@ -103,7 +169,7 @@ class ReactionSystem:
         return out
 
     def rates(self, Pp, T, theta, inhib=0.0):
-        """Reaction rates (n x nr) in mol g^-1 s^-1 from partial pressures Pp (n x ns, bar).
+        """Reaction rates (n x nr) in mol m^-2 s^-1 from partial pressures Pp (n x ns, bar).
         theta is (p,) for one kinetics or (n, p) for one kinetics per row."""
         th = np.atleast_2d(theta)
         a, b = th[:, 0::2], th[:, 1::2]                         # (1 or n, nr)
@@ -121,12 +187,14 @@ class ReactionSystem:
         return r
 
     # ------------------------------------------------------------------ batch simulation
-    def simulate(self, P, VA, VB, VI, W, T, theta=None, truth=False, method="fast", groups=None):
+    def simulate(self, P, VA, VB, VI, W, T, theta=None, truth=False, method="fast", groups=None,
+                 a_spec=A_SPEC):
         """Outlet molar flows (n x ns, mol/s) for n experiments at once.
 
+        P bar, VA/VB/VI standard mL/min, W g of catalyst, T K; a_spec m2/g (scalar or per row).
         truth=True -> the virtual real reactor (true kinetics + product inhibition).
         Otherwise the advisor's model with the given theta (no inhibition).
-        Integrates in the dimensionless bed coordinate s = W / Wcat in [0, 1], with flows
+        Integrates in the dimensionless bed coordinate s = S / (a_s Wcat) in [0, 1], with flows
         divided by the inlet total flow, so all states are O(1).
 
         method='fast'   vectorised adaptive Rosenbrock (ROS2), every row with its own step
@@ -139,9 +207,9 @@ class ReactionSystem:
                         the same integration steps.  Used for finite-difference derivatives
                         with respect to the kinetics (an experiment and its perturbed copies
                         share a label), so the derivatives are smooth."""
-        P, VA, VB, VI, W, T = (np.atleast_1d(np.asarray(v, float)) for v in (P, VA, VB, VI, W, T))
-        n = max(map(len, (P, VA, VB, VI, W, T)))
-        P, VA, VB, VI, W, T = (np.broadcast_to(v, (n,)).copy() for v in (P, VA, VB, VI, W, T))
+        P, VA, VB, VI, W, T, a_s = (np.atleast_1d(np.asarray(v, float)) for v in (P, VA, VB, VI, W, T, a_spec))
+        n = max(map(len, (P, VA, VB, VI, W, T, a_s)))
+        P, VA, VB, VI, W, T, a_s = (np.broadcast_to(v, (n,)).copy() for v in (P, VA, VB, VI, W, T, a_s))
         if truth:
             theta, inhib = self.theta_true, self.K_inhib
         else:
@@ -151,7 +219,7 @@ class ReactionSystem:
         F0[:, 0], F0[:, 1], F0[:, -1] = mfc_to_molar(VA), mfc_to_molar(VB), mfc_to_molar(VI)
         FT0 = F0.sum(1)
         f0 = F0 / FT0[:, None]
-        scale = W / FT0                                       # g s / mol
+        scale_ = a_s * W / FT0                                # catalyst surface per molar feed, m2 s / mol
         nuT = self.nu.T
 
         th_rows = theta.ndim == 2
@@ -160,7 +228,7 @@ class ReactionSystem:
             f = np.maximum(f, 0.0)
             Pp = P[idx, None] * f / f.sum(1, keepdims=True)
             th = theta[idx] if th_rows else theta
-            return scale[idx, None] * (self.rates(Pp, T[idx], th, inhib) @ nuT)
+            return scale_[idx, None] * (self.rates(Pp, T[idx], th, inhib) @ nuT)
 
         if method == "lsoda":
             sol = solve_ivp(lambda s, y: g(y.reshape(n, -1)).ravel(), (0.0, 1.0), f0.ravel(),
@@ -171,7 +239,9 @@ class ReactionSystem:
             f = sol.y[:, -1].reshape(n, -1)
         else:
             f = _ros2(g, f0, groups=groups)
-        return np.maximum(f, 0.0) * FT0[:, None], F0
+        with np.errstate(invalid="ignore"):
+            f = np.where(np.isnan(f), np.nan, np.maximum(f, 0.0))
+        return f * FT0[:, None], F0
 
     # ------------------------------------------------------------------ what the GC sees
     @staticmethod
@@ -184,19 +254,27 @@ class ReactionSystem:
         numbers are turned into a mass balance without any extra measurement."""
         y = np.atleast_2d(y)
         FI = mfc_to_molar(VI)
-        return y * (FI / y[:, -1])[:, None]
+        return y * (FI / np.maximum(y[:, -1], 1e-9))[:, None]
+
+    def inlet_flows(self, VA, VB, VI):
+        VA, VB, VI = (np.atleast_1d(np.asarray(v, float)) for v in (VA, VB, VI))
+        n = max(map(len, (VA, VB, VI)))
+        F0 = np.zeros((n, self.ns))
+        F0[:, 0], F0[:, 1], F0[:, -1] = mfc_to_molar(VA), mfc_to_molar(VB), mfc_to_molar(VI)
+        return F0
 
     # ------------------------------------------------------------------ economics
     def profit(self, F, F0, P, W):
         """Process margin in money units per hour (placeholder prices):
-             value of C made - cost of A and B fed - disposal of by-products
-             - compression energy (feed * ln P) - catalyst cost
+             value of C made - cost of A and B fed - cost of inert - disposal of by-products
+             - compression energy (feed * ln P) - catalyst cost (constant within a campaign)
         Same structure as 'margin' in bo/problem.py."""
         p = self.prices
         Fm, F0m = F * MMOL_H, F0 * MMOL_H
         byp = sum(Fm[:, self.species.index(s)] * c for s, c in p.get("disposal", {}).items())
         return (p["v_C"] * Fm[:, self.iC]
                 - p["c_feed"] * (F0m[:, 0] + F0m[:, 1])
+                - p.get("c_inert", 0.0) * F0m[:, -1]
                 - byp
                 - p["c_comp"] * F0m.sum(1) * np.log(np.asarray(P, float))
                 - p["c_cat"] * np.asarray(W, float))
@@ -275,12 +353,13 @@ def _ros2(g, f0, rtol=3e-3, atol=3e-5, h0=1e-9, max_iter=5000, groups=None):
         s[act[ok]] += hh[ok]
         h[act] = hh * np.clip(0.9 / np.sqrt(np.maximum(ratio, 1e-10)), 0.2, 5.0)
     else:
-        raise RuntimeError("ROS2 did not reach the reactor outlet")
+        # rows that never reached the outlet (absurd trial kinetics): no result, not a crash
+        f[s < 1.0 - 1e-12] = np.nan
     return f
 
 
 # =================================================================================== systems
-_BASE_PRICES = dict(v_C=1.0, c_feed=0.20, c_comp=0.03, c_cat=3.0)
+_BASE_PRICES = dict(v_C=1.0, c_feed=0.20, c_inert=0.02, c_comp=0.03, c_cat=3.0)
 
 SIMPLE = ReactionSystem(
     "simple",
@@ -289,7 +368,7 @@ SIMPLE = ReactionSystem(
     fwd=[[1, 1, 0, 0, 0], [1, 0, 0, 0, 0]],
     rev=[[0] * 5, [0] * 5],
     thermo=[None, None],
-    theta_true=theta_from([2.0e-7, 2.0e-7], [80e3, 120e3]),     # = reactor_twin.DEFAULT_THETA
+    theta_true=theta_from([2.0e-7, 2.0e-7], [80e3, 120e3]),     # = reactor_twin.DEFAULT_THETA per gram
     theta_guess=theta_from([1e-6, 1e-6], [100e3, 100e3]),
     K_inhib=0.02,
     prices=dict(_BASE_PRICES, disposal={}),
@@ -339,26 +418,41 @@ COMPLEX_MISSING_E = ReactionSystem(
 SYSTEMS = {"simple": SIMPLE, "complex": COMPLEX}
 MODELS = {"complex_missing_E": COMPLEX_MISSING_E}
 
-# ------------------------------------------------------------------ the search box (same as bo/problem.py)
-KEYS = ["P", "V_A", "V_B", "T", "Wcat"]
-NAMES = ["P (bar)", "V_A (mL/min)", "V_B (mL/min)", "T (K)", "Wcat (g)"]
-UNITS = ["bar", "mL/min", "mL/min", "K", "g"]
-LOW = np.array([1.0, 1.0, 1.0, 450.0, 0.05])
-HIGH = np.array([100.0, 50.0, 50.0, 850.0, 5.0])
-V_I = 10.0
+
+# =================================================================================== how a campaign starts
+def base_case(seed=0):
+    """Operating conditions a chemist would start a campaign from ("literature conditions").
+    Seed 0 is the project's base case (10 bar, 20/20/10 mL/min, 600 K); other seeds are
+    plausible alternatives, so repeated campaigns also test different starting points."""
+    if seed == 0:
+        return np.array([10.0, 20.0, 20.0, 10.0, 600.0])
+    rng = np.random.default_rng(1000 + seed)
+    P = round(rng.uniform(5, 25))
+    VA, VB = round(rng.uniform(10, 30)), round(rng.uniform(10, 30))
+    VI = round(rng.uniform(5, 15))
+    T = 5 * round(rng.uniform(560, 640) / 5)
+    return np.array([P, VA, VB, VI, T], float)
 
 
-def unscale(x):
-    return LOW + np.clip(np.atleast_2d(x), 0, 1) * (HIGH - LOW)
+def screening_runs(base, max_step=None):
+    """The five runs an operator does first, before any optimiser is involved: a rising
+    temperature ladder (T0 - 25, T0, T0 + 25), then pressure up, then more B.  Consecutive
+    runs differ by at most one step per knob, so the sequence is as viable as any other."""
+    step = MAX_STEP if max_step is None else np.asarray(max_step, float)
+    P0, A0, B0, I0, T0 = base
+    dT, dP, dB = min(25.0, step[4]), min(10.0, step[0]), min(10.0, step[2])
+    rows = [[P0, A0, B0, I0, T0 - dT],
+            [P0, A0, B0, I0, T0],
+            [P0, A0, B0, I0, T0 + dT],
+            [P0 + dP, A0, B0, I0, T0 + dT],
+            [P0 + dP, A0, B0 + dB, I0, T0 + dT]]
+    return np.clip(np.array(rows, float), LOW, HIGH)
 
 
-def scale(phys):
-    return (np.atleast_2d(phys) - LOW) / (HIGH - LOW)
-
-
-def run_points(system, X, theta=None, truth=False):
-    """Simulate scaled points X (n x 5).  Returns (profit, F_out, F0, physical inputs)."""
+def run_points(system, X, wcat=WCAT, a_spec=A_SPEC, theta=None, truth=False):
+    """Simulate scaled points X (n x 5) at a fixed catalyst load.
+    Returns (profit, F_out, F0, physical inputs)."""
     ph = unscale(X)
-    P, VA, VB, T, W = ph.T
-    F, F0 = system.simulate(P, VA, VB, V_I, W, T, theta=theta, truth=truth)
-    return system.profit(F, F0, P, W), F, F0, ph
+    P, VA, VB, VI, T = ph.T
+    F, F0 = system.simulate(P, VA, VB, VI, wcat, T, theta=theta, truth=truth, a_spec=a_spec)
+    return system.profit(F, F0, P, wcat), F, F0, ph

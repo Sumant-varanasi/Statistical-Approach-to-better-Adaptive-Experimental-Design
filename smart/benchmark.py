@@ -1,17 +1,18 @@
 """
-Head-to-head benchmark on the virtual reactors (both reaction systems).
+Head-to-head benchmark on the virtual reactors (both reaction systems), run the way the real
+reactor is run: catalyst fixed, 5 operator screening runs first, then every method proposes
+runs within the step limits.
 
 Methods
-    smart       the physics-informed advisor (smart/advisor.py)
-    gp_ei_logw  best plain BO from the v2 benchmark (fitted GP + EI, log P & W_cat), profit only
-    ofat        trial and error, one factor at a time (what is usually done by hand)
-    random      random search
+    smart        the physics-informed advisor (smart/advisor.py)
+    plain_bo     black-box BO (v2's fitted GP + EI) under the same step limits, profit only
+    chemist      an experienced operator's rules of thumb + momentum (advisor.ChemistPolicy)
+    random_walk  a random allowed step each run
 Stress test (complex system only)
     smart_missing_E   the advisor with the over-reaction C + B -> E left out of its model
 
-Every method sees the same virtual reactor with the same GC noise; profit is always computed
-from the noisy GC reading.  Methods with the same seed start from the same Latin-hypercube
-design (OFAT starts from the project's base case instead, as a person would).  Each run is
+Every method sees the same virtual reactor, the same GC noise and the SAME 5 screening runs
+for a given seed; profit is always computed from the noisy GC reading.  Each campaign is
 saved to results/smart_bench/<system>/<method>_s<seed>.npz, so the benchmark can be stopped
 and resumed.
 """
@@ -26,15 +27,16 @@ import numpy as np
 OUT = os.environ.get("SMART_BENCH_DIR", os.path.join("results", "smart_bench"))
 METHODS = {
     "smart": "Smart advisor (physics + GP)",
-    "gp_ei_logw": "Plain BO (GP + EI, v2 best)",
-    "ofat": "Trial and error (one factor at a time)",
-    "random": "Random search",
+    "plain_bo": "Plain BO (GP + EI, profit only)",
+    "chemist": "Chemist's rules of thumb",
+    "random_walk": "Random walk",
 }
 # stress test, complex system only: advisor whose model is missing the over-reaction
 STRESS = {"smart_missing_E": "Smart advisor, over-reaction C+B->E missing from its model"}
 LABELS = {**METHODS, **STRESS}
 SYSTEM_LABEL = {"simple": "Simple reaction  (A+B->C, A->D)",
                 "complex": "Complex reaction  (A+B<=>C, C+B->E, A->D)"}
+N_SCREEN = 5
 
 
 def path_for(system, method, seed):
@@ -42,7 +44,7 @@ def path_for(system, method, seed):
 
 
 def job(args):
-    system, method, seed, budget, n_init = args
+    system, method, seed, budget = args
     p = path_for(system, method, seed)
     if os.path.exists(p):
         return args, None
@@ -51,15 +53,9 @@ def job(args):
     t0 = time.time()
     if method.startswith("smart"):
         model = "complex_missing_E" if method == "smart_missing_E" else None
-        h = advisor.run_smart(system, budget=budget, seed=seed, n_init=n_init, model=model)
-        h.pop("info", None)
-        h.pop("advisor", None)
-    elif method == "ofat":
-        h = advisor.run_ofat(system, budget=budget, seed=seed)
+        h = advisor.run_smart(system, budget=budget, seed=seed, model=model)
     else:
-        from bo import loop
-        h = loop.run(method, advisor.ProfitProblem(system, seed), budget=budget, seed=seed,
-                     n_init=n_init)
+        h = advisor.run_baseline(system, method, budget=budget, seed=seed)
     h = {k: v for k, v in h.items() if isinstance(v, (np.ndarray, float, int, str, np.floating))}
     h["time_total"] = time.time() - t0
     os.makedirs(os.path.dirname(p), exist_ok=True)
@@ -67,17 +63,17 @@ def job(args):
     return args, (float(h["rec"][-1]), h["time_total"])
 
 
-def run_all(systems=("simple", "complex"), methods=tuple(LABELS), seeds=10, budget=30,
-            n_init=8, workers=None, verbose=True):
+def run_all(systems=("simple", "complex"), methods=tuple(LABELS), seeds=10, budget=25,
+            workers=None, verbose=True):
     from multiprocessing import Pool
-    jobs = [(s, m, k, budget, n_init) for k in range(seeds) for s in systems for m in methods
+    jobs = [(s, m, k, budget) for k in range(seeds) for s in systems for m in methods
             if m not in STRESS or s == "complex"]
     todo = [j for j in jobs if not os.path.exists(path_for(*j[:3]))]
     if not todo:
         return
     workers = workers or max(1, min(len(todo), (os.cpu_count() or 2) - 2))
     if verbose:
-        print(f"Running {len(todo)} optimisation campaigns on {workers} processes "
+        print(f"Running {len(todo)} campaigns on {workers} processes "
               f"(finished ones are cached in {OUT}) ...", flush=True)
     t0 = time.time()
     # longest jobs (smart, complex) first so the pool finishes evenly

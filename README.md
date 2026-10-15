@@ -10,109 +10,133 @@ The repo has two halves that are compared against each other:
 | **Digital twin (simulation)** | Solves the packed-bed reactor equations for one experiment, and can be run thousands of times to brute-force the best operating point. | `reactor_twin.py`, `test_reactor_twin.py`, `sweeps.py`, `simulation_campaign.py` |
 | **Bayesian optimisation (BO)** | Treats the twin as an expensive black box and tries to find the best operating point in as few experiments as possible. | `bo_basic.py`, `bo_5knobs.py` |
 | **Comparison** | Overlays the two on one figure. | `compare.py` |
-| **Smart reactor advisor (V3)** | Physics-informed optimiser: learns the kinetics from GC readings and tells an operator what to run next, in plain English. Tested on the simple network and a complex one. | `reactor_advisor.py`, `khare_demo.py`, `smart/` |
+| **Smart reactor advisor (V3)** | Physics-informed optimiser run the way the reactor is run: catalyst fixed, inert flow as a knob, step limits between runs. Learns the kinetics from GC readings and tells an operator what to run next, in plain English. Compared with a chemist's rules of thumb on the simple network and a complex one. | `reactor_advisor.py`, `khare_demo.py`, `smart/`, `smart-advisor-model.md` |
 
 > All kinetic parameters in `reactor_twin.py` are **placeholders**. Every number and
 > figure below will change once the real kinetics are agreed with Prof. Khare.
 
 ---
 
-## V3. The smart reactor advisor (physics-informed optimisation)
+## V3. The smart reactor advisor (physics-informed, run the way the reactor is run)
 
-**The problem it solves.** Someone runs a small catalytic reactor (a lab, a pilot plant, a
-small chemicals business) and wants it to make more money. Every trial run costs a day,
-feed gas and catalyst, so they can afford perhaps 10–30 trials, and they do not know
-kinetics or machine learning. Today they tune by hand, one knob at a time. The advisor
-takes the run log they already keep (settings + GC printout), and tells them in plain
-English what to run next, why, what profit to expect, and whether another trial is worth it.
+**The problem it solves.** Someone runs a small catalytic fixed-bed reactor (a lab, a pilot
+plant, a small chemicals business) and wants it to make more money. Every run costs a day,
+feed gas and reactor time, so they can afford perhaps 10–25 runs, and they do not know
+kinetics or machine learning. Today they tune by rules of thumb. The advisor takes the run
+log they already keep (set points + GC printout) and tells them, in plain English, what to
+run next, why, what profit to expect, where this is heading and whether another run is worth
+its cost.
+
+**It follows the real operating protocol** (`smart-advisor-model.md`):
+
+- the catalyst is loaded once; its mass and BET area are campaign settings, never a suggestion;
+- five knobs can change between runs: pressure, the flows of A, B **and the inert**, temperature;
+- no knob may change more than a set amount between consecutive runs (defaults 10 bar,
+  10 mL/min per flow, 30 K; `--max-step`), so every suggestion is viable;
+- the GC needs ≥ 10 mL/min of feed and ≥ 2 mL/min of inert (internal standard);
+- the bed is integrated over the **catalyst surface area** S = a_BET · W_cat with rates per m²,
+  so the learned kinetics are properties of the catalyst material and carry over to another
+  loading or batch.
 
 ```bash
-python reactor_advisor.py --demo                     # example 6-run log + advice
-python reactor_advisor.py --demo --simulate-days 8   # watch it run the (virtual) reactor for 8 days
-python reactor_advisor.py my_reactor_log.csv --limit temperature=200:300 --fix pressure=30 --trial-cost 500
-python khare_demo.py                                 # the full demo / evidence (≈15 min first time, then cached)
-python test_smart.py                                 # 20 checks (≈1 min)
+python reactor_advisor.py --demo                       # the 5 screening runs an operator does, then advice
+python reactor_advisor.py --demo --simulate-days 10    # watch it run the (virtual) reactor for 10 days
+python reactor_advisor.py my_reactor_log.csv --surface-area 120 --max-step temperature=20 --limit pressure=1:40
+python reactor_advisor.py my_reactor_log.csv --trial-cost 500 --hours 6000
+python khare_demo.py                                   # the full demo / evidence (~10 min first time, then cached)
+python test_smart.py                                   # 34 checks (~2 min)
 ```
 
-Log format (`my_reactor_log.csv`): `pressure_bar, flow_A_mL_min, flow_B_mL_min,
-temperature_C, catalyst_g, gc_A, gc_B, gc_C, gc_D, [gc_E,] gc_I` — GC as mole fractions or %.
-Profit is computed from the GC reading using the inert as internal standard.
+Log format (`my_reactor_log.csv`, rows in the order run): `pressure_bar, flow_A_mL_min,
+flow_B_mL_min, flow_I_mL_min, temperature_C, catalyst_g, gc_A, gc_B, gc_C, gc_D, [gc_E,] gc_I`
+(GC as mole fractions or %). Profit is computed from the GC reading via the internal standard.
 
 ### Why it is "smart": it knows the physics and learns only what it does not know
 
-Plain BO (v1, v2) sees **one number per experiment** (profit) and learns the landscape from
-scratch. The advisor sees the **full GC composition** and reasons with a reactor model:
+Plain BO (v1, v2) sees **one number per run** (profit) and learns the landscape from scratch,
+and under step limits it cannot see further than one step. The advisor sees the **full GC
+composition** and reasons with a reactor model:
 
-| Built in (physics) | Learned from the experiments |
+| Built in (physics) | Learned from the runs |
 |---|---|
-| reaction network and stoichiometry, packed-bed mole balances | rate constant of every reaction |
-| Arrhenius temperature dependence, ideal-gas partial pressures | activation energy of every reaction |
+| reaction network and stoichiometry, mole balances over the catalyst surface | rate constant of every reaction |
+| Arrhenius temperature dependence, ideal-gas partial pressures (inert dilution included) | activation energy of every reaction |
 | equilibrium limit from thermodynamics (ΔH, ΔS) | a Gaussian-process correction for whatever the physics misses |
 | economics (prices) | |
 
-Each round: (1) fit the kinetics to all GC readings (Bayesian least squares with a wide
-prior, `smart/kinetics.py`); (2) draw several plausible versions of the chemistry from the
-fit's uncertainty; (3) simulate thousands of candidate operating points under every version;
-(4) add a GP fitted to the profit the physics got wrong (`SmoothGP`, with a noise floor
-propagated from the GC error so it cannot mistake noise for chemistry); (5) run the
-candidate with the highest Expected Improvement. So the next run is chosen because the
-chemistry says profit should be high there, or because the plausible chemistries disagree
-about it.
+Each round: (1) fit the kinetics to all GC readings (Bayesian least squares, wide prior,
+`smart/kinetics.py`); (2) draw plausible versions of the chemistry; (3) **plan**: predict profit
+over the whole box and find where the model expects the best profit and how many runs away it
+is; (4) add the GP correction (noise floor from the GC error); (5) choose, among the runs
+reachable in one step, the one with the highest Expected Improvement, or, when nothing within
+reach beats the best run yet but the model is confident a better region exists, take the
+**purposeful step**: a full step on the bottleneck knob with the other knobs set to the best
+predicted values at that step.
 
-The physics is **deliberately imperfect**: the virtual reactor has product inhibition and
-1 % GC noise that the advisor's model does not contain, exactly as a real reactor would differ
-from any textbook model. A stress test also removes a whole reaction from the advisor's model.
+The physics is **deliberately imperfect**: the virtual reactor has product inhibition and 1 %
+GC noise that the advisor's model does not contain. A stress test also removes a whole
+reaction from the advisor's model.
 
 ### Two chemistries
 
 | | Simple (the project's network) | Complex |
 |---|---|---|
 | reactions | A + B → C, A → D | A + B ⇌ C (reversible, exothermic), C + B → E (over-reaction), A → D (cracking) |
-| best possible profit (placeholder prices) | 25.0 /h at 100 bar, 624 K, 1.0 g | 20.6 /h at 35 bar, 521 K, 2.1 g |
-| temperature window keeping ≥ 90 % of best profit | 63 K | 28 K |
-| share of the operating box that makes any profit | 8 % | 4.5 % |
+| best possible profit at 1 g (placeholder prices) | 28.8 /h at 97 bar, 50/49/2 mL/min, 624 K | 22.4 /h at 43 bar, 50/49/2 mL/min, 529 K |
+| temperature window keeping ≥ 90 % of best profit | 72 K | 32 K |
+| share of the operating box that makes any profit | 5.5 % | 2.0 % |
 
 On the complex network everything competes: hotter is faster but the equilibrium and the
-cracking take product away; more catalyst or more B converts more A but the over-reaction
-eats the product; pressure helps the equilibrium but costs compression. The profitable window
-is narrow and inside the box (`figures/smart_1_operating_window.png`).
+cracking take product away; more B converts more A but the over-reaction eats the product;
+pressure helps the equilibrium but costs compression; inert dilutes everything. The
+profitable window is narrow (`figures/smart_1_operating_window.png`).
 
 ### Results
 
-From `python khare_demo.py`: 10 campaigns per method and chemistry, 30 experiments each,
-all methods on the same virtual reactor with the same GC noise, the same 8-run starting
-design for the advisor and plain BO (trial and error starts from the project's base case, as
-a person would). Score = **true** profit of the settings each method would recommend, as %
-of the best possible profit.
+From `python khare_demo.py`: 10 campaigns per method and chemistry, each from a different
+plausible base case, 25 runs each (five weeks at one run per day). All methods see the same
+virtual reactor, the same GC noise and the **same 5 screening runs**; from run 6 on each
+proposes runs within the step limits. Score = **true** profit of the settings each method
+would recommend, as % of the best possible profit at that catalyst loading.
 
-| Chemistry | Method | after 12 experiments | after 30 | experiments to reach 90 % |
-|---|---|---|---|---|
-| simple | **Smart advisor** (physics + GP) | **94 %** | **97 %** | **11** (10/10 runs got there) |
-| simple | Plain BO (GP + EI, v2's best) | 36 % | 79 % | > 30 (4/10) |
-| simple | Trial and error (one factor at a time) | −28 % | 22 % | > 30 (0/10) |
-| simple | Random search | −2 % | 40 % | > 30 (0/10) |
-| complex | **Smart advisor** (physics + GP) | **87 %** | **94 %** | **13.5** (9/10) |
-| complex | Plain BO (GP + EI, v2's best) | −54 % | 33 % | > 30 (0/10) |
-| complex | Trial and error | 10 % | 19 % | > 30 (0/10) |
-| complex | Random search | 0 % | 29 % | > 30 (0/10) |
-| complex | Smart advisor, **C + B → E missing from its model** | 75 % | 95 % | 19 (9/10) |
+| Chemistry | Method | after 10 runs | after 15 | after 25 | runs to reach 90 % |
+|---|---|---|---|---|---|
+| simple | **Smart advisor** (physics + GP) | **93 %** | **95 %** | 96 % | **9.5** (10/10 campaigns) |
+| simple | Chemist's rules of thumb | 21 % | 74 % | 96 % | 21 (7/10) |
+| simple | Plain BO (GP + EI, profit only) | 2 % | 15 % | 40 % | > 25 (2/10) |
+| simple | Random walk | −8 % | −6 % | −6 % | > 25 (0/10) |
+| complex | **Smart advisor** (physics + GP) | **99 %** | **98 %** | **97 %** | **9** (10/10) |
+| complex | Chemist's rules of thumb | 8 % | 61 % | 87 % | > 25 (4/10) |
+| complex | Plain BO (GP + EI, profit only) | −8 % | 6 % | 25 % | > 25 (0/10) |
+| complex | Random walk | −20 % | −20 % | −20 % | > 25 (0/10) |
+| complex | Smart advisor, **C + B → E missing from its model** | 62 % | 95 % | 99 % | 12 (10/10) |
 
-- Smart beats plain BO in **10/10 paired runs** on both chemistries after 12 experiments
-  (Wilcoxon signed-rank p = 0.002), and after 30 (simple 8/10, p = 0.02; complex 10/10, p = 0.002).
-- **Simple vs complex.** The advantage of knowing the physics is 18 points of profit on the
-  simple reaction (97 vs 79 %) and 61 points on the complex one (94 vs 33 %). On a simple
-  reaction the profitable region is wider and a black box eventually finds most of it, so
-  there is less to gain; on the complex one it keeps missing the narrow window.
+- **A good chemist gets there too, given enough runs**: after 25 runs the rules of thumb
+  reach 96 % (simple) and 87 % (complex). After 25 runs smart and chemist are tied on the
+  simple reaction (5/10 paired campaigns, p = 0.92); on the complex one smart is still ahead
+  (9/10, p = 0.004).
+- **The advisor's value is speed.** It reaches 90 % of the best profit in a median of 9.5
+  runs (simple) and 9 runs (complex), against 21 and "not within 25" for the chemist. After
+  10 and 15 runs it beats the chemist in **10/10 paired campaigns** on both chemistries
+  (Wilcoxon p = 0.002). Each run saved is a day of reactor time, feed gas and operator time.
+- **Why it is faster**: it learns each reaction's temperature response from the screening
+  ladder alone (full GC composition, not one profit number), predicts where the best profit
+  is over the whole box, and walks there one allowed step at a time; the chemist probes a
+  knob or two per run; plain BO, which sees only profit, cannot plan beyond one step.
 - **Wrong network.** With the over-reaction removed from its model the advisor is slower
-  (75 % after 12) but still ends at 95 %: the GP correction learns the missing product loss.
-- **What it learned** (live run, complex, 16 experiments): activation energies 76 / 131 / 155
-  kJ/mol vs true 70 / 120 / 150; rate constants about 2.7× low because the model lacks the
-  product inhibition, which the fitted constants and the GP absorb.
-- **Operator view** (`reactor_advisor.py --demo --simulate-days 8`): hand-tuned runs made
-  1.1 /h; the advisor's second suggestion measured 22.2 /h (true optimum 20.6).
+  (62 % after 10, 95 % after 15) but still ends at 99 %: the GP correction learns the missing
+  product loss.
+- **What it learned** (live run, complex, 15 runs, 517–625 K covered): the ordering of the
+  activation energies (side reactions higher than the main one) comes out right, which is
+  what decides the best temperature; the absolute values are biased high by ~30 kJ/mol
+  because the fit absorbs the product inhibition the model lacks. Recommended settings
+  within 2 % of the best possible.
+- **Operator view** (`reactor_advisor.py --demo --simulate-days 10`): screening runs made
+  1.2 /h at best; day 1 is a planned stepping stone, day 5 reaches the optimum (24.8 /h
+  measured, true 22.4), and on day 10 the tool says another run is not worth its cost.
 
-Figures: `figures/smart_1_operating_window.png` (margin for error),
-`smart_2_progress.png` (profit vs experiments), `smart_3_runs_needed.png`,
+Figures: `figures/smart_1_operating_window.png` (margin for error at 1 g),
+`smart_2_progress.png` (profit vs runs, shared screening band), `smart_3_runs_needed.png`,
 `smart_4_learned_chemistry.png` (learned vs true Arrhenius lines; GC parity).
 Tables: `results/smart_demo_summary.md` (git-ignored, rebuilt by the demo).
 
@@ -120,13 +144,14 @@ Tables: `results/smart_demo_summary.md` (git-ignored, rebuilt by the demo).
 
 | File | What it does |
 |---|---|
-| `reactor_advisor.py` | the operator's tool: reads a run log, plain-English advice, `next_run.csv` |
+| `reactor_advisor.py` | the operator's tool: reads a run log, plain-English advice, step-limited suggestion, plan, `next_run.csv` |
 | `khare_demo.py` | the 4-part demo: operating windows, head-to-head benchmark, live run, bottom line |
-| `smart/systems.py` | both reaction networks; batch simulator (vectorised adaptive Rosenbrock solver, plus exact LSODA); GC and profit |
-| `smart/kinetics.py` | kinetic parameter estimation from GC readings, with uncertainty (Laplace) |
-| `smart/advisor.py` | the advisor, the virtual reactor, trial-and-error baseline, adapter for the `bo/` strategies, true optima (`smart/optima.json`) |
+| `smart-advisor-model.md` | the model and protocol: surface-area coordinate, inert knob, constraints, economics, advisor, baselines |
+| `smart/systems.py` | both reaction networks; batch simulator (vectorised adaptive Rosenbrock solver, plus exact LSODA); knobs, step limits, screening runs |
+| `smart/kinetics.py` | kinetic parameter estimation from GC readings, with uncertainty (Laplace), per m² of catalyst |
+| `smart/advisor.py` | the advisor (plan + step-limited choice), the virtual reactor, the chemist / plain-BO / random-walk policies, true optima (`smart/optima.json`) |
 | `smart/benchmark.py` | resumable multi-seed benchmark (`results/smart_bench/`) |
-| `test_smart.py` | 20 checks: matches `reactor_twin.py`, solver accuracy, atom balances, equilibrium, GC→profit, kinetics recovery, safety limits, log format |
+| `test_smart.py` | 34 checks: matches `reactor_twin.py`, surface-area invariance, solver accuracy, atom balances, equilibrium, GC→profit, kinetics recovery, step limits for every method, safety box, log format |
 
 ### Limits (honest list)
 
@@ -134,13 +159,13 @@ Tables: `results/smart_demo_summary.md` (git-ignored, rebuilt by the demo).
   it still works when one reaction is missing, but slower; with a badly wrong network the GP
   correction has to do the work and the advantage shrinks.
 - It wins partly because it **uses more information** (the whole GC composition, not one
-  profit number). That is the point, but it is not a like-for-like test of surrogates.
-- One suggestion takes ~5–10 s (thousands of reactor simulations), against < 1 s for plain BO.
-  Irrelevant next to a day-long experiment.
-- Kinetics, prices, GC noise and the "true" reactor are placeholders. The next step is to run
-  it on real GC data from the Micromeritics reactor.
-- Suggestions only: every experiment still needs a safety check (`--limit` keeps suggestions
-  inside safe ranges).
+  profit number) and because it can **plan beyond one step**. Both are the point, but neither
+  is a like-for-like test of surrogates.
+- One suggestion takes ~5–10 s. Irrelevant next to a day-long run.
+- Kinetics, prices, GC noise, the inhibition and the step limits are placeholders. The next
+  step is to run it on real GC data from the Micromeritics reactor.
+- Suggestions only: every run still needs a safety check (`--limit` keeps suggestions inside
+  safe ranges, `--max-step` sets what the hardware allows).
 
 ---
 
