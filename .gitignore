@@ -3,3 +3,6 @@ results/
 demo_experiments.csv
 suggestions.csv
 bo/optima.json.tmp
+my_reactor_log.csv
+next_run.csv
+smart/optima.json.tmp
