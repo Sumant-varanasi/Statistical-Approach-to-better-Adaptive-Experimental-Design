@@ -66,6 +66,16 @@
     </details>
 
     <details class="fold">
+      <summary>Product spec and budget</summary>
+      <div class="grid2">
+        <label>Minimum selectivity <span class="unit">0-1</span><input id="s-spec-SC" type="number" step="any" min="0" max="1" placeholder="none"></label>
+        <label>Max temperature rise <span class="unit">K, adiabatic</span><input id="s-spec-dT" type="number" step="any" min="1" placeholder="none"></label>
+        <label>Runs you can still afford<input id="s-remaining" type="number" step="1" min="1" required></label>
+      </div>
+      <p class="hint">Only runs likely to meet the spec are suggested. The planner weighs exploring against earning by how many runs are left.</p>
+    </details>
+
+    <details class="fold">
       <summary>Economics</summary>
       <div class="grid2">
         <label>Cost of one run <span class="unit">money</span><input id="s-cost" type="number" step="any" min="0" placeholder="optional"></label>
@@ -77,8 +87,11 @@
 
     <details class="fold">
       <summary>Virtual reactor (for trying it out)</summary>
-      <label>Scenario seed<input id="s-seed" type="number" step="1" min="0" max="999"></label>
-      <p class="hint">A simulated reactor with hidden, imperfect chemistry. Use it to see how the advisor works before using your own log.</p>
+      <div class="grid2">
+        <label>Scenario seed<input id="s-seed" type="number" step="1" min="0" max="999"></label>
+        <label>Activity lost per day <span class="unit">%</span><input id="s-deact" type="number" step="any" min="0" max="49"></label>
+      </div>
+      <p class="hint">A simulated reactor with hidden, imperfect chemistry. Use it to see how the advisor works before using your own log. A non-zero activity loss makes its catalyst age on stream.</p>
     </details>
 
     <div class="rail-actions">
@@ -158,7 +171,7 @@
       </div>
     </div>
     <p id="runs-msg" class="msg" role="status"></p>
-    <p class="hint">Set points as you set them; GC as it prints them (mole fractions or %). Profit, conversion and selectivity are worked out from the GC with the inert as internal standard. Order matters: the next suggestion starts from the last row.</p>
+    <p class="hint">Set points as you set them; GC as it prints them (mole fractions or %); how long the run lasted. Profit, conversion, selectivity and the adiabatic temperature rise are worked out from the GC with the inert as internal standard. Order matters: the next suggestion starts from the last row, and a repeated set point later in the log is what lets the model see catalyst drift.</p>
 
     <form id="run-form" class="run-form" hidden autocomplete="off">
       <h3 id="run-form-title">Add a run</h3>

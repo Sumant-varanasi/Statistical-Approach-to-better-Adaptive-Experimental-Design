@@ -204,3 +204,85 @@ class GP:
         ls = ", ".join(f"{n}={l:.2f}" for n, l in zip(names, self.ls))
         return (f"length-scales [{ls}]  signal var={self.s2:.2f}  "
                 f"noise sd={np.sqrt(self.sn2) * self.y_std:.3g} (output units)")
+
+
+class GPEnsemble:
+    """Several GPs at distinct local optima of the marginal likelihood, mixed with weights
+    proportional to their likelihood.  A single optimum commits to one set of length-scales and
+    one noise level, which over-states confidence near the data; the mixture keeps that
+    hyper-parameter uncertainty.  Same interface as GP (fit / predict / sample / condition_on).
+
+        gpe = GPEnsemble(n_members=4).fit(X, y)
+        mu, sd = gpe.predict(Xs)
+    """
+
+    smooth = True
+
+    def __init__(self, kernel="matern52", n_members=4, n_restarts=10, seed=0, noise_bounds=(1e-6, 0.5)):
+        self.kernel, self.n_members, self.n_restarts = kernel, n_members, n_restarts
+        self.noise_bounds = noise_bounds
+        self.rng = np.random.default_rng(seed)
+        self.members, self.weights = [], np.array([1.0])
+
+    def fit(self, X, y):
+        X = np.atleast_2d(np.asarray(X, float))
+        y = np.asarray(y, float).ravel()
+        n, d = X.shape
+        y_std = y.std() if y.std() > 0 else 1.0
+        ys = (y - y.mean()) / y_std
+        probe = GP(kernel=self.kernel, ard=True, noise_bounds=self.noise_bounds)
+        bounds = probe._bounds(d)
+        lo, hi = np.array(bounds).T
+        starts = [np.r_[np.full(d, np.log(0.3)), 0.0, np.log(1e-3)]]
+        for _ in range(self.n_restarts):
+            starts.append(lo + self.rng.random(len(lo)) * (hi - lo))
+        optima = []
+        for p0 in starts:
+            res = minimize(probe._nll_and_grad, np.clip(p0, lo, hi), args=(X, ys), jac=True,
+                           method="L-BFGS-B", bounds=bounds, options={"maxiter": 200})
+            if np.isfinite(res.fun):
+                optima.append((res.fun, res.x))
+        optima.sort(key=lambda t: t[0])
+        kept = []
+        for nll, p in optima:                       # distinct optima within 6 nats of the best
+            if nll - optima[0][0] > 6.0:
+                break
+            if all(np.max(np.abs(p - q)) > 0.3 for _, q in kept):
+                kept.append((nll, p))
+            if len(kept) == self.n_members:
+                break
+        nlls = np.array([k[0] for k in kept])
+        w = np.exp(-(nlls - nlls.min()) / 2.0)      # tempered: raw exp(-nll) collapses onto one member
+        self.weights = w / w.sum()
+        self.members = []
+        for _, p in kept:
+            ls, s2, sn2 = probe._unpack(p, d)
+            self.members.append(GP(kernel=self.kernel, ard=True, fixed=dict(ls=ls, s2=s2, noise=sn2)).fit(X, y))
+        self.X, self.ls = X, self.members[0].ls
+        return self
+
+    def predict(self, Xs, include_noise=False):
+        mus, sds = zip(*(m.predict(Xs, include_noise) for m in self.members))
+        mus, sds = np.array(mus), np.array(sds)
+        w = self.weights[:, None]
+        mu = (w * mus).sum(0)
+        var = (w * (sds ** 2 + mus ** 2)).sum(0) - mu ** 2
+        return mu, np.sqrt(np.maximum(var, 1e-12))
+
+    def sample(self, Xs, n_samples, rng):
+        pick = rng.choice(len(self.members), size=n_samples, p=self.weights)
+        out = np.empty((n_samples, np.atleast_2d(Xs).shape[0]))
+        for i, m in enumerate(self.members):
+            sel = np.nonzero(pick == i)[0]
+            if len(sel):
+                out[sel] = m.sample(Xs, len(sel), rng)
+        return out
+
+    def condition_on(self, x_new, y_new):
+        e = GPEnsemble.__new__(GPEnsemble)
+        e.__dict__.update(self.__dict__)
+        e.members = [m.condition_on(x_new, y_new) for m in self.members]
+        return e
+
+    def describe(self, names=None):
+        return f"{len(self.members)} GPs, weights {np.round(self.weights, 2)}; best: " + self.members[0].describe(names)

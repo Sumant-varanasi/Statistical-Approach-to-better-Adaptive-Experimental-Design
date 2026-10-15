@@ -46,9 +46,12 @@ Two reaction systems
 
 Each system has a TRUE kinetics (what the virtual "real reactor" uses, unknown to the
 advisor) and a GUESS (an order-of-magnitude starting point a chemist could write down).
-The true reactor also has product inhibition (adsorbed C slows every reaction), which the
-advisor's power-law model does NOT contain: the advisor's physics is deliberately imperfect,
-exactly as it would be on a real reactor.
+The true reactor also has Langmuir-Hinshelwood site blocking: adsorbed product C (and, more
+weakly, reactant A) occupies the surface, so every rate is divided by
+(1 + K_C(T) P_C + K_A P_A)^m_j, with m_j the number of sites in the rate-determining step
+(the molecularity of the forward reaction) and K_C falling with temperature as adsorption is
+exothermic.  The advisor's model (kinetics.py) can learn product inhibition, but it never has
+the reactant term, so its physics stays deliberately imperfect, as on a real reactor.
 
 Kinetic parameters are written per reaction j as
     a_j = ln k_j(T_REF)                 (rate constant per m2 at the reference temperature)
@@ -136,12 +139,15 @@ class ReactionSystem:
     thermo      per reaction (dH J/mol, dS J/mol/K) or None if irreversible
     theta_true  true kinetics of the virtual reactor
     theta_guess a chemist's order-of-magnitude guess (start of the fit)
-    K_inhib     true product-inhibition constant on C (1/bar); 0 = none.  Not in the advisor model.
+    K_inhib     true product-adsorption constant K_C at T_REF (1/bar); 0 = none
+    e_inhib     -dH_ads/(R T_REF) of the product: K_C(T) = K_inhib exp(e_inhib (T_REF/T - 1))
+    K_A         true reactant-adsorption constant (1/bar, taken temperature-independent)
+    dH          reaction enthalpies (J/mol) of every reaction, for the adiabatic temperature rise
     prices      economics used by the profit objective
     """
 
     def __init__(self, name, species, nu, fwd, rev, thermo, theta_true, theta_guess,
-                 K_inhib, prices, product="C", description=""):
+                 K_inhib, prices, product="C", description="", e_inhib=0.0, K_A=0.0, dH=None):
         self.name = name
         self.species = list(species)
         self.ns = len(species)
@@ -152,10 +158,12 @@ class ReactionSystem:
         self.thermo = thermo
         self.theta_true = np.asarray(theta_true, float)
         self.theta_guess = np.asarray(theta_guess, float)
-        self.K_inhib = K_inhib
+        self.K_inhib, self.e_inhib, self.K_A = K_inhib, e_inhib, K_A
         self.prices = prices
         self.iC = self.species.index(product)
         self.description = description
+        self.sites = self.fwd.sum(1)                   # m_j: molecularity of the forward step
+        self.dH = np.array(dH if dH is not None else [th[0] if th else 0.0 for th in thermo], float)
 
     # ------------------------------------------------------------------ physics
     def log_keq(self, T):
@@ -168,9 +176,12 @@ class ReactionSystem:
                 out[:, j] = (-dH / (R * T) + dS / R)[:, 0]
         return out
 
-    def rates(self, Pp, T, theta, inhib=0.0):
+    def rates(self, Pp, T, theta, inhib=0.0, K_A=0.0):
         """Reaction rates (n x nr) in mol m^-2 s^-1 from partial pressures Pp (n x ns, bar).
-        theta is (p,) for one kinetics or (n, p) for one kinetics per row."""
+        theta is (p,) for one kinetics or (n, p) for one kinetics per row.
+        inhib: product-adsorption constant K_C (1/bar), scalar or one per row; K_A: reactant
+        adsorption constant.  Every rate j is divided by (1 + K_C P_C + K_A P_A)^m_j, m_j = number
+        of surface sites in the forward step (sum of its reaction orders)."""
         th = np.atleast_2d(theta)
         a, b = th[:, 0::2], th[:, 1::2]                         # (1 or n, nr)
         lnk = a - b * (T_REF / T[:, None] - 1.0)
@@ -182,18 +193,24 @@ class ReactionSystem:
         if rev_j.any():
             back = np.exp(lnk[:, rev_j] + lnP @ self.rev[rev_j].T - lk[:, rev_j])
             r[:, rev_j] = fwd[:, rev_j] - back
-        if inhib:
-            r = r / (1.0 + inhib * Pp[:, [self.iC]]) ** 2
+        if np.any(inhib) or K_A:
+            K = np.asarray(inhib, float)
+            if K.ndim == 1:
+                K = K[:, None]
+            site = 1.0 + K * Pp[:, [self.iC]] + K_A * Pp[:, [0]]
+            r = r / site ** self.sites[None, :]
         return r
 
     # ------------------------------------------------------------------ batch simulation
     def simulate(self, P, VA, VB, VI, W, T, theta=None, truth=False, method="fast", groups=None,
-                 a_spec=A_SPEC):
+                 a_spec=A_SPEC, inhib=None):
         """Outlet molar flows (n x ns, mol/s) for n experiments at once.
 
         P bar, VA/VB/VI standard mL/min, W g of catalyst, T K; a_spec m2/g (scalar or per row).
-        truth=True -> the virtual real reactor (true kinetics + product inhibition).
-        Otherwise the advisor's model with the given theta (no inhibition).
+        truth=True -> the virtual real reactor (true kinetics, product and reactant adsorption
+        with the product constant falling with temperature).  Otherwise the advisor's model with
+        the given theta and, if `inhib` is given (scalar or one value per row), product
+        inhibition with that constant (and no reactant term).
         Integrates in the dimensionless bed coordinate s = S / (a_s Wcat) in [0, 1], with flows
         divided by the inlet total flow, so all states are O(1).
 
@@ -211,10 +228,13 @@ class ReactionSystem:
         n = max(map(len, (P, VA, VB, VI, W, T, a_s)))
         P, VA, VB, VI, W, T, a_s = (np.broadcast_to(v, (n,)).copy() for v in (P, VA, VB, VI, W, T, a_s))
         if truth:
-            theta, inhib = self.theta_true, self.K_inhib
+            theta = self.theta_true
+            inhib_v = self.K_inhib * np.exp(self.e_inhib * (T_REF / T - 1.0))    # K_C(T), per row
+            K_A = self.K_A
         else:
-            inhib = 0.0
+            inhib_v, K_A = (0.0 if inhib is None else np.asarray(inhib, float)), 0.0
         theta = np.asarray(theta, float)
+        inhib_rows = np.ndim(inhib_v) == 1
         F0 = np.zeros((n, self.ns))
         F0[:, 0], F0[:, 1], F0[:, -1] = mfc_to_molar(VA), mfc_to_molar(VB), mfc_to_molar(VI)
         FT0 = F0.sum(1)
@@ -228,7 +248,8 @@ class ReactionSystem:
             f = np.maximum(f, 0.0)
             Pp = P[idx, None] * f / f.sum(1, keepdims=True)
             th = theta[idx] if th_rows else theta
-            return scale_[idx, None] * (self.rates(Pp, T[idx], th, inhib) @ nuT)
+            K = inhib_v[idx] if inhib_rows else inhib_v
+            return scale_[idx, None] * (self.rates(Pp, T[idx], th, K, K_A) @ nuT)
 
         if method == "lsoda":
             sol = solve_ivp(lambda s, y: g(y.reshape(n, -1)).ravel(), (0.0, 1.0), f0.ravel(),
@@ -279,6 +300,8 @@ class ReactionSystem:
                 - p["c_comp"] * F0m.sum(1) * np.log(np.asarray(P, float))
                 - p["c_cat"] * np.asarray(W, float))
 
+    CP_GAS = 35.0        # J mol^-1 K^-1, a typical ideal-gas heat capacity for the mixture
+
     def kpis(self, F, F0):
         """Conversion of A, selectivity to C, yield of C."""
         FA0 = F0[:, 0]
@@ -287,6 +310,18 @@ class ReactionSystem:
         made = F[:, 2:-1].sum(1)
         SC = np.where(made > 0, F[:, self.iC] / np.maximum(made, 1e-30), np.nan)
         return XA, SC, YC
+
+    def extents(self, F, F0):
+        """Extent of every reaction (mol/s), solved from the change in molar flows."""
+        dF = (F - F0)[:, :-1]
+        xi, *_ = np.linalg.lstsq(self.nu[:-1], dF.T, rcond=None)
+        return xi.T
+
+    def dT_ad(self, F, F0):
+        """Adiabatic temperature rise (K) if the heat of reaction were not removed: the number
+        the isothermal model cannot see and an operator must bound.  sum_j (-dH_j) xi_j / (F_T0 c_p)."""
+        xi = self.extents(F, F0)
+        return (xi @ (-self.dH)) / (F0.sum(1) * self.CP_GAS)
 
 
 _GAMMA = 1.0 + 1.0 / np.sqrt(2.0)
@@ -370,7 +405,8 @@ SIMPLE = ReactionSystem(
     thermo=[None, None],
     theta_true=theta_from([2.0e-7, 2.0e-7], [80e3, 120e3]),     # = reactor_twin.DEFAULT_THETA per gram
     theta_guess=theta_from([1e-6, 1e-6], [100e3, 100e3]),
-    K_inhib=0.02,
+    K_inhib=0.02, e_inhib=8.0, K_A=0.005,                        # K_C: -dH_ads ~ 38 kJ/mol
+    dH=[-80e3, 40e3],                                            # A+B->C exothermic, cracking endothermic
     prices=dict(_BASE_PRICES, disposal={}),
     description="A + B -> C (wanted),  A -> D (side reaction)",
 )
@@ -393,7 +429,8 @@ COMPLEX = ReactionSystem(
     thermo=[(-120e3, -170.0), None, None],         # A + B <=> C: exothermic, fewer molecules
     theta_true=theta_from([3.0e-6, 3.0e-7, 1.0e-6], [70e3, 120e3, 150e3]),
     theta_guess=theta_from([1e-6, 1e-6, 1e-6], [100e3, 100e3, 100e3]),
-    K_inhib=0.03,
+    K_inhib=0.03, e_inhib=10.0, K_A=0.005,                       # K_C: -dH_ads ~ 48 kJ/mol
+    dH=[-120e3, -60e3, 50e3],                                    # main exothermic, over-reaction exothermic, cracking endothermic
     prices=dict(_BASE_PRICES, disposal={"D": 0.10, "E": 0.15}),
     description="A + B <=> C (wanted, reversible),  C + B -> E (over-reaction),  A -> D (cracking)",
 )
@@ -410,7 +447,7 @@ COMPLEX_MISSING_E = ReactionSystem(
     thermo=[COMPLEX.thermo[0], None],
     theta_true=COMPLEX.theta_true[[0, 1, 4, 5]],
     theta_guess=COMPLEX.theta_guess[[0, 1, 4, 5]],
-    K_inhib=0.0,
+    K_inhib=0.0, dH=[-120e3, 50e3],
     prices=COMPLEX.prices,
     description="advisor model WITHOUT the over-reaction C + B -> E",
 )

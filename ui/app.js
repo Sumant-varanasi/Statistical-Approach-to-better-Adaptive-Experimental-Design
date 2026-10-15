@@ -67,6 +67,8 @@ function renderSetup() {
   $("s-wcat").value = st.wcat; $("s-aspec").value = st.a_spec;
   ["P", "VA", "VB", "VI", "T"].forEach((k, i) => { $("s-step-" + k).value = st.max_step[i]; });
   $("s-cost").value = st.trial_cost ?? ""; $("s-hours").value = st.hours; $("s-seed").value = st.seed;
+  $("s-spec-SC").value = st.spec.S_C ?? ""; $("s-spec-dT").value = st.spec.dT_ad ?? ""; $("s-remaining").value = st.remaining;
+  $("s-deact").value = st.deactivation ?? 0;
 
   const L = $("limits");
   L.innerHTML = "";
@@ -94,6 +96,8 @@ async function applySettings() {
     max_step: ["P", "VA", "VB", "VI", "T"].map((k) => +$("s-step-" + k).value),
     lo: [0, 1, 2, 3, 4].map((i) => +$("s-lo-" + i).value), hi: [0, 1, 2, 3, 4].map((i) => +$("s-hi-" + i).value),
     fixed: {}, prices: {}, trial_cost: $("s-cost").value === "" ? null : +$("s-cost").value, hours: +$("s-hours").value, seed: +$("s-seed").value,
+    spec: { S_C: $("s-spec-SC").value === "" ? null : +$("s-spec-SC").value, dT_ad: $("s-spec-dT").value === "" ? null : +$("s-spec-dT").value },
+    remaining: +$("s-remaining").value, deactivation: +($("s-deact").value || 0),
   };
   for (let i = 0; i < 5; i++) if ($("s-fx-" + i).checked) {
     if ($("s-fxv-" + i).value === "") { setMsg("setup-msg", `give a value for the fixed ${knobLabel(i).toLowerCase()}`, "err"); return false; }
@@ -118,6 +122,7 @@ function runInputs() {
       el("input", { type: "number", id: "r-" + S.meta.knobs[i], step: "any", required: "", min: S.meta.box_lo[i], max: S.meta.box_hi[i], "aria-label": `${knobLabel(i)} of this run` })));
   }
   ri.append(el("label", {}, "Catalyst ", el("span", { class: "unit" }, "g"), el("input", { type: "number", id: "r-W", step: "any", required: "", min: "0.001", "aria-label": "catalyst mass of this run" })));
+  ri.append(el("label", {}, "Run lasted ", el("span", { class: "unit" }, "h"), el("input", { type: "number", id: "r-hours", step: "any", required: "", min: "0.1", "aria-label": "duration of this run in hours" })));
   const gi = $("gc-inputs"); gi.innerHTML = "";
   for (const sp of S.meta.species) {
     gi.append(el("label", {}, sp === "I" ? "I (inert)" : sp, el("span", { class: "unit" }, "% or fraction"),
@@ -131,6 +136,7 @@ function openForm(run) {
   const src = run || last || null;
   for (let i = 0; i < 5; i++) $("r-" + S.meta.knobs[i]).value = src ? src[S.meta.knobs[i]] : "";
   $("r-W").value = run ? run.W : (last ? last.W : S.settings.wcat);
+  $("r-hours").value = run ? run.hours : (last ? last.hours : S.meta.hours_per_run);
   S.meta.species.forEach((sp, k) => { $("r-gc-" + sp).value = run ? (run.gc[k] * 100).toFixed(3) : ""; });
   setMsg("run-msg", "");
   $("run-form").hidden = false;
@@ -140,7 +146,7 @@ $("btn-add").addEventListener("click", () => openForm(null));
 $("run-cancel").addEventListener("click", () => { $("run-form").hidden = true; editIndex = null; });
 $("run-form").addEventListener("submit", async (ev) => {
   ev.preventDefault();
-  const body = { gc: S.meta.species.map((sp) => +$("r-gc-" + sp).value), W: +$("r-W").value, source: "manual" };
+  const body = { gc: S.meta.species.map((sp) => +$("r-gc-" + sp).value), W: +$("r-W").value, hours: +$("r-hours").value, source: "manual" };
   for (let i = 0; i < 5; i++) body[S.meta.knobs[i]] = +$("r-" + S.meta.knobs[i]).value;
   try {
     const wasEdit = editIndex !== null;
@@ -180,9 +186,9 @@ function renderRuns() {
   const head = T.querySelector("thead"); head.innerHTML = "";
   const tr1 = el("tr", {}, el("th", { class: "first", rowspan: 2 }, "Run"));
   for (let i = 0; i < 5; i++) tr1.append(el("th", { rowspan: 2 }, `${knobLabel(i)} (${knobUnit(i)})`));
-  tr1.append(el("th", { rowspan: 2 }, "Cat. (g)"), el("th", { class: "grp", colspan: sp.length }, "GC reading (%)"),
-    el("th", { class: "grp", rowspan: 2 }, "Conv."), el("th", { rowspan: 2 }, "Select."), el("th", { rowspan: 2 }, "Profit /h"),
-    el("th", { rowspan: 2 }, "Model /h"), el("th", { rowspan: 2 }, ""));
+  tr1.append(el("th", { rowspan: 2 }, "Cat. (g)"), el("th", { rowspan: 2 }, "Hours"), el("th", { class: "grp", colspan: sp.length }, "GC reading (%)"),
+    el("th", { class: "grp", rowspan: 2 }, "Conv."), el("th", { rowspan: 2 }, "Select."), el("th", { rowspan: 2, title: "adiabatic temperature rise implied by the GC reading" }, "ΔT ad (K)"),
+    el("th", { rowspan: 2 }, "Profit /h"), el("th", { rowspan: 2 }, "Model /h"), el("th", { rowspan: 2 }, ""));
   const tr2 = el("tr", {}); for (const s of sp) tr2.append(el("th", {}, s));
   head.append(tr1, tr2);
   const body = T.querySelector("tbody"); body.innerHTML = "";
@@ -190,9 +196,9 @@ function renderRuns() {
     const tr = el("tr", { class: (idx === S.best_idx ? "best " : "") + (idx === S.runs.length - 1 ? "last" : "") });
     tr.append(el("td", { class: "first num" }, `${r.i + 1} `, el("span", { class: "src", title: r.source === "virtual" ? "measured on the virtual reactor" : "entered by you" }, r.source === "virtual" ? "sim" : "")));
     for (let i = 0; i < 5; i++) tr.append(el("td", { class: "num" }, fmt(r[S.meta.knobs[i]], knobDec(i))));
-    tr.append(el("td", { class: "num" }, fmt(r.W, 2)));
+    tr.append(el("td", { class: "num" }, fmt(r.W, 2)), el("td", { class: "num" }, fmt(r.hours, 0)));
     r.gc.forEach((g) => tr.append(el("td", { class: "gc" }, fmt(100 * g, 1))));
-    tr.append(el("td", { class: "num" }, fmt(r.XA, 2)), el("td", { class: "num" }, fmt(r.SC, 2)));
+    tr.append(el("td", { class: "num" }, fmt(r.XA, 2)), el("td", { class: "num" }, fmt(r.SC, 2)), el("td", { class: "num" }, fmt(r.dT, 0)));
     tr.append(el("td", { class: "num profit" }, el("span", { class: r.profit < 0 ? "neg" : "" }, fmt(r.profit, 1))));
     tr.append(el("td", { class: "num" }, r.pred === null ? "–" : fmt(r.pred, 1)));
     tr.append(el("td", {}, el("button", { class: "row-btn", type: "button", title: "edit", "aria-label": `edit run ${r.i + 1}`, onclick: () => openForm(r) }, "✎"),
@@ -255,7 +261,8 @@ function renderAdvice() {
   });
   $("next-pred").innerHTML = `${fmt(nx.pred, 1)} <small>/ h</small>`;
   $("next-range").textContent = `likely between ${fmt(nx.lo, 1)} and ${fmt(nx.hi, 1)}`;
-  $("next-why").textContent = nx.why + (nx.same_as_last ? " (It repeats your last run to confirm it.)" : "");
+  $("next-why").textContent = nx.why + (nx.same_as_last && nx.kind !== "stay" ? " (It repeats your last run to confirm it.)" : "")
+    + (Object.keys(nx.spec || {}).length ? ` Meets your spec with ${fmt(100 * nx.p_spec, 0)} % probability.` : "");
 
   const pl = A.plan;
   $("plan-steps").textContent = pl.steps_away === 0 ? "you are there" : `${pl.steps_away} run${pl.steps_away > 1 ? "s" : ""} away`;

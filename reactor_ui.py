@@ -33,7 +33,8 @@ warnings.filterwarnings("ignore")
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from smart.systems import (SYSTEMS, LOW, HIGH, MAX_STEP, MIN_TOTAL_FLOW, WCAT, A_SPEC, R, T_REF, DIM,
                            unscale, scale, physical, feasible, base_case, screening_runs, theta_to_physical)
-from smart.advisor import SmartAdvisor, VirtualReactor, profit_from_gc, kpis_from_gc, step_box
+from smart.advisor import SmartAdvisor, VirtualReactor, profit_from_gc, kpis_from_gc, dT_ad_from_gc, step_box
+from smart.kinetics import HOURS_PER_RUN
 
 UI_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ui")
 KNOB_KEYS = ["P", "VA", "VB", "VI", "T"]
@@ -41,6 +42,7 @@ KNOB_NAMES = ["Pressure", "Flow of A", "Flow of B", "Inert flow", "Temperature"]
 KNOB_UNITS = ["bar", "mL/min", "mL/min", "mL/min", "°C"]
 KNOB_DEC = [0, 1, 1, 1, 0]
 LOG_COLS = ["pressure_bar", "flow_A_mL_min", "flow_B_mL_min", "flow_I_mL_min", "temperature_C", "catalyst_g"]
+SPEC_LABELS = dict(S_C="minimum selectivity to C", dT_ad="maximum adiabatic temperature rise (K)")
 REACTIONS = {
     "simple": [dict(name="Main reaction", eq="A + B → C", role="wanted"),
                dict(name="Side reaction", eq="A → D", role="unwanted by-product")],
@@ -99,6 +101,9 @@ class Campaign:
         self.prices = dict(SYSTEMS[self.system].prices)
         self.prices.pop("disposal", None)
         self.trial_cost, self.hours = None, 8000.0
+        self.spec = {}                         # product / safety spec, e.g. {"S_C": 0.9, "dT_ad": 60}
+        self.remaining = 10                    # runs the operator can still afford
+        self.deactivation = 0.0                # virtual reactor only: activity lost per day, %
         self.seed = 0
         self.runs = []                         # dicts: P, VA, VB, VI, T (K), W, gc (list), source
         self.vr = None
@@ -123,9 +128,10 @@ class Campaign:
 
     def reactor(self, wcat=None):
         wcat = self.wcat if wcat is None else float(wcat)
-        key = (self.system, wcat, self.a_spec, self.seed, tuple(sorted(self.prices.items())))
+        key = (self.system, wcat, self.a_spec, self.seed, self.deactivation, tuple(sorted(self.prices.items())))
         if self.vr is None or self.vr_key != key:
-            self.vr = VirtualReactor(self.S(), seed=self.seed, wcat=wcat, a_spec=self.a_spec)
+            self.vr = VirtualReactor(self.S(), seed=self.seed, wcat=wcat, a_spec=self.a_spec,
+                                     deactivation=self.deactivation / 100.0 / 24.0)
             self.vr_key = key
         return self.vr
 
@@ -140,22 +146,27 @@ class Campaign:
 
     def kpis(self):
         if not self.runs:
-            return [], [], []
+            return [], [], [], []
         S = self.S()
         phys6, gc = self.arrays()
         prof = profit_from_gc(S, phys6, gc)
         XA, SC, _ = kpis_from_gc(S, phys6, gc)
-        return prof.tolist(), XA.tolist(), SC.tolist()
+        dT = dT_ad_from_gc(S, phys6, gc)
+        return prof.tolist(), XA.tolist(), SC.tolist(), dT.tolist()
+
+    def hours_rows(self):
+        return np.array([r.get("hours", HOURS_PER_RUN) for r in self.runs], float)
 
     # ------------------------------------------------------------------ state for the page
     def state(self):
-        prof, XA, SC = self.kpis()
+        prof, XA, SC, dT = self.kpis()
         pred = self.analysis["pred"] if self.analysis else [None] * len(self.runs)
         runs = []
         for i, r in enumerate(self.runs):
             runs.append(dict(i=i, **user_row([r["P"], r["VA"], r["VB"], r["VI"], r["T"]]), W=rnd(r["W"], 3),
+                             hours=rnd(r.get("hours", HOURS_PER_RUN), 2),
                              gc=[rnd(v, 5) for v in r["gc"]], source=r["source"],
-                             profit=rnd(prof[i], 2), XA=rnd(XA[i], 3), SC=rnd(SC[i], 3),
+                             profit=rnd(prof[i], 2), XA=rnd(XA[i], 3), SC=rnd(SC[i], 3), dT=rnd(dT[i], 1),
                              pred=rnd(pred[i], 2) if pred[i] is not None else None))
         lo_u, hi_u = list(self.lo), list(self.hi)
         lo_u[4], hi_u[4] = rnd(C(lo_u[4]), 2), rnd(C(hi_u[4]), 2)
@@ -163,11 +174,13 @@ class Campaign:
         return dict(
             settings=dict(system=self.system, wcat=self.wcat, a_spec=self.a_spec, max_step=self.max_step,
                           lo=lo_u, hi=hi_u, fixed=fixed_u, prices=self.prices, trial_cost=self.trial_cost,
-                          hours=self.hours, seed=self.seed),
+                          hours=self.hours, seed=self.seed, spec=self.spec, remaining=self.remaining,
+                          deactivation=self.deactivation),
             meta=dict(knobs=KNOB_KEYS, names=KNOB_NAMES, units=KNOB_UNITS, dec=KNOB_DEC,
                       box_lo=[LOW[0], LOW[1], LOW[2], LOW[3], rnd(C(LOW[4]), 2)], box_hi=[HIGH[0], HIGH[1], HIGH[2], HIGH[3], rnd(C(HIGH[4]), 2)],
                       min_total_flow=MIN_TOTAL_FLOW, species=self.species(), reactions=REACTIONS,
                       descriptions={k: v.description for k, v in SYSTEMS.items()}, price_labels=PRICE_LABELS,
+                      spec_labels=SPEC_LABELS, hours_per_run=HOURS_PER_RUN,
                       default_prices={k: {kk: vv for kk, vv in v.prices.items() if kk != "disposal"} for k, v in SYSTEMS.items()}),
             runs=runs, n=len(runs), truth_known=self.truth_known(),
             analysis_ready=self.analysis is not None, busy=self.busy,
@@ -239,6 +252,24 @@ class Campaign:
                     raise ValueError("operating hours per year must be positive")
             if "seed" in b:
                 new["seed"] = int(b["seed"])
+            if "spec" in b:
+                sp = {}
+                for k, v in (b["spec"] or {}).items():
+                    if k in SPEC_LABELS and v not in (None, ""):
+                        sp[k] = float(v)
+                        if k == "S_C" and not 0 < sp[k] <= 1:
+                            raise ValueError("the minimum selectivity must be between 0 and 1")
+                        if k == "dT_ad" and sp[k] <= 0:
+                            raise ValueError("the maximum temperature rise must be positive")
+                new["spec"] = sp
+            if "remaining" in b:
+                new["remaining"] = int(b["remaining"])
+                if new["remaining"] < 1:
+                    raise ValueError("runs you can still afford must be at least 1")
+            if "deactivation" in b:
+                new["deactivation"] = float(b["deactivation"] or 0.0)
+                if not 0 <= new["deactivation"] < 50:
+                    raise ValueError("activity loss per day must be between 0 and 50 %")
             for k, v in new.items():
                 setattr(self, k, v)
             self._invalidate()
@@ -249,9 +280,12 @@ class Campaign:
         try:
             P, VA, VB, VI, T = (float(b[k]) for k in KNOB_KEYS)
             W = float(b.get("W", self.wcat))
+            hours = float(b.get("hours") or HOURS_PER_RUN)
             gc = [float(v) for v in b["gc"]]
         except (KeyError, TypeError, ValueError):
             raise ValueError("every set point and every GC value is needed, as numbers")
+        if hours <= 0:
+            raise ValueError("the run's duration must be positive")
         if len(gc) != len(self.species()):
             raise ValueError(f"this chemistry has {len(self.species())} GC columns ({', '.join(self.species())})")
         if min(gc) < 0 or sum(gc) <= 0:
@@ -272,7 +306,7 @@ class Campaign:
             raise ValueError(f"total feed must be at least {MIN_TOTAL_FLOW:g} mL/min for the GC")
         if W <= 0:
             raise ValueError("catalyst mass must be positive")
-        return dict(P=P, VA=VA, VB=VB, VI=VI, T=Tk, W=W, gc=gc.tolist(), source=b.get("source", "manual"))
+        return dict(P=P, VA=VA, VB=VB, VI=VI, T=Tk, W=W, hours=hours, gc=gc.tolist(), source=b.get("source", "manual"))
 
     def add_run(self, b):
         with self.lock:
@@ -318,6 +352,7 @@ class Campaign:
         for r in rows:
             new.append(self._parse_run(dict(P=r["pressure_bar"], VA=r["flow_A_mL_min"], VB=r["flow_B_mL_min"],
                                             VI=r["flow_I_mL_min"], T=r["temperature_C"], W=r["catalyst_g"],
+                                            hours=(r.get("hours_h") or "").strip() or HOURS_PER_RUN,
                                             gc=[r[f"gc_{s}"] for s in species], source="manual")))
         with self.lock:
             if b.get("replace", True):
@@ -338,7 +373,7 @@ class Campaign:
             for row in rows:
                 r = vr.run(scale(row)[0])
                 self.runs.append(dict(P=row[0], VA=row[1], VB=row[2], VI=row[3], T=row[4], W=self.wcat,
-                                      gc=r["gc"].tolist(), source="virtual"))
+                                      hours=r["hours"], gc=r["gc"].tolist(), source="virtual"))
             self._invalidate()
         return self.state()
 
@@ -354,13 +389,15 @@ class Campaign:
         hi = (np.array(self.hi) - LOW) / (HIGH - LOW)
         fixed = {i: (v - LOW[i]) / (HIGH[i] - LOW[i]) for i, v in self.fixed.items()}
         key = (self.system, self.a_spec, self.seed, float(phys6[-1, 5]), tuple(self.max_step), tuple(self.lo),
-               tuple(self.hi), tuple(sorted(fixed.items())), tuple(sorted(self.prices.items())))
+               tuple(self.hi), tuple(sorted(fixed.items())), tuple(sorted(self.prices.items())),
+               tuple(sorted(self.spec.items())))
         adv = getattr(self, "_adv", None)
         if adv is None or getattr(self, "_adv_key", None) != key:
             adv = SmartAdvisor(S, wcat=phys6[-1, 5], a_spec=self.a_spec, seed=self.seed, lo=lo, hi=hi,
-                               fixed=fixed, max_step=self.max_step)
+                               fixed=fixed, max_step=self.max_step, spec=self.spec, remaining=self.remaining)
             self._adv, self._adv_key = adv, key
-        adv.update(X, gc, prof, wcat_rows=phys6[:, 5])
+        adv.remaining = self.remaining
+        adv.update(X, gc, prof, wcat_rows=phys6[:, 5], hours=self.hours_rows())
         return S, adv, X, prof
 
     def analyse(self, b=None):
@@ -423,9 +460,17 @@ class Campaign:
     def _next_block(self, adv, S, X, info, x_next, x_last, x_best, mu_data):
         gain = info["pred"] - mu_data[int(np.argmax(mu_data))]
         _, _, parts = adv.predict(x_next[None], parts=True)
-        if info.get("mode") == "walk":
-            why = ("Nothing within one step beats your best run yet, but the model is confident a much better "
-                   "region exists (see where this is heading): this is the biggest allowed step toward it.")
+        if info.get("mode") == "recover":
+            why = ("None of the runs within one step is likely to meet your spec, so this is the step most "
+                   "likely to get back within spec while heading toward the predicted best.")
+            kind = "recover"
+        elif info.get("mode") == "stay":
+            why = ("Keep running these settings: nothing within one step is expected to earn more over the runs "
+                   "you have left, so the best use of the next run is production at the best point.")
+            kind = "stay"
+        elif info.get("mode") == "walk":
+            why = ("Nothing within one step beats your best run yet, but over the runs you have left the model "
+                   "expects more from heading toward the predicted best: this is the step that way.")
             kind = "walk"
         elif gain > 1.64 * info["sd"]:
             why = f"The chemistry model is fairly sure this beats your best run, by about {gain:.1f} per hour."
@@ -444,7 +489,9 @@ class Campaign:
         return dict(**user_row(unscale(x_next)[0]), pred=rnd(info["pred"], 2),
                     lo=rnd(info["pred"] - 1.64 * info["sd"], 2), hi=rnd(info["pred"] + 1.64 * info["sd"], 2),
                     ei=rnd(info["ei"], 3), why=why, kind=kind, moves=self._moves(x_last, x_next),
-                    same_as_last=bool(np.max(np.abs(x_next - x_last)) < 1e-6))
+                    same_as_last=bool(np.max(np.abs(x_next - x_last)) < 1e-6),
+                    p_spec=rnd(info.get("p_spec", 1.0), 3), spec=dict(adv.spec),
+                    traj_profit=[rnd(v, 2) for v in info.get("traj_profit", [])])
 
     def _plan_block(self, info):
         return dict(**user_row(unscale(info["model_opt"])[0]), pred=rnd(info["model_opt_pred"], 2),
@@ -469,7 +516,7 @@ class Campaign:
         return out
 
     def _chemistry_block(self, adv, S, X):
-        th = adv.kin.samples(400, np.random.default_rng(1))
+        th = adv.kin.split(adv.kin.samples(400, np.random.default_rng(1)))["kin"]
         Ea = th[:, 1::2] * R * T_REF / 1000.0
         P, VA, VB, VI, T = unscale(X[-1])[0]
         reactions = []
@@ -498,27 +545,48 @@ class Campaign:
                          f"much catalyst you use.")
         notes.append("Diluting with inert lowers every partial pressure and slows all reactions; it only pays "
                      "when it improves selectivity.")
-        resid = (adv.kin.predict_gc(physical(adv.X, adv.W)) - adv.gc)[:, :-1]
+        d = adv.kin.describe(T=T)
+        if d["model"] == "plain":
+            notes.append("Your GC readings are explained by the rate laws alone: no sign yet of the product "
+                         "slowing the reactions or of the catalyst losing activity.")
+        else:
+            notes.append(f"Your data show the product slowing the reactions (product inhibition): with "
+                         f"{d['K_C']:.3g} /bar of product partial pressure the rates halve at about "
+                         f"{1 / max(d['K_C'], 1e-9):.1f} bar of C (likely {d['K_C_lo']:.2g}-{d['K_C_hi']:.2g} /bar). "
+                         f"This is why pushing conversion to the limit pays less than the rate laws alone suggest.")
+        if "loss_per_day" in d:
+            if d["loss_per_day"] > 0:
+                notes.append(f"The catalyst is losing activity: about {100 * d['loss_per_day']:.1f} % per day on stream "
+                             f"(likely {100 * d['loss_lo']:.1f}-{100 * d['loss_hi']:.1f} %). The advice already allows for it; "
+                             f"plan a regeneration or a fresh bed when the loss becomes too costly.")
+            else:
+                notes.append(f"The catalyst is still breaking in: activity rising about {-100 * d['loss_per_day']:.1f} % per day on stream.")
+        elif not adv.kin.has_replicates and len(adv.X) >= 8:
+            notes.append("Whether the catalyst is losing activity cannot be told yet: no set point has been repeated. "
+                         "A check run (repeat an earlier run) would show it.")
+        resid = (adv.kin.predict_gc(physical(adv.X, adv.W), t=adv.t_rows) - adv.gc)[:, :-1]
         Tr = unscale(adv.X)[:, 4]
         return dict(reactions=reactions, notes=notes, miss_pct=rnd(100 * np.median(np.abs(resid)), 2),
                     T_range=[rnd(C(Tr.min()), 0), rnd(C(Tr.max()), 0)], at_T=rnd(C(T), 0),
-                    truth_known=self.truth_known())
+                    truth_known=self.truth_known(), model=d["model"],
+                    K_C=rnd(d.get("K_C"), 4), loss_per_day=rnd(d.get("loss_per_day"), 4),
+                    has_replicates=bool(adv.kin.has_replicates))
 
     def _arrhenius_block(self, adv, S):
         Tg = np.linspace(450, 850, 60)
-        draws = adv.kin.samples(200, np.random.default_rng(0))
+        draws = adv.kin.split(adv.kin.samples(200, np.random.default_rng(0)))["kin"]
         out = dict(x=(1000 / Tg).round(4).tolist(), T_C=[rnd(C(t), 0) for t in Tg], reactions=[])
         for j, rx in enumerate(REACTIONS[S.name]):
             lg = lambda th: (th[2 * j] - th[2 * j + 1] * (T_REF / Tg - 1)) / np.log(10)
             band = np.array([lg(d) for d in draws])
             lo, hi = np.percentile(band, [5, 95], 0)
-            out["reactions"].append(dict(name=rx["name"], eq=rx["eq"], learned=lg(adv.kin.theta).round(3).tolist(),
+            out["reactions"].append(dict(name=rx["name"], eq=rx["eq"], learned=lg(adv.kin.theta_kin).round(3).tolist(),
                                          lo=lo.round(3).tolist(), hi=hi.round(3).tolist(),
                                          truth=(lg(S.theta_true).round(3).tolist() if self.truth_known() else None)))
         return out
 
     def _parity_block(self, adv, S):
-        pred = adv.kin.predict_gc(physical(adv.X, adv.W))
+        pred = adv.kin.predict_gc(physical(adv.X, adv.W), t=adv.t_rows)
         return dict(species=S.species[:-1], meas=adv.gc[:, :-1].round(5).tolist(), pred=pred[:, :-1].round(5).tolist())
 
     def landscape(self, b):
@@ -576,9 +644,10 @@ class Campaign:
             x = np.array(self.analysis["x_next"])
             W = self.runs[-1]["W"]             # the bed that is loaded, as the advice assumed
             vr = self.reactor(W)
-            r = vr.run(x)
+            r = vr.run(x, hours=self.runs[-1].get("hours", HOURS_PER_RUN))
             P, VA, VB, VI, T = unscale(x)[0]
-            self.runs.append(dict(P=P, VA=VA, VB=VB, VI=VI, T=T, W=W, gc=r["gc"].tolist(), source="virtual"))
+            self.runs.append(dict(P=P, VA=VA, VB=VB, VI=VI, T=T, W=W, hours=r["hours"], gc=r["gc"].tolist(),
+                                  source="virtual"))
             self._invalidate()
         return self.state()
 
@@ -587,9 +656,10 @@ class Campaign:
         species = self.species()
         buf = io.StringIO()
         w = csv.writer(buf)
-        w.writerow(["run"] + LOG_COLS + [f"gc_{s}" for s in species])
+        w.writerow(["run"] + LOG_COLS + [f"gc_{s}" for s in species] + ["hours_h"])
         for i, r in enumerate(self.runs, 1):
-            w.writerow([i, r["P"], r["VA"], r["VB"], r["VI"], round(C(r["T"]), 2), r["W"]] + [round(v, 5) for v in r["gc"]])
+            w.writerow([i, r["P"], r["VA"], r["VB"], r["VI"], round(C(r["T"]), 2), r["W"]] + [round(v, 5) for v in r["gc"]]
+                       + [round(r.get("hours", HOURS_PER_RUN), 2)])
         return buf.getvalue()
 
     def export_next(self):

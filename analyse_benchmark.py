@@ -43,8 +43,9 @@ PAIRED = {"bo_v1": False}       # bo_v1 uses its own random start, so it is not 
 COLOR = {"gp_ei": "#2a78d6", "random": "#eb6834", "bo_v1": "#1baf7a", "nn_ei": "#eda100",
          "simplex": "#e87ba4", "lhs": "#008300", "gp_ucb": "#6250d6", "gp_ts": "#e34948",
          "gp_pi": "#008300", "gp_ei_q4": "#e87ba4", "gp_ei_raw": "#1baf7a", "nn_ts": "#eda100",
-         "cgp_ei": "#6250d6", "gp_ei_logw": "#6250d6", "gp_ei_logall": "#e34948"}
-DASH = {"nn_ts": (4, 2), "gp_ei_raw": (4, 2)}
+         "cgp_ei": "#6250d6", "gp_ei_logw": "#6250d6", "gp_ei_logall": "#e34948",
+         "gp_ei_tr": "#eb6834", "gpe_ei": "#1baf7a", "gpe_ei_tr": "#eda100"}
+DASH = {"nn_ts": (4, 2), "gp_ei_raw": (4, 2), "gpe_ei_tr": (4, 2)}
 INK, INK2, MUTED, GRID = "#0b0b0b", "#52514e", "#898781", "#e1e0d9"
 FLOOR = 1e-4                    # regret below this is drawn at the floor (log axis)
 
@@ -54,6 +55,7 @@ GROUPS = {
     "bench_surrogate.png": ["gp_ei", "gp_ei_raw", "nn_ei", "nn_ts"],
     "bench_constrained.png": ["cgp_ei", "gp_ei", "bo_v1", "lhs", "random"],
     "bench_log_inputs.png": ["gp_ei_logw", "gp_ei_logall", "gp_ei", "bo_v1"],
+    "bench_optimisers_v3.png": ["gp_ei", "gp_ei_tr", "gpe_ei", "gpe_ei_tr", "gp_ei_logw"],
 }
 GROUP_SETTINGS = {"bench_constrained.png": ["margin_spec"]}
 
@@ -172,6 +174,7 @@ def convergence_figure(data, strategies, path, title, settings=None):
     axes = np.atleast_1d(axes)
     for ax, setting in zip(axes, settings):
         ends = []
+        t = np.arange(1, 51)
         for s in strategies:
             if s not in data[setting]:
                 continue
@@ -203,8 +206,9 @@ def convergence_figure(data, strategies, path, title, settings=None):
         style(ax)
     axes[0].set_ylabel("Normalised regret (log scale, lower is better)\n0 = true optimum, 1 = typical random point",
                        fontsize=8, color=INK2)
-    h, l = axes[-1].get_legend_handles_labels()
-    fig.legend(h, l, loc="lower center", ncol=min(len(l), 6 if len(settings) > 1 else 3), fontsize=8, frameon=False)
+    h, l = max((ax.get_legend_handles_labels() for ax in axes), key=lambda hl: len(hl[1]))
+    if l:
+        fig.legend(h, l, loc="lower center", ncol=min(len(l), 6 if len(settings) > 1 else 3), fontsize=8, frameon=False)
     fig.suptitle(title + "  (line = median of 20 seeds, band = middle 50 %)", fontsize=10, color=INK)
     fig.tight_layout(rect=(0, 0.06 if len(settings) > 1 else 0.1, 1, 0.95))
     fig.savefig(path, dpi=150)
@@ -281,17 +285,29 @@ def main():
     os.makedirs("figures", exist_ok=True)
     rows, tests = summarise(data)
     for fname, strats in GROUPS.items():
+        present = [st for st in (GROUP_SETTINGS.get(fname) or MAIN_SETTINGS) if st in data]
+        if not present or any(s not in data[st] for st in present for s in strats):
+            print(f"skipping {fname}: not every strategy of the group has runs in results/bench")
+            continue                     # keep the committed figure rather than draw a partial one
         title = {"bench_convergence.png": "BO vs conventional search",
                  "bench_acquisition.png": "Effect of the acquisition function (GP surrogate)",
                  "bench_surrogate.png": "Surrogate model: GP vs neural-network ensemble",
                  "bench_constrained.png": "Constrained BO: best profit that meets the selectivity spec",
-                 "bench_log_inputs.png": "GP inputs on a log scale (same search box, different model view)"}[fname]
+                 "bench_log_inputs.png": "GP inputs on a log scale (same search box, different model view)",
+                 "bench_optimisers_v3.png": "v3 optimisers: trust region and GP ensemble vs plain GP + EI"}[fname]
         convergence_figure(data, strats, os.path.join("figures", fname), title,
                            GROUP_SETTINGS.get(fname))
-    final_regret_figure(data, "figures/bench_final_regret.png")
-    targets_figure(rows, "figures/bench_evals_to_target.png", GROUPS["bench_convergence.png"])
+    core = GROUPS["bench_convergence.png"]
+    if all(s in data.get(st, {}) for st in MAIN_SETTINGS if st in data for s in core):
+        final_regret_figure(data, "figures/bench_final_regret.png")
+        targets_figure(rows, "figures/bench_evals_to_target.png", core)
+    else:
+        print("skipping bench_final_regret.png and bench_evals_to_target.png: the full strategy set is not in results/bench")
 
     for name, recs in [("results/bench_summary.csv", rows), ("results/bench_tests.csv", tests)]:
+        if not recs:
+            print(f"skipping {name}: nothing to write (the reference strategy {REF} has no runs)")
+            continue
         with open(name, "w", newline="") as fh:
             w = csv.DictWriter(fh, fieldnames=list(recs[0]))
             w.writeheader()

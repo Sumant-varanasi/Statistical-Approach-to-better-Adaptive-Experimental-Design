@@ -25,11 +25,12 @@ The story in four parts, printing as it goes and saving one figure per part:
           How narrow the profitable operating window is for each: the "margin for error".
           -> figures/smart_1_operating_window.png
 
-  PART 2  Head-to-head on both chemistries, repeated over 10 starting points:
-              smart advisor (physics + GP)   vs   a chemist's rules of thumb (hill climbing
-              with chemistry heuristics)   vs   plain Bayesian optimisation   vs   random walk
+  PART 2  Head-to-head on three scenarios (simple, complex, complex with a catalyst losing
+          activity), repeated over 10 starting points:
+              smart advisor v5 (kinetics ladder + campaign planner)   vs   smart v4   vs   a
+              chemist's rules of thumb   vs   plain Bayesian optimisation   vs   random walk
           plus a stress test where the advisor's model is MISSING the over-reaction.
-          -> figures/smart_2_progress.png, figures/smart_3_runs_needed.png
+          -> figures/smart_2_progress.png, smart_3_runs_needed.png, smart_5_profit_earned.png
 
   PART 3  Live: the advisor runs the complex reactor, explaining each choice, then shows
           what it learned about the chemistry (rate constants vs the truth, GC predictions
@@ -68,12 +69,14 @@ from smart import benchmark as B
 
 # colours (validated categorical slots, fixed per method across every figure)
 COL = {"plain_bo": "#2a78d6", "smart": "#eb6834", "chemist": "#1baf7a", "random_walk": "#eda100",
-       "smart_missing_E": "#e87ba4"}
-STYLE = {"plain_bo": "-", "smart": "-", "chemist": "--", "random_walk": ":", "smart_missing_E": "-."}
+       "smart_missing_E": "#e87ba4", "smart_v4": "#4a3aa7"}
+STYLE = {"plain_bo": "-", "smart": "-", "chemist": "--", "random_walk": ":", "smart_missing_E": "-.", "smart_v4": "--"}
 SYS_COL = {"simple": "#52514e", "complex": "#4a3aa7"}
 INK, INK2, GRID = "#0b0b0b", "#52514e", "#e5e4e0"
-SHORT = {"smart": "Smart advisor", "plain_bo": "Plain BO", "chemist": "Chemist's rules",
-         "random_walk": "Random walk", "smart_missing_E": "Smart, wrong network"}
+SHORT = {"smart": "Smart v5", "smart_v4": "Smart v4", "plain_bo": "Plain BO", "chemist": "Chemist's rules",
+         "random_walk": "Random walk", "smart_missing_E": "Smart v5, wrong network"}
+SETTINGS = ("simple", "complex", "complex_deact")
+STABLE = ("simple", "complex")
 N_SCREEN = B.N_SCREEN
 os.makedirs("figures", exist_ok=True)
 os.makedirs("results", exist_ok=True)
@@ -151,12 +154,17 @@ def part1():
 
 
 # =================================================================================== PART 2
-def curves(system, method, seeds, budget=25):
-    H = B.load(system, method, seeds, budget)
+def f_best(setting):
+    return true_optimum(B.SETTINGS[setting]["system"])["f_opt"]
+
+
+def load_curves(setting, method, seeds, budget=25):
+    """Per campaign: recommended profit as % of the fresh-catalyst best, and profit earned."""
+    H = B.load(setting, method, seeds, budget)
     if not H:
-        return None
-    f = true_optimum(system)["f_opt"]
-    return np.array([h["rec"] for h in H]) / f * 100      # % of best possible profit
+        return None, None
+    f = f_best(setting)
+    return np.array([h["rec"] for h in H]) / f * 100, np.array([h["cum_true"] for h in H])
 
 
 def runs_to(rel, level=90):
@@ -167,34 +175,37 @@ def runs_to(rel, level=90):
     return np.array(out)
 
 
+def methods_for(setting):
+    return list(B.METHODS) + (["smart_missing_E"] if B.applies("smart_missing_E", setting) else [])
+
+
 def part2(seeds, budget, workers):
-    banner("PART 2 - Head to head: smart advisor vs a chemist's rules vs plain BO vs random walk")
-    say(f"  {seeds} campaigns per method and chemistry (10 different starting points), {budget} runs each.")
+    banner("PART 2 - Head to head: smart advisor v5 vs v4 vs a chemist's rules vs plain BO vs random walk")
+    say(f"  {seeds} campaigns per method and scenario (10 different starting points), {budget} runs each.")
     say(f"  Every method sees the same virtual reactor, the same GC noise and the SAME {N_SCREEN} screening\n"
         "  runs; from then on each proposes runs within the step limits.  Scored by the TRUE profit\n"
-        "  of the settings each method would recommend after each run.\n")
+        "  of the settings each method would recommend after each run, and by the profit EARNED.\n")
     B.run_all(seeds=seeds, budget=budget, workers=workers)
 
-    methods = list(B.METHODS)
-    fig, axes = plt.subplots(1, 2, figsize=(12, 4.6), sharey=True)
-    res = {}
-    for ax, system in zip(axes, ("simple", "complex")):
-        ms = methods + (["smart_missing_E"] if system == "complex" else [])
+    fig, axes = plt.subplots(1, 3, figsize=(16, 4.8), sharey=True)
+    res, cum = {}, {}
+    for ax, setting in zip(axes, SETTINGS):
         ends = []
-        for m in ms:
-            rel = curves(system, m, seeds, budget)
+        for m in methods_for(setting):
+            rel, c = load_curves(setting, m, seeds, budget)
             if rel is None:
                 continue
-            res[(system, m)] = rel
+            res[(setting, m)], cum[(setting, m)] = rel, c
             n = np.arange(1, rel.shape[1] + 1)
             med = np.median(rel, 0)
-            if m in ("smart", "chemist"):
+            if m in ("smart", "smart_v4", "chemist"):
                 q1, q3 = np.percentile(rel, [25, 75], 0)
-                ax.fill_between(n, np.maximum(q1, -60), q3, color=COL[m], alpha=0.15, lw=0)
+                ax.fill_between(n, np.maximum(q1, -60), q3, color=COL[m], alpha=0.13, lw=0)
             ax.plot(n, np.maximum(med, -60), STYLE[m], color=COL[m], lw=2, label=B.LABELS[m])
             ends.append([float(np.clip(med[-1], -55, 100)), SHORT[m]])
         ends.sort(reverse=True)                       # keep end labels >= 7 points apart,
-        ends[0][0] = min(ends[0][0], 94)              # below the 100 % line
+        if ends:
+            ends[0][0] = min(ends[0][0], 94)          # below the 100 % line
         for k in range(1, len(ends)):
             ends[k][0] = min(ends[k][0], ends[k - 1][0] - 7)
         for y, txt in ends:
@@ -204,62 +215,77 @@ def part2(seeds, budget, workers):
         ax.text(N_SCREEN / 2 + 0.5, -58, f"{N_SCREEN} screening\nruns, same\nfor all", fontsize=6.5, color=INK2,
                 ha="center", va="bottom")
         ax.text(N_SCREEN + 0.8, 103, "method chooses, one allowed step per run ->", fontsize=7, color=INK2)
+        if B.SETTINGS[setting]["check_every"]:
+            for r in range(N_SCREEN + B.SETTINGS[setting]["check_every"], budget + 1, B.SETTINGS[setting]["check_every"]):
+                ax.axvline(r, color=GRID, lw=1)
+            ax.text(budget - 0.5, -48, "| = check run (base case repeated)", fontsize=6.5, color=INK2, ha="right")
         style(ax)
-        ax.set_title(B.SYSTEM_LABEL[system], fontsize=10, color=INK)
+        ax.set_title(B.SETTING_LABEL[setting], fontsize=9.5, color=INK)
         ax.set_xlabel("runs on the reactor", fontsize=9, color=INK)
-        ax.set_xlim(0.5, budget + 8)
+        ax.set_xlim(0.5, budget + 9)
         ax.set_ylim(-62, 110)
-    axes[0].set_ylabel("profit of the recommended settings,\n% of the best possible (median over campaigns)",
-                       fontsize=9, color=INK)
-    h, l = axes[1].get_legend_handles_labels()
+    axes[0].set_ylabel("profit of the recommended settings at the current activity,\n% of the fresh-catalyst best (median over campaigns)",
+                       fontsize=8.5, color=INK)
+    h, l = max((ax.get_legend_handles_labels() for ax in axes), key=lambda hl: len(hl[1]))
     fig.legend(h, l, loc="lower center", ncol=3, frameon=False, fontsize=8)
-    fig.suptitle("Shaded = middle half of the campaigns (smart advisor and chemist). Values below -60 % are drawn at -60 %.",
+    fig.suptitle("Shaded = middle half of the campaigns (smart v5, v4 and chemist). Values below -60 % are drawn at -60 %.",
                  fontsize=8.5, color=INK2)
-    fig.tight_layout(rect=(0, 0.1, 1, 0.97))
+    fig.tight_layout(rect=(0, 0.12, 1, 0.97))
     fig.savefig("figures/smart_2_progress.png", dpi=150)
     plt.close(fig)
 
     # table + stats
     lines = []
-    for system in ("simple", "complex"):
-        f = true_optimum(system)["f_opt"]
-        say(f"\n  {B.SYSTEM_LABEL[system]}   (best possible profit {f:.1f} /h)")
-        say(f"    {'method':58s} {'after 10':>9s} {'after 15':>9s} {'after ' + str(budget):>9s} {'runs to 90%':>12s}")
-        for m in methods + (["smart_missing_E"] if system == "complex" else []):
-            if (system, m) not in res:
+    for setting in SETTINGS:
+        f = f_best(setting)
+        say(f"\n  {B.SETTING_LABEL[setting]}   (best possible profit on a fresh catalyst {f:.1f} /h)")
+        say(f"    {'method':58s} {'after 10':>9s} {'after 15':>9s} {'after ' + str(budget):>9s} {'runs to 90%':>16s} {'earned':>8s}")
+        for m in methods_for(setting):
+            if (setting, m) not in res:
                 continue
-            rel = res[(system, m)]
+            rel, c = res[(setting, m)], cum[(setting, m)]
             r90 = runs_to(rel)
             med90 = np.median(r90)
             hit = np.mean(np.isfinite(r90))
-            s90 = f"{med90:g}" if np.isfinite(med90) else f">{budget}"
-            s90 += f" ({100 * hit:.0f}% hit)"
+            s90 = (f"{med90:g}" if np.isfinite(med90) else f">{budget}") + f" ({100 * hit:.0f}% hit)"
             a10, a15, aN = np.median(rel[:, 9]), np.median(rel[:, 14]), np.median(rel[:, -1])
-            say(f"    {B.LABELS[m]:58s} {a10:8.0f}% {a15:8.0f}% {aN:8.0f}% {s90:>16s}")
-            lines.append((system, m, a10, a15, aN, med90, hit))
-        a = res[(system, "smart")]
-        for other in ("chemist", "plain_bo"):
-            b_ = res[(system, other)]
+            earned = np.median(c[:, -1])
+            say(f"    {B.LABELS[m]:58s} {a10:8.0f}% {a15:8.0f}% {aN:8.0f}% {s90:>16s} {earned:8.0f}")
+            lines.append((setting, m, a10, a15, aN, med90, hit, earned))
+        if (setting, "smart") not in res:
+            continue
+        a, ca = res[(setting, "smart")], cum[(setting, "smart")]
+        for other in ("smart_v4", "chemist", "plain_bo"):
+            if (setting, other) not in res:
+                continue
+            b_, cb = res[(setting, other)], cum[(setting, other)]
             k = min(len(a), len(b_))
             for at in (9, 14, budget - 1):
                 try:
                     p = wilcoxon(a[:k, at], b_[:k, at]).pvalue
                 except ValueError:
                     p = 1.0
-                say(f"    smart vs {SHORT[other]:16s} after {at + 1:2d} runs: smart better in "
+                say(f"    v5 vs {SHORT[other]:16s} after {at + 1:2d} runs: v5 better in "
                     f"{np.sum(a[:k, at] > b_[:k, at])}/{k} paired campaigns, Wilcoxon p = {p:.3g}")
+            try:
+                p = wilcoxon(ca[:k, -1], cb[:k, -1]).pvalue
+            except ValueError:
+                p = 1.0
+            say(f"    v5 vs {SHORT[other]:16s} profit earned over {budget} runs: v5 more in "
+                f"{np.sum(ca[:k, -1] > cb[:k, -1])}/{k} campaigns, median {np.median(ca[:, -1]):.0f} vs {np.median(cb[:, -1]):.0f}, p = {p:.3g}")
     plot_runs_needed(res, budget)
-    say("\n  -> figures/smart_2_progress.png, figures/smart_3_runs_needed.png")
-    return res, lines
+    plot_earned(cum, budget)
+    say("\n  -> figures/smart_2_progress.png, figures/smart_3_runs_needed.png, figures/smart_5_profit_earned.png")
+    return res, cum, lines
 
 
 def plot_runs_needed(res, budget):
-    methods = ["smart", "chemist", "plain_bo", "random_walk"]
+    methods = ["smart", "smart_v4", "chemist", "plain_bo"]
     fig, ax = plt.subplots(figsize=(9.5, 4.3))
     w = 0.19
     for j, m in enumerate(methods):
-        for i, system in enumerate(("simple", "complex")):
-            rel = res.get((system, m))
+        for i, setting in enumerate(STABLE):
+            rel = res.get((setting, m))
             if rel is None:
                 continue
             r90 = runs_to(rel)
@@ -278,7 +304,7 @@ def plot_runs_needed(res, budget):
     ax.axhline(N_SCREEN, color=INK2, lw=0.8, ls=":")
     ax.text(1.62, N_SCREEN + 0.4, "screening runs", fontsize=7, color=INK2, ha="right")
     ax.set_xticks([0, 1])
-    ax.set_xticklabels([B.SYSTEM_LABEL["simple"], B.SYSTEM_LABEL["complex"]], fontsize=9)
+    ax.set_xticklabels([B.SETTING_LABEL[s] for s in STABLE], fontsize=9)
     ax.set_ylim(-4, budget + 5)
     ax.set_yticks([t for t in ax.get_yticks() if 0 <= t <= budget])
     ax.set_ylabel("runs needed (median)", fontsize=9, color=INK)
@@ -291,9 +317,38 @@ def plot_runs_needed(res, budget):
     plt.close(fig)
 
 
+def plot_earned(cum, budget):
+    """Profit earned over the whole campaign (every run produces): median with the middle half."""
+    methods = ["smart", "smart_v4", "chemist", "plain_bo", "random_walk"]
+    fig, ax = plt.subplots(figsize=(10, 4.3))
+    w = 0.16
+    for j, m in enumerate(methods):
+        for i, setting in enumerate(SETTINGS):
+            c = cum.get((setting, m))
+            if c is None:
+                continue
+            fin = c[:, -1]
+            med, q1, q3 = np.median(fin), np.percentile(fin, 25), np.percentile(fin, 75)
+            x = i + (j - 2) * (w + 0.015)
+            ax.bar(x, med, w, color=COL[m], label=B.LABELS[m] if i == 0 else None)
+            ax.plot([x, x], [q1, q3], color=INK2, lw=1)
+            ax.text(x, (med if med > 0 else q3) + 4, f"{med:.0f}", ha="center", fontsize=7.5, color=INK)
+    style(ax)
+    ax.axhline(0, color=INK2, lw=0.8)
+    ax.set_xticks(range(len(SETTINGS)))
+    ax.set_xticklabels([B.SETTING_LABEL[s].replace(" (", "\n(") for s in SETTINGS], fontsize=8.5)
+    ax.set_ylabel(f"profit earned over the {budget} runs (money units, median; bar = middle half)", fontsize=8.5, color=INK)
+    ax.set_title("What the campaign earned while it was learning: every run produces, so wandering costs money",
+                 fontsize=9.5, color=INK)
+    ax.legend(frameon=False, fontsize=8, loc="upper center", bbox_to_anchor=(0.5, -0.2), ncol=5)
+    fig.tight_layout()
+    fig.savefig("figures/smart_5_profit_earned.png", dpi=150)
+    plt.close(fig)
+
+
 # =================================================================================== PART 3
 def part3(budget_live=15, seed=0):
-    banner("PART 3 - Live: the advisor runs the complex reactor and explains itself")
+    banner("PART 3 - Live: the v5 advisor runs the complex reactor and explains itself")
     S = SYSTEMS["complex"]
     o = true_optimum("complex")
     f = o["f_opt"]
@@ -320,12 +375,14 @@ def part3(budget_live=15, seed=0):
     say(f"\n  ({time.time() - t0:.0f} s)  Recommended settings now make {h['rec'][-1]:.1f} /h "
         f"= {100 * h['rec'][-1] / f:.0f} % of the best possible, after {budget_live} runs.")
 
-    th_fit, th_true = adv.kin.theta, S.theta_true
+    th_fit, th_true = adv.kin.theta_kin, S.theta_true
     k_f, E_f = theta_to_physical(th_fit)
     k_t, E_t = theta_to_physical(th_true)
-    sd = adv.kin.param_sd()[1::2] * R * T_REF / 1000
+    sd = adv.kin.param_sd()[1:2 * S.nr:2] * R * T_REF / 1000
     names = ["A+B<=>C (main)", "C+B->E (over-reaction)", "A->D (cracking)"]
-    say("\n  What it learned (from GC readings only):")
+    dsc = adv.kin.describe()
+    say(f"\n  What it learned (from GC readings only; model the data chose: {dsc['model']}"
+        + (f", K_C = {dsc['K_C']:.3g} /bar" if "K_C" in dsc else "") + "):")
     for j in range(3):
         say(f"    {names[j]:24s} Ea fitted {E_f[j]:5.0f} ± {sd[j]:3.0f} kJ/mol   true {E_t[j]:4.0f}"
             f"    k_ref fitted/true = {k_f[j] / k_t[j]:.2f}")
@@ -352,7 +409,7 @@ def plot_learned(adv, th_true, th_fit, names):
     S = SYSTEMS["complex"]
     fig, (a1, a2) = plt.subplots(1, 2, figsize=(11, 4.2))
     Tg = np.linspace(450, 850, 100)
-    draws = adv.kin.samples(200, np.random.default_rng(0))
+    draws = adv.kin.split(adv.kin.samples(200, np.random.default_rng(0)))["kin"]
     cols = ["#2a78d6", "#eb6834", "#1baf7a"]
     for j in range(3):
         lg = lambda th: (th[2 * j] - th[2 * j + 1] * (T_REF / Tg - 1)) / np.log(10)
@@ -365,7 +422,7 @@ def plot_learned(adv, th_true, th_fit, names):
     a1.set_ylabel("log10 rate constant k(T), per m2 of catalyst", fontsize=9, color=INK)
     a1.set_title("Arrhenius plot: learned (dashed, 90 % band) vs true (solid)", fontsize=9.5, color=INK)
     a1.legend(frameon=False, fontsize=7, loc="lower left")
-    pred = adv.kin.predict_gc(physical(adv.X, adv.W))
+    pred = adv.kin.predict_gc(physical(adv.X, adv.W), t=adv.t_rows)
     meas = adv.gc
     for k, sp in enumerate(S.species[:-1]):
         c = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4"][k]
@@ -385,42 +442,50 @@ def plot_learned(adv, th_true, th_fit, names):
 # =================================================================================== PART 4
 def part4(windows, lines, budget, seeds):
     banner("PART 4 - The bottom line for the person running the reactor")
-    get = {(s, m): (a10, a15, aN, r90, hit) for s, m, a10, a15, aN, r90, hit in lines}
+    get = {(st, m): (a10, a15, aN, r90, hit, earned) for st, m, a10, a15, aN, r90, hit, earned in lines}
     out = ["# Smart reactor advisor - demo summary", "",
-           f"{seeds} campaigns per method and chemistry, {budget} runs each ({N_SCREEN} shared screening runs, "
+           f"{seeds} campaigns per method and scenario, {budget} runs each ({N_SCREEN} shared screening runs, "
            f"then one step per run within the step limits; catalyst fixed at {WCAT:g} g). Placeholder kinetics and prices.",
-           "Profit = true profit of the settings each method recommends, as % of the best possible.", "",
-           "| Chemistry | Method | after 10 runs | after 15 | after " + str(budget) + " | runs to reach 90 % |",
-           "|---|---|---|---|---|---|"]
-    for (s, m), (a10, a15, aN, r90, hit) in get.items():
+           "Profit = true profit of the settings each method recommends, as % of the best possible on a fresh catalyst; "
+           "earned = profit produced over the whole campaign (money units).", "",
+           "| Scenario | Method | after 10 runs | after 15 | after " + str(budget) + " | runs to reach 90 % | earned |",
+           "|---|---|---|---|---|---|---|"]
+    for (st, m), (a10, a15, aN, r90, hit, earned) in get.items():
         r = f"{r90:g}" if np.isfinite(r90) else f">{budget}"
-        out.append(f"| {s} | {B.LABELS[m]} | {a10:.0f} % | {a15:.0f} % | {aN:.0f} % | {r} ({100 * hit:.0f} % of campaigns got there) |")
+        out.append(f"| {st} | {B.LABELS[m]} | {a10:.0f} % | {a15:.0f} % | {aN:.0f} % | {r} ({100 * hit:.0f} % of campaigns got there) | {earned:.0f} |")
     out += ["", "## Operating window (range of each knob that keeps >= 90 % of the best profit)", "",
             "| Chemistry | Knob | from | to | share of range |", "|---|---|---|---|---|"]
     for name, knob, lo, hi, frac in windows:
         out.append(f"| {name} | {knob} | {lo:.3g} | {hi:.3g} | {100 * frac:.0f} % |")
 
     fmt = lambda v: f"{v:g}" if np.isfinite(v) else f"more than {budget}"
-    for system in ("simple", "complex"):
-        f = true_optimum(system)["f_opt"]
-        say(f"\n  {system.upper()} reaction ({N_SCREEN} screening runs + chosen runs):")
-        say(f"    {'':18s}{'after 10 runs':>15s}{'after 15 runs':>15s}{'after ' + str(budget):>12s}{'runs to 90 %':>16s}")
-        for m, label in (("smart", "smart advisor"), ("chemist", "chemist's rules"), ("plain_bo", "plain BO")):
-            a10, a15, aN, r90, hit = get[(system, m)]
-            say(f"    {label:18s}{a10:14.0f}%{a15:14.0f}%{aN:11.0f}%{fmt(r90):>16s}")
-    gap = {s: get[(s, "smart")][1] - get[(s, "chemist")][1] for s in ("simple", "complex")}
-    rs = {s: (get[(s, "smart")][3], get[(s, "chemist")][3]) for s in ("simple", "complex")}
+    for st in SETTINGS:
+        say(f"\n  {B.SETTING_LABEL[st]} ({N_SCREEN} screening runs + chosen runs):")
+        say(f"    {'':18s}{'after 10 runs':>15s}{'after 15 runs':>15s}{'after ' + str(budget):>12s}{'runs to 90 %':>16s}{'earned':>9s}")
+        for m, label in (("smart", "smart v5"), ("smart_v4", "smart v4"), ("chemist", "chemist's rules"), ("plain_bo", "plain BO")):
+            if (st, m) not in get:
+                continue
+            a10, a15, aN, r90, hit, earned = get[(st, m)]
+            say(f"    {label:18s}{a10:14.0f}%{a15:14.0f}%{aN:11.0f}%{fmt(r90):>16s}{earned:9.0f}")
+
+    def g(st, m, i):
+        return get[(st, m)][i] if (st, m) in get else float("nan")
     reading = (
-        f"\n  Reading: a good chemist gets there too, given enough runs - after {budget} runs the rules of\n"
-        f"  thumb reach {get[('simple', 'chemist')][2]:.0f} % (simple) and {get[('complex', 'chemist')][2]:.0f} % (complex). "
-        f"The advisor's value is SPEED:\n  it needs {fmt(rs['simple'][0])} runs (simple) and {fmt(rs['complex'][0])} runs (complex) "
-        f"to reach 90 % of the best profit, against\n  {fmt(rs['simple'][1])} and {fmt(rs['complex'][1])} for the chemist, "
-        f"and after 15 runs it is {gap['simple']:.0f} points ahead on the simple\n  reaction and {gap['complex']:.0f} points "
-        "ahead on the complex one. Each run saved is a day of reactor time, feed\n  gas and operator time. "
-        "The advisor is faster because it reads the full GC composition, learns each\n  reaction's temperature "
-        "response and the equilibrium limit from the screening runs alone, and then\n  walks straight to the "
-        "predicted best, one allowed step at a time, instead of probing one knob\n  at a time. Plain BO, which sees "
-        "only profit, cannot plan beyond one step and falls far behind.")
+        f"\n  Reading: v5 against v4 - the kinetics ladder and the campaign planner - reach 90 % of the best\n"
+        f"  profit in {fmt(g('simple', 'smart', 3))} vs {fmt(g('simple', 'smart_v4', 3))} runs (simple) and "
+        f"{fmt(g('complex', 'smart', 3))} vs {fmt(g('complex', 'smart_v4', 3))} runs (complex), and earn\n"
+        f"  {g('simple', 'smart', 5):.0f} vs {g('simple', 'smart_v4', 5):.0f} (simple) and {g('complex', 'smart', 5):.0f} vs "
+        f"{g('complex', 'smart_v4', 5):.0f} (complex) over the campaign. Against a good chemist the\n"
+        f"  advantage is still speed and money: the rules of thumb need {fmt(g('simple', 'chemist', 3))} and "
+        f"{fmt(g('complex', 'chemist', 3))} runs and earn {g('simple', 'chemist', 5):.0f} and {g('complex', 'chemist', 5):.0f}.\n"
+        f"  On the catalyst that loses activity, v5 ends at {g('complex_deact', 'smart', 2):.0f} % of the fresh-catalyst best "
+        f"and earns {g('complex_deact', 'smart', 5):.0f}, against {g('complex_deact', 'smart_v4', 2):.0f} % / "
+        f"{g('complex_deact', 'smart_v4', 5):.0f} for v4 and {g('complex_deact', 'chemist', 2):.0f} % / "
+        f"{g('complex_deact', 'chemist', 5):.0f} for the chemist: it sees the drift\n  in the check runs and keeps re-planning."
+        "\n  Why: v5 reads the full GC composition, learns each reaction's temperature response, the product\n"
+        "  inhibition and - once a set point is repeated - the loss of activity, and plans the next runs as a\n"
+        "  campaign (profit earned on the way plus what the best point found is worth for the runs left),\n"
+        "  instead of optimising one step at a time. Plain BO, which sees only profit, cannot plan beyond one step.")
     say(reading)
     out += ["", "## Reading", "", " ".join(reading.split())]
     with open("results/smart_demo_summary.md", "w", encoding="utf-8") as fh:
@@ -437,7 +502,7 @@ def main():
     a = ap.parse_args()
     t0 = time.time()
     windows = part1()
-    res, lines = part2(a.seeds, a.budget, a.workers)
+    res, cum, lines = part2(a.seeds, a.budget, a.workers)
     if not a.skip_live:
         part3()
     part4(windows, lines, a.budget, a.seeds)

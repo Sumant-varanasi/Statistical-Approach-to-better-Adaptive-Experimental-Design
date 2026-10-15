@@ -44,7 +44,15 @@ Usage
 
 Log format (CSV, one row per run, in the order they were run; GC in mole fractions or %):
     pressure_bar, flow_A_mL_min, flow_B_mL_min, flow_I_mL_min, temperature_C, catalyst_g,
-    gc_A, gc_B, gc_C, gc_D, [gc_E,] gc_I
+    gc_A, gc_B, gc_C, gc_D, [gc_E,] gc_I [, hours_h]
+    hours_h = how long the run lasted (time-on-stream; default 24 h). With it the advisor can
+    tell a catalyst that is losing activity from one that is not - but only if some set point
+    is repeated later in the log (a check run).
+
+Product spec and budget
+    --min-selectivity 0.9      only runs likely to keep selectivity >= 0.9 are suggested
+    --max-dT 60                keep the adiabatic temperature rise under 60 K (thermal safety)
+    --remaining 8              runs you can still afford: the planner weighs exploration by it
 
 Safety: the advisor only SUGGESTS.  Check every suggestion against your plant's safety limits
 (use --limit to keep it inside them) before running it.  Prices are placeholders: replace them.
@@ -65,7 +73,8 @@ except Exception:
 
 from smart.systems import (SYSTEMS, LOW, HIGH, MAX_STEP, MIN_TOTAL_FLOW, WCAT, A_SPEC, R, unscale, scale,
                            physical, base_case, screening_runs)
-from smart.advisor import SmartAdvisor, VirtualReactor, profit_from_gc, kpis_from_gc
+from smart.advisor import SmartAdvisor, VirtualReactor, profit_from_gc, kpis_from_gc, dT_ad_from_gc
+from smart.kinetics import HOURS_PER_RUN
 
 # knobs in the optimiser's order: P, V_A, V_B, V_I, T
 KNOBS = ["pressure", "flow_A", "flow_B", "flow_I", "temperature"]
@@ -111,15 +120,17 @@ def read_log(path, S):
     if np.median(gc.sum(1)) > 1.5:          # given in % -> fractions
         gc = gc / 100.0
     gc = gc / gc.sum(1, keepdims=True)
-    return user, gc
+    hours = np.array([float(r["hours_h"]) if r.get("hours_h", "").strip() else HOURS_PER_RUN for r in rows])
+    return user, gc, hours
 
 
-def write_log(path, S, user, gc):
+def write_log(path, S, user, gc, hours=None):
+    hours = np.full(len(user), HOURS_PER_RUN) if hours is None else np.asarray(hours, float)
     with open(path, "w", newline="") as fh:
         w = csv.writer(fh)
-        w.writerow(["run"] + COLS + [f"gc_{s}" for s in S.species])
-        for i, (u, g) in enumerate(zip(user, gc), 1):
-            w.writerow([i] + [round(v, 3) for v in u] + [round(v, 5) for v in g])
+        w.writerow(["run"] + COLS + [f"gc_{s}" for s in S.species] + ["hours_h"])
+        for i, (u, g, h) in enumerate(zip(user, gc, hours), 1):
+            w.writerow([i] + [round(v, 3) for v in u] + [round(v, 5) for v in g] + [round(h, 2)])
 
 
 def make_demo_log(path, system, wcat, a_spec, seed=0):
@@ -138,7 +149,7 @@ def make_demo_log(path, system, wcat, a_spec, seed=0):
 def explain_chemistry(adv, S, x_ref):
     """Plain-language summary of the fitted kinetics."""
     out = []
-    th = adv.kin.samples(400, np.random.default_rng(1))
+    th = adv.kin.split(adv.kin.samples(400, np.random.default_rng(1)))["kin"]
     Ea = th[:, 1::2] * R * 573.15 / 1000.0                       # kJ/mol for every draw
     P, VA, VB, VI, T = unscale(x_ref)[0]
     names = REACTION_NAMES.get(S.name, [f"reaction {j + 1}" for j in range(S.nr)])
@@ -167,7 +178,18 @@ def explain_chemistry(adv, S, x_ref):
                    f"however much catalyst you use.")
     out.append("   - Diluting with inert lowers every partial pressure, which slows the reactions; it only "
                "pays when it improves selectivity.")
-    resid = (adv.kin.predict_gc(physical(adv.X, adv.W)) - adv.gc)[:, :-1]
+    d = adv.kin.describe()
+    if d["model"] == "plain":
+        out.append("   - Your GC readings are explained by the rate laws alone: no sign yet of the product slowing "
+                   "the reactions or of the catalyst losing activity.")
+    else:
+        out.append(f"   - Your data show the product slowing the reactions (product inhibition, K_C about "
+                   f"{d['K_C']:.3g} /bar, likely {d['K_C_lo']:.2g}-{d['K_C_hi']:.2g}): pushing conversion to the "
+                   f"limit pays less than the rate laws alone suggest.")
+    if d["model"] == "inhib_decay":
+        out.append(f"   - The catalyst is losing about {100 * d['loss_per_run']:.1f} % of its activity per run "
+                   f"(likely {100 * d['loss_lo']:.1f}-{100 * d['loss_hi']:.1f} %); the advice allows for it.")
+    resid = (adv.kin.predict_gc(physical(adv.X, adv.W), t=adv.t_rows) - adv.gc)[:, :-1]
     out.append(f"   - How well this chemistry explains your GC readings: typical miss "
                f"{100 * np.median(np.abs(resid)):.2f} percentage points of composition.")
     return out
@@ -213,15 +235,16 @@ def parse_knob_args(args):
     return lo, hi, fixed, step
 
 
-def advise(args, user, gc, S):
+def advise(args, user, gc, S, hours=None):
     phys6 = to_internal(user)
     X = scale(phys6[:, :5])
     wcat_rows = phys6[:, 5]
     profit = profit_from_gc(S, phys6, gc)
     lo, hi, fixed, step = parse_knob_args(args)
+    spec = {k: v for k, v in dict(S_C=args.min_selectivity, dT_ad=args.max_dT).items() if v is not None}
     adv = SmartAdvisor(S, wcat=wcat_rows[-1], a_spec=args.surface_area, seed=args.seed,
-                       lo=lo, hi=hi, fixed=fixed, max_step=step)
-    adv.update(X, gc, profit, wcat_rows=wcat_rows)
+                       lo=lo, hi=hi, fixed=fixed, max_step=step, spec=spec, remaining=args.remaining)
+    adv.update(X, gc, profit, wcat_rows=wcat_rows, hours=hours)
     x_next, info = adv.suggest(X[-1], np.random.default_rng(args.seed))
     ib = adv.recommend()
     mu_data, sd_data = adv.predict(X)
@@ -232,20 +255,25 @@ def report(args, user, gc, S, adv, X, profit, x_next, info, ib, mu_data):
     line = "=" * 78
     phys6 = to_internal(user)
     XA, SC, _ = kpis_from_gc(S, phys6, gc)
+    dT = dT_ad_from_gc(S, phys6, gc)
     print(line)
     print("  SMART REACTOR ADVISOR")
     print(line)
     print(f"  Chemistry: {S.description}")
     print(f"  Catalyst : {user[-1, 5]:.3g} g loaded, {args.surface_area:.0f} m2/g (fixed for this campaign)")
     print(f"  Your log : {len(profit)} runs from {args.log}.  Money = placeholder prices, per hour.")
-    print(f"  Step limits per run: {MAX_STEP_TEXT(adv)}\n")
+    print(f"  Step limits per run: {MAX_STEP_TEXT(adv)}")
+    if adv.spec:
+        print("  Spec     : " + ", ".join(f"{'selectivity' if k == 'S_C' else 'adiabatic temperature rise'} "
+                                         f"{'>=' if k == 'S_C' else '<='} {v:g}{' K' if k == 'dT_ad' else ''}" for k, v in adv.spec.items()))
+    print(f"  Budget   : {adv.remaining} more run(s) planned for.\n")
 
     print("1. HOW YOUR RUNS WENT  (worked out from your GC readings)")
-    print("   run " + "".join(f"{s[:11]:>12s}" for s in SHOW) + f"{'conv.':>7s}{'select.':>8s}{'profit/h':>10s}")
+    print("   run " + "".join(f"{s[:11]:>12s}" for s in SHOW) + f"{'conv.':>7s}{'select.':>8s}{'dT_ad K':>9s}{'profit/h':>10s}")
     for i, (u, p) in enumerate(zip(user, profit), 1):
         tag = "   <- best" if i - 1 == ib else ""
         print(f"   {i:3d} " + "".join(f"{FMT[j].format(u[j]):>12s}" for j in range(5))
-              + f"{XA[i - 1]:7.2f}{SC[i - 1]:8.2f}{p:10.2f}{tag}")
+              + f"{XA[i - 1]:7.2f}{SC[i - 1]:8.2f}{dT[i - 1]:9.0f}{p:10.2f}{tag}")
     print(f"   Best proven run: run {ib + 1}, making about {mu_data[ib]:.1f} per hour "
           f"(the model's estimate, which smooths out GC noise).\n")
 
@@ -265,9 +293,15 @@ def report(args, user, gc, S, adv, X, profit, x_next, info, ib, mu_data):
     print("   Compared with your last run: " + "; ".join(explain_move(to_user(last), to_user(nxt))) + ".")
     print(f"   Expected profit: {info['pred']:.1f} per hour (likely between {lo90:.1f} and {hi90:.1f}).")
     _, _, parts = adv.predict(x_next[None], parts=True)
-    if info.get("mode") == "walk":
-        why = ("nothing within one step beats your best run yet, but the model is confident a much better "
-               "region exists (see 4): this is the biggest allowed step toward it.")
+    if info.get("mode") == "recover":
+        why = ("none of the runs within one step is likely to meet your spec; this is the step most likely "
+               "to get back within spec while heading toward the predicted best (see 4).")
+    elif info.get("mode") == "stay":
+        why = ("keep running these settings: nothing within one step is expected to earn more over the "
+               "runs you have left, so the best use of the next run is production at the best point.")
+    elif info.get("mode") == "walk":
+        why = ("nothing within one step beats your best run yet, but over the runs you have left the model "
+               "expects more from heading toward the predicted best (see 4): this is the step that way.")
     elif gain > 1.64 * info["sd"]:
         why = f"the chemistry model is fairly sure this beats your best run by about {gain:.1f} per hour."
     elif info["toward_opt"]:
@@ -278,7 +312,10 @@ def report(args, user, gc, S, adv, X, profit, x_next, info, ib, mu_data):
     else:
         why = ("your data and the textbook physics disagree a little around here; this run checks "
                "whether the extra profit the model sees is real.")
-    print(f"   Why this run: {why}\n")
+    print(f"   Why this run: {why}")
+    if adv.spec:
+        print(f"   Meets your spec with probability {100 * info.get('p_spec', 1.0):.0f} % (over the chemistries that fit your data).")
+    print()
 
     print("4. WHERE THIS IS HEADING")
     print("   The model expects the best profit at: " +
@@ -326,25 +363,30 @@ def MAX_STEP_TEXT(adv):
     return f"{s[0]:.0f} bar, {s[1]:.0f}/{s[2]:.0f}/{s[3]:.0f} mL/min (A/B/inert), {s[4]:.0f} °C"
 
 
-def simulate_days(args, S, user, gc):
+def simulate_days(args, S, user, gc, hours):
     """Let the advisor run the (virtual) reactor for N days: each day it suggests a run, the
     virtual reactor + GC produce a reading, the log grows.  Shows how it would be used."""
-    vr = VirtualReactor(S, seed=args.seed + 99, wcat=user[-1, 5], a_spec=args.surface_area)
+    vr = VirtualReactor(S, seed=args.seed + 99, wcat=user[-1, 5], a_spec=args.surface_area,
+                        deactivation=args.deactivation / 100.0 / 24.0)
     print(f"Running the advisor on the virtual {S.name} reactor for {args.simulate_days} days "
-          f"(one run per day, step limits respected) ...\n")
-    print("  day  " + "".join(f"{s[:11]:>12s}" for s in SHOW) + f"{'expected':>10s}{'measured':>10s}{'best so far':>13s}{'best is':>10s}")
+          f"(one run per day, step limits respected" + (f", catalyst losing {args.deactivation:g} %/day" if args.deactivation else "") + ") ...\n")
+    print("  day  " + "".join(f"{s[:11]:>12s}" for s in SHOW) + f"{'expected':>10s}{'measured':>10s}{'best so far':>13s}{'best is':>10s}  what")
     for d in range(1, args.simulate_days + 1):
-        adv, X, profit, x_next, info, ib, mu_data, _ = advise(args, user, gc, S)
+        adv, X, profit, x_next, info, ib, mu_data, _ = advise(args, user, gc, S, hours)
+        if args.check_every and d % args.check_every == 0:          # a check run: repeat the base case
+            x_next, info = X[1].copy(), dict(info, pred=mu_data[1], steps_away=info["steps_away"], mode="check-run")
         r = vr.run(x_next)
         user = np.vstack([user, np.r_[to_user(unscale(x_next))[0], user[-1, 5]]])
         gc = np.vstack([gc, r["gc"]])
+        hours = np.r_[hours, r["hours"]]
         prof = profit_from_gc(S, to_internal(user), gc)
         print(f"  {d:3d}  " + "".join(f"{FMT[j].format(to_user(unscale(x_next))[0][j]):>12s}" for j in range(5))
               + f"{info['pred']:10.1f}{r['profit']:10.1f}{prof.max():13.1f}"
-              + f"{info['steps_away']:5d} away", flush=True)
-    write_log(args.log, S, user, gc)
+              + f"{info['steps_away']:5d} away  {info.get('mode', '')}", flush=True)
+        args.remaining = max(1, args.remaining - 1)
+    write_log(args.log, S, user, gc, hours)
     print(f"\nThe log {args.log} now has {len(user)} runs. Final advice:\n")
-    return user, gc
+    return user, gc, hours
 
 
 def main():
@@ -365,6 +407,11 @@ def main():
     ap.add_argument("--fix", action="append", default=[], help="knob you cannot change, e.g. --fix flow_I=10")
     ap.add_argument("--trial-cost", type=float, default=None, help="cost of one run (money)")
     ap.add_argument("--hours", type=float, default=8000, help="operating hours per year (default 8000)")
+    ap.add_argument("--min-selectivity", type=float, default=None, help="product spec: selectivity to C at least this")
+    ap.add_argument("--max-dT", type=float, default=None, help="thermal safety: adiabatic temperature rise at most this (K)")
+    ap.add_argument("--remaining", type=int, default=10, help="runs you can still afford (default 10)")
+    ap.add_argument("--deactivation", type=float, default=0.0, help="virtual reactor only: activity lost per day, %% (default 0)")
+    ap.add_argument("--check-every", type=int, default=0, help="--simulate-days only: repeat the base case every N days")
     ap.add_argument("--seed", type=int, default=0)
     args = ap.parse_args()
     if args.log is None:                       # never overwrite a real log with demo data
@@ -379,10 +426,10 @@ def main():
               f"with {args.catalyst:g} g of catalyst loaded.\n")
     if not os.path.exists(args.log):
         raise SystemExit(f"{args.log} not found. Try:  python reactor_advisor.py --demo")
-    user, gc = read_log(args.log, S)
+    user, gc, hours = read_log(args.log, S)
     if args.simulate_days:
-        user, gc = simulate_days(args, S, user, gc)
-    adv, X, profit, x_next, info, ib, mu_data, _ = advise(args, user, gc, S)
+        user, gc, hours = simulate_days(args, S, user, gc, hours)
+    adv, X, profit, x_next, info, ib, mu_data, _ = advise(args, user, gc, S, hours)
     report(args, user, gc, S, adv, X, profit, x_next, info, ib, mu_data)
 
 

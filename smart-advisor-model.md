@@ -57,10 +57,29 @@ $T_{ref} = 573.15$ K, so $\ln k_j(T) = a_j - b_j\,(T_{ref}/T - 1)$.
 
 ## 4. The virtual "real" reactor
 
-The benchmark's reactor uses the true kinetics **plus two things the advisor's model does not
-contain**: product inhibition, $r_j \to r_j/(1 + K_C P_C)^2$, and GC noise (1 % relative +
-0.05 % absolute on every mole fraction, renormalised). So the advisor's physics is imperfect in
-the way any textbook model is on a real reactor, and the GC-derived profit is noisy.
+The benchmark's reactor uses the true kinetics plus Langmuir–Hinshelwood **site blocking** by
+adsorbed product and, more weakly, adsorbed reactant:
+
+$$r_j \to \frac{r_j}{\left(1 + K_C(T)\,P_C + K_A\,P_A\right)^{m_j}}, \qquad
+  K_C(T) = K_C(T_{ref})\,\exp\!\left[e\left(\frac{T_{ref}}{T} - 1\right)\right],\ e = \frac{-\Delta H_{ads}}{R\,T_{ref}},$$
+
+with $m_j$ the number of surface sites in the rate-determining step (the molecularity of the
+forward reaction: 2 for A + B → C and C + B → E, 1 for A → D). Adsorption is exothermic, so
+$K_C$ falls with temperature ($\Delta H_{ads} \approx -48$ kJ/mol for the complex network).
+GC noise is 1 % relative + 0.05 % absolute on every mole fraction, renormalised.
+
+Optionally the catalyst **loses activity on stream** (the `complex_deact` scenario): the
+active area shrinks by a factor $\exp(-\lambda\,\Delta t)$ during each run of duration
+$\Delta t$ hours, with a severity-weighted rate the advisor's model does not know,
+
+$$\lambda = \lambda_0\,\exp\!\left[-\frac{40\ \mathrm{kJ/mol}}{R}\left(\frac1T - \frac1{T_{ref}}\right)\right]\sqrt{\frac{P_A}{4\ \mathrm{bar}}},$$
+
+i.e. coking that is faster when hotter and with more A in the feed ($\lambda_0$ = 2 % per day
+at 10 bar, 40 % A, $T_{ref}$).
+
+The advisor's model (section 8.1) can learn product adsorption and its heat and a constant
+deactivation rate, but never has the reactant term or the severity dependence: its physics is
+imperfect in the way any textbook model is on a real reactor, and the GC-derived profit is noisy.
 
 ## 5. Knobs, campaign settings and constraints
 
@@ -98,39 +117,91 @@ printout.
    These five runs are the same for every method.
 3. From run 6 on, the method proposes the next run, which must lie within one step of the
    previous run for every knob, inside the safety box, and satisfy the flow minimum.
-4. 25 runs in all (five weeks at one run per day). Ten campaigns per method, each from a
-   different plausible base case (seed 0 is the project's 10 bar, 20/20/10 mL/min, 600 K).
+4. 25 runs in all (five weeks at one run per day, 24 h on stream each). Ten campaigns per
+   method, each from a different plausible base case (seed 0 is the project's 10 bar,
+   20/20/10 mL/min, 600 K).
+5. On a deactivating catalyst (`complex_deact`), every method repeats the base case as a
+   **check run** every 5th run: the way an operator sees drift, and the only way the model can.
 
 Score: the true profit of the settings the method would *recommend* after each run (its best
 run by predicted or measured profit), as a share of the best possible profit at that catalyst
 loading (found by differential evolution on the true model).
 
-## 8. The advisor
+## 8. The advisor (v5)
 
-Each round:
+### 8.1 Learning the chemistry: a ladder of model classes
 
-1. **Fit the kinetics** to all GC readings so far by Bayesian least squares with a wide prior
-   around a chemist's order-of-magnitude guess (`smart/kinetics.py`); uncertainty from the
-   Laplace approximation, inflated by $\chi^2/\text{dof}$ when the physics fits worse than the
-   GC noise explains.
-2. **Draw plausible chemistries**: the best estimate plus five draws from the posterior.
-3. **Plan**: predict profit over the whole box (1024 Sobol points + local refinement) under every
-   chemistry; the model's optimum $x^*$ is where the best-estimate mean is highest. Report how
-   many runs away it is under the step limits (the bottleneck knob decides).
-4. **Correct**: a Gaussian process (Matérn, length-scales ≥ 0.15 in scaled units, noise floor
-   from the GC error propagated to profit) fitted to the residual *measured − physics* at the
-   runs done so far, added to every prediction.
-5. **Choose within reach**: candidates in the step box (512 Sobol + the step toward $x^*$ +
-   local points), scored by Expected Improvement over the best predicted profit so far.
-   If nothing within reach looks like an improvement but the model is confident
-   ($\mu^* - 1.64\sigma^* >$ best) that a better region exists, take the **purposeful step**:
-   a full step on the bottleneck knob, with the other knobs set to the best predicted values
-   at that step.
-6. Recommend the tested run with the highest *predicted* profit (a lucky GC reading cannot
-   fool it).
+The fit (`smart/kinetics.py`) is Bayesian least squares on every GC mole fraction with a wide
+prior around a chemist's order-of-magnitude guess; uncertainty from the Laplace approximation,
+inflated by $\chi^2/\text{dof}$ when the physics fits worse than the GC noise explains. Five
+nested model classes are fitted, each warm-started from the one below it:
 
-Cost: 5–10 s per suggestion (a few thousand reactor simulations with the vectorised
-Rosenbrock solver in `smart/systems.py`).
+| Model | Adds | Parameters |
+|---|---|---|
+| `plain` | $\ln k_{j,ref}$, $E_{a,j}$ for every reaction | $2n_r$ |
+| `inhib` | product adsorption, every rate $/(1 + K_C(T) P_C)^{m_j}$, with the typical adsorption heat ($e = 10$) | +1 ($\ln K_C$) |
+| `inhib_T` | the adsorption heat itself | +1 ($e \ge 0$) |
+| `decay` | catalyst activity $\exp(-d\,t)$, $t$ = hours on stream before the run ($d<0$ = break-in) | +1 ($d$) |
+| `plain_decay` | decay without adsorption | +1 |
+
+The data choose by BIC, $\chi^2_{\text{noise}} + p \ln n$, with $\chi^2$ weighted by the GC's
+*own* noise (the fit weights carry an allowance for model error, which would understate the
+evidence); the decay parameter counts double, so drift is only claimed when clearly supported.
+**Deactivation can only be told apart from the kinetics by repeating a set point later**, so
+the decay models are only tried when the log holds such a replicate pair (a check run). The
+advisor reports what the data support ("your data show product inhibition, $K_C \approx 0.03$
+/bar"; "no set point has been repeated, so drift cannot be told yet").
+
+Measured on the virtual complex reactor (15 runs): the plain model gives $E_a$ = 69 / 119 / 165
+kJ/mol (true 70 / 120 / 150) with $\chi^2/\text{dof}$ = 13; the ladder picks `inhib` and gives
+71 / 120 / 151 with $\chi^2/\text{dof}$ = 0.10.
+
+### 8.2 Choosing the next run: a receding-horizon planner
+
+1. **Plausible chemistries**: the best estimate plus five posterior draws.
+2. **Plan**: predict profit over the whole box (1024 Sobol points + the runs done + local
+   refinement) and find the model's optimum $x^*$; report how many runs away it is under the
+   step limits (the bottleneck knob decides). With a spec, only points likely to meet it count.
+3. **Correct and calibrate**: a Gaussian process (Matérn, length-scales ≥ 0.15, noise floor from
+   the GC error propagated to profit) on the residual *measured − physics*; the predictive
+   spread is scaled by $c = \max(1, \text{RMS}\,z)$ of the advisor's own past misses at the data.
+4. **First steps within reach**: the step toward $x^*$, the corners of the step box (full steps
+   on every free knob), points on the line to $x^*$, "stay", and Sobol points; candidates
+   unlikely to meet the spec ($P_{\text{feas}} < 0.5$) or below the flow minimum are dropped.
+   Shortlist: top-6 by Expected Improvement, top-3 by predicted mean, the step toward $x^*$, stay.
+5. **Roll forward**: from each shortlisted step, follow the model mean greedily for $H-1$
+   further allowed steps (batched over all shortlisted steps per depth).
+6. **Score the whole trajectory under every plausible chemistry** (plus a GP residual draw):
+   $$\text{return} = \sum_{h=1}^{H} f_\theta(x_h) + (R - H)\,\max\!\big(\text{best},\ \max_h f_\theta(x_h)\big),$$
+   $R$ = runs the operator can still afford, $H = \min(4, R)$; choose the first step of the
+   trajectory with the highest expected return per remaining run. A step that earns nothing
+   now but opens a better region wins when there are enough runs left to cash it in; a safe
+   step wins when there are not. "Stay" wins when nothing within reach is worth the risk.
+7. **Recovery**: when nothing within one step is likely to meet the spec, take the step most
+   likely to get back within spec that also heads toward $x^*$.
+8. Recommend the tested run with the highest *predicted* profit among those that met the
+   spec as measured (a lucky GC reading cannot fool it).
+
+The v4 rule (Expected Improvement one step ahead with the purposeful step toward $x^*$) is
+kept as `planner="greedy"` for comparison.
+
+### 8.3 Product and safety specs
+
+`spec = {"S_C": 0.9, "dT_ad": 60}` means selectivity to C at least 0.9 and adiabatic
+temperature rise at most 60 K; `"X_A"` (minimum conversion) is also available. The
+adiabatic rise $\Delta T_{ad} = \sum_j (-\Delta H_j)\,\xi_j / (F_{T,0}\,c_p)$ is the temperature
+the reaction would reach if the heat were not removed: a heat-load indicator the isothermal
+model cannot see. For this chemistry it is hundreds of kelvin at any useful conversion, so it
+is informative rather than a sensible limit. Feasibility of a candidate is the fraction of the
+plausible chemistries under which it meets the spec.
+
+Cost: 5–15 s per suggestion (a few thousand reactor simulations with the vectorised
+Rosenbrock solver in `smart/systems.py`; the 5-model fit is warm-started after the first).
+
+Score: the true profit of the settings the method would *recommend* after each run, at the
+catalyst's current activity, as a share of the best possible profit on a fresh catalyst; and
+the **cumulative profit earned** over the campaign (every run produces, so a campaign that
+wanders earns less).
 
 ## 9. Baselines
 
@@ -143,7 +214,9 @@ Rosenbrock solver in `smart/systems.py`).
 - **Plain BO**: the v2 fitted GP (Matérn, ARD, log P, rank output transform) + Expected
   Improvement on the profit numbers only, candidates within the step box.
 - **Random walk**: a random allowed step each run.
-- **Stress test**: the advisor with the over-reaction C + B → E removed from its model (E still
+- **Smart v4**: the previous advisor (plain kinetics, one-step Expected Improvement with the
+  purposeful step), to measure what the v5 kinetics ladder and planner add.
+- **Stress test**: the v5 advisor with the over-reaction C + B → E removed from its model (E still
   appears in the GC; only the GP correction can account for the lost product).
 
 ## 10. What is still placeholder

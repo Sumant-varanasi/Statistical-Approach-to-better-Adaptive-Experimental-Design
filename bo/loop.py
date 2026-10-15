@@ -33,7 +33,7 @@ import time
 import numpy as np
 from scipy.stats import qmc
 from scipy.optimize import minimize
-from .gp import GP
+from .gp import GP, GPEnsemble
 from .nn import NNEnsemble
 from .acquisition import propose, propose_constrained, expected_improvement
 
@@ -58,7 +58,53 @@ STRATEGIES = {
     "gp_ei_logall": dict(kind="bo", model="gp", acq="ei", warp_in=(0, 1, 2, 4), label="GP + EI, log P, flows & W_cat"),
     # same strategies but WITHOUT the output transform, to measure what it adds
     "gp_ei_raw": dict(kind="bo", model="gp", acq="ei", warp=False, label="GP + EI, no output transform"),
+    # v3 additions: a trust region around the incumbent (TuRBO-1 rules) against getting stuck,
+    # and a likelihood-weighted ensemble of GP hyper-parameter optima for honest uncertainty
+    "gp_ei_tr": dict(kind="bo", model="gp", acq="ei", tr=True, label="GP + EI, trust region"),
+    "gpe_ei": dict(kind="bo", model="gpe", acq="ei", label="GP ensemble + EI"),
+    "gpe_ei_tr": dict(kind="bo", model="gpe", acq="ei", tr=True, label="GP ensemble + EI, trust region"),
 }
+
+
+class TrustRegion:
+    """TuRBO-1 style trust region in the scaled box: a hyper-rectangle of side L around the
+    incumbent, sides scaled by the GP length-scales (normalised to geometric mean 1).  L doubles
+    after `tol_s` consecutive improvements, halves after `tol_f` consecutive failures, and is
+    reset to L0 when it falls below Lmin (the data are kept: a soft restart)."""
+
+    def __init__(self, dim, L0=0.8, Lmin=0.05, Lmax=1.6, tol_s=3, tol_f=3):
+        self.dim, self.L0, self.L, self.Lmin, self.Lmax = dim, L0, L0, Lmin, Lmax
+        self.tol_s, self.tol_f = tol_s, tol_f
+        self.succ = self.fail = self.restarts = 0
+
+    def box(self, center, ls=None):
+        w = np.ones(self.dim)
+        if ls is not None:
+            ls = np.asarray(ls, float)
+            w = np.clip(ls / np.exp(np.mean(np.log(ls))), 0.25, 4.0)
+        half = 0.5 * self.L * w
+        return np.clip(center - half, 0, 1), np.clip(center + half, 0, 1)
+
+    def update(self, improved):
+        if improved:
+            self.succ, self.fail = self.succ + 1, 0
+        else:
+            self.fail, self.succ = self.fail + 1, 0
+        if self.succ >= self.tol_s:
+            self.L, self.succ = min(2 * self.L, self.Lmax), 0
+        if self.fail >= self.tol_f:
+            self.L, self.fail = self.L / 2, 0
+        if self.L < self.Lmin:
+            self.L, self.restarts = self.L0, self.restarts + 1
+
+
+def _length_scales(model):
+    """Fitted length-scales of a GP, GP ensemble or a LogInputs wrapper around one (or None)."""
+    for obj in (model, getattr(model, "m", None)):
+        ls = getattr(obj, "ls", None)
+        if ls is not None:
+            return np.asarray(ls, float)
+    return None
 
 
 def copula_transform(y):
@@ -161,11 +207,12 @@ def run(name, problem, budget=50, seed=0, n_init=N_INIT, verbose=False):
         q = spec.get("q", 1)
         for x in initial_design(n_init, dim, seed):
             evaluate(x)
-        if spec["model"] == "gp":
-            model = GP(seed=seed)
+        if spec["model"] in ("gp", "gpe"):
+            model = GP(seed=seed) if spec["model"] == "gp" else GPEnsemble(seed=seed)
             if spec.get("warp_in"):
                 from .problem import LOW, HIGH
                 model = LogInputs(model, spec["warp_in"], LOW, HIGH)
+        tr = TrustRegion(dim) if spec.get("tr") else None
         while len(X) < budget:
             ts = time.time()
             if spec["model"] == "nn":
@@ -179,15 +226,27 @@ def run(name, problem, budget=50, seed=0, n_init=N_INIT, verbose=False):
                 batch = [propose_constrained(model, model_c, np.array(X), y_fit,
                                              np.array(c) >= 0, rng)]
                 q = 0
+            box = None
+            if tr is not None:                     # search only inside the trust region
+                centre = np.array(X)[int(np.argmax(model.predict(np.array(X))[0]))]
+                box = tr.box(centre, _length_scales(model))
             for j in range(min(q, budget - len(X))):
                 acq = "ei" if spec["acq"] == "cei" else spec["acq"]   # no spec on this problem: plain EI
-                x = propose(m, np.array(X), y_fit, acq, rng, t=len(X) + 1)
+                x = propose(m, np.array(X), y_fit, acq, rng, t=len(X) + 1, box=box)
                 batch.append(x)
                 if q > 1:     # kriging believer: pretend the GP mean was observed
                     m = m.condition_on(x, m.predict(x)[0][0])
             t_model.append(time.time() - ts)
+            inc_before = int(np.argmax(model.predict(np.array(X))[0]))
             for x in batch:
                 evaluate(x, model)
+            if tr is not None:
+                # success = a new point becomes the posterior-mean incumbent after the refit
+                # (noise-robust, and the same rule the benchmark uses to recommend a point)
+                y_fit = copula_transform(y_obs) if spec.get("warp", True) else np.array(y_obs)
+                model.fit(np.array(X), y_fit)
+                inc_after = int(np.argmax(model.predict(np.array(X))[0]))
+                tr.update(inc_after != inc_before and inc_after >= len(X) - len(batch))
             if verbose:
                 print(f"{name} eval {len(X):3d}  best true so far {max(y_true):.4f}")
         problem.final_model = model

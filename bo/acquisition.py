@@ -42,22 +42,25 @@ def upper_confidence_bound(mu, sd, beta):
 
 
 # ---------------------------------------------------------------------------- maximiser
-def _candidates(X, y, dim, rng, n_sobol=1024, n_local=512, local_sd=0.05):
-    sob = qmc.Sobol(dim, scramble=True, seed=rng.integers(1 << 31)).random(n_sobol)
+def _candidates(X, y, dim, rng, n_sobol=1024, n_local=512, local_sd=0.05, box=None):
+    lo, hi = (np.zeros(dim), np.ones(dim)) if box is None else (np.asarray(box[0], float), np.asarray(box[1], float))
+    sob = lo + qmc.Sobol(dim, scramble=True, seed=rng.integers(1 << 31)).random(n_sobol) * (hi - lo)
     top = X[np.argsort(y)[-5:]]
-    loc = top[rng.integers(len(top), size=n_local)] + rng.normal(0, local_sd, (n_local, dim))
-    return np.clip(np.vstack([sob, loc]), 0, 1)
+    loc = top[rng.integers(len(top), size=n_local)] + rng.normal(0, local_sd, (n_local, dim)) * (hi - lo)
+    return np.clip(np.vstack([sob, loc]), lo, hi)
 
 
-def propose(model, X, y, acq, rng, t=1, best=None, xi=0.0, n_polish=4):
+def propose(model, X, y, acq, rng, t=1, best=None, xi=0.0, n_polish=4, box=None):
     """Return the next point (scaled) chosen by acquisition `acq` in {'ei','pi','ucb','ts'}.
 
     model  any surrogate with predict(Xs) -> (mu, sd); for 'ts' it also needs sample()
     X, y   data so far (y = observed values)
     best   incumbent value used by EI/PI (defaults to max of the model mean at the data)
+    box    optional (lo, hi) in scaled units: search only inside it (trust region)
     """
     dim = X.shape[1]
-    C = _candidates(X, y, dim, rng)
+    C = _candidates(X, y, dim, rng, box=box)
+    bnds = [(0, 1)] * dim if box is None else list(zip(np.asarray(box[0], float), np.asarray(box[1], float)))
 
     if acq == "ts":
         # Thompson sampling: one joint posterior draw over a candidate set, take its argmax.
@@ -73,8 +76,14 @@ def propose(model, X, y, acq, rng, t=1, best=None, xi=0.0, n_polish=4):
         best = np.max(model.predict(X)[0])
     beta = ucb_beta(t, dim)
 
+    members = getattr(model, "members", None)       # a GP ensemble: mix the acquisition, not the moments
+
     def score(Z):
-        mu, sd = model.predict(np.atleast_2d(Z))
+        Z = np.atleast_2d(Z)
+        if members and acq in ("ei", "pi"):
+            fn = expected_improvement if acq == "ei" else probability_of_improvement
+            return sum(w * fn(*m.predict(Z), best, xi) for w, m in zip(model.weights, members))
+        mu, sd = model.predict(Z)
         if acq == "ei":
             return expected_improvement(mu, sd, best, xi)
         if acq == "pi":
@@ -89,7 +98,7 @@ def propose(model, X, y, acq, rng, t=1, best=None, xi=0.0, n_polish=4):
     if getattr(model, "smooth", True):
         for x0 in starts:
             res = minimize(lambda z: -score(z)[0], x0, method="L-BFGS-B",
-                           bounds=[(0, 1)] * dim, options={"maxiter": 50})
+                           bounds=bnds, options={"maxiter": 50})
             if -res.fun > best_s:
                 best_x, best_s = np.clip(res.x, 0, 1), -res.fun
     return best_x
