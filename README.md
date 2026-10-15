@@ -10,7 +10,7 @@ The repo has two halves that are compared against each other:
 | **Digital twin (simulation)** | Solves the packed-bed reactor equations for one experiment, and can be run thousands of times to brute-force the best operating point. | `reactor_twin.py`, `test_reactor_twin.py`, `sweeps.py`, `simulation_campaign.py` |
 | **Bayesian optimisation (BO)** | Treats the twin as an expensive black box and tries to find the best operating point in as few experiments as possible. | `bo_basic.py`, `bo_5knobs.py` |
 | **Comparison** | Overlays the two on one figure. | `compare.py` |
-| **Smart reactor advisor (V3)** | Physics-informed optimiser run the way the reactor is run: catalyst fixed, inert flow as a knob, step limits between runs. Learns the kinetics from GC readings and tells an operator what to run next, in plain English. Compared with a chemist's rules of thumb on the simple network and a complex one. | `reactor_advisor.py`, `khare_demo.py`, `smart/`, `smart-advisor-model.md` |
+| **Smart reactor advisor (V3)** | Physics-informed optimiser run the way the reactor is run: catalyst fixed, inert flow as a knob, step limits between runs. Learns the kinetics from GC readings and tells an operator what to run next, in plain English, in a web page or on the command line. Compared with a chemist's rules of thumb on the simple network and a complex one. | `reactor_ui.py` + `ui/`, `reactor_advisor.py`, `khare_demo.py`, `smart/`, `smart-advisor-model.md` |
 
 > All kinetic parameters in `reactor_twin.py` are **placeholders**. Every number and
 > figure below will change once the real kinetics are agreed with Prof. Khare.
@@ -39,7 +39,8 @@ its cost.
   loading or batch.
 
 ```bash
-python reactor_advisor.py --demo                       # the 5 screening runs an operator does, then advice
+python reactor_ui.py                                   # the web interface: opens http://localhost:8765 (no extra packages)
+python reactor_advisor.py --demo                       # the same tool on the command line: 5 screening runs, then advice
 python reactor_advisor.py --demo --simulate-days 10    # watch it run the (virtual) reactor for 10 days
 python reactor_advisor.py my_reactor_log.csv --surface-area 120 --max-step temperature=20 --limit pressure=1:40
 python reactor_advisor.py my_reactor_log.csv --trial-cost 500 --hours 6000
@@ -50,6 +51,23 @@ python test_smart.py                                   # 34 checks (~2 min)
 Log format (`my_reactor_log.csv`, rows in the order run): `pressure_bar, flow_A_mL_min,
 flow_B_mL_min, flow_I_mL_min, temperature_C, catalyst_g, gc_A, gc_B, gc_C, gc_D, [gc_E,] gc_I`
 (GC as mole fractions or %). Profit is computed from the GC reading via the internal standard.
+
+### The web interface (`reactor_ui.py`)
+
+One page, for a chemist or operator who never opens a terminal. `python reactor_ui.py` starts a
+small server on your own machine (Python's own `http.server`, nothing is installed, nothing
+leaves the machine) and opens the page. Left: the campaign (chemistry, catalyst mass and BET
+area, largest change per run, safety ranges and fixed knobs, economics, prices). Main column:
+
+| Card | What it does |
+|---|---|
+| **What to run next** | the five set points as tiles with the change from the last run, expected profit with a likely range, why this run; *where this is heading* (predicted best settings, how many runs away); *is another run worth it?* (in money when a cost per run is given); *if you must run the plant today*. Buttons: get advice, run it on the virtual reactor, simulate 5 days, download `next_run.csv`. |
+| **Your runs** | type a run (set points in °C, bar, mL/min; GC as % or fractions; catalyst mass per run), edit or delete rows, import / export the CSV log, load the 5 screening runs on the virtual reactor. Conversion, selectivity and profit are worked out from the GC. |
+| **What the model learned** | a card per reaction (activation energy with its likely range, how much faster per +10 °C), the plain-English notes, the Arrhenius plot with the uncertainty band, and every GC number against the model. On the virtual reactor the true chemistry is drawn too; on a real one it is not known and not shown. |
+| **Explore** | profit of every run with the model's estimate, and *what-if* charts: expected profit as each knob moves while the others stay at the next run, your best run or the predicted best, with the one-step reachable band shaded. |
+
+Light and dark themes, keyboard-navigable, works on a phone. `python test_reactor_ui.py` runs
+26 checks of the campaign logic (validation, °C/K, GC in %, round trips, step limits, fixed knobs).
 
 ### Why it is "smart": it knows the physics and learns only what it does not know
 
@@ -144,7 +162,8 @@ Tables: `results/smart_demo_summary.md` (git-ignored, rebuilt by the demo).
 
 | File | What it does |
 |---|---|
-| `reactor_advisor.py` | the operator's tool: reads a run log, plain-English advice, step-limited suggestion, plan, `next_run.csv` |
+| `reactor_ui.py`, `ui/` | the web interface (server + page); `test_reactor_ui.py` checks it |
+| `reactor_advisor.py` | the same tool on the command line: reads a run log, plain-English advice, step-limited suggestion, plan, `next_run.csv` |
 | `khare_demo.py` | the 4-part demo: operating windows, head-to-head benchmark, live run, bottom line |
 | `smart-advisor-model.md` | the model and protocol: surface-area coordinate, inert knob, constraints, economics, advisor, baselines |
 | `smart/systems.py` | both reaction networks; batch simulator (vectorised adaptive Rosenbrock solver, plus exact LSODA); knobs, step limits, screening runs |

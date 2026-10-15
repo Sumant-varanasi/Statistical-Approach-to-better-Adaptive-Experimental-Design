@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Reactor Advisor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="app.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23c8521f'/%3E%3Cpath d='M10 7h12v4h-2v9a4 4 0 0 1-8 0V11h-2z' fill='white'/%3E%3C/svg%3E">
+</head>
+<body>
+
+<header class="top">
+  <div class="brand">
+    <svg width="28" height="28" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7" fill="var(--accent)"/><path d="M10 7h12v4h-2v9a4 4 0 0 1-8 0V11h-2z" fill="var(--accent-ink)"/></svg>
+    <span class="brand-name">Reactor Advisor</span>
+    <span id="chem-badge" class="badge">complex</span>
+  </div>
+  <nav class="jump" aria-label="Sections">
+    <a href="#advice">Advice</a><a href="#runs">Runs</a><a href="#learned">Chemistry</a><a href="#explore">Explore</a>
+  </nav>
+  <div class="top-right">
+    <span id="status" class="status" role="status" aria-live="polite">no runs yet</span>
+    <button id="theme" class="icon-btn" type="button" aria-label="Switch light / dark" title="Light / dark">◐</button>
+  </div>
+</header>
+
+<div class="layout">
+
+<!-- ================================================================ setup rail -->
+<aside class="rail" aria-label="Campaign setup">
+  <form id="setup" class="setup" autocomplete="off">
+    <h2 class="rail-title">Campaign</h2>
+    <p class="hint">Set once per catalyst loading. The advisor never asks you to change the catalyst.</p>
+
+    <fieldset>
+      <legend>Chemistry</legend>
+      <div class="chem-choice" id="chem-choice"></div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Catalyst (loaded once)</legend>
+      <div class="grid2">
+        <label>Mass <span class="unit">g</span><input id="s-wcat" type="number" step="any" min="0.01" max="50" required></label>
+        <label>BET area <span class="unit">m²/g</span><input id="s-aspec" type="number" step="any" min="1" max="2000" required></label>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Largest change per run <button type="button" class="help" data-help="step">?</button></legend>
+      <div class="grid2">
+        <label>Pressure <span class="unit">bar</span><input id="s-step-P" type="number" step="any" min="0.1" required></label>
+        <label>Temperature <span class="unit">°C</span><input id="s-step-T" type="number" step="any" min="0.1" required></label>
+        <label>Flow of A <span class="unit">mL/min</span><input id="s-step-VA" type="number" step="any" min="0.1" required></label>
+        <label>Flow of B <span class="unit">mL/min</span><input id="s-step-VB" type="number" step="any" min="0.1" required></label>
+        <label>Inert flow <span class="unit">mL/min</span><input id="s-step-VI" type="number" step="any" min="0.1" required></label>
+      </div>
+      <p class="help-text" id="help-step" hidden>What your furnace, back-pressure regulator and good practice allow between two consecutive runs. Every suggestion stays within these of your last run, so it is always viable.</p>
+    </fieldset>
+
+    <details class="fold">
+      <summary>Safety ranges and fixed knobs</summary>
+      <div id="limits" class="limits"></div>
+      <p class="hint">Tick <em>fixed</em> for a knob you cannot change; the advisor will not touch it.</p>
+    </details>
+
+    <details class="fold">
+      <summary>Economics</summary>
+      <div class="grid2">
+        <label>Cost of one run <span class="unit">money</span><input id="s-cost" type="number" step="any" min="0" placeholder="optional"></label>
+        <label>Operating hours / year<input id="s-hours" type="number" step="any" min="1" required></label>
+      </div>
+      <div id="prices" class="prices"></div>
+      <p class="hint">Prices are placeholders until agreed; profit is in money units per hour.</p>
+    </details>
+
+    <details class="fold">
+      <summary>Virtual reactor (for trying it out)</summary>
+      <label>Scenario seed<input id="s-seed" type="number" step="1" min="0" max="999"></label>
+      <p class="hint">A simulated reactor with hidden, imperfect chemistry. Use it to see how the advisor works before using your own log.</p>
+    </details>
+
+    <div class="rail-actions">
+      <button type="submit" class="btn primary" id="apply">Apply settings</button>
+      <span id="setup-msg" class="msg" role="status"></span>
+    </div>
+  </form>
+</aside>
+
+<!-- ================================================================ main -->
+<main class="main">
+
+  <!-- ---------------------------------------------------------- advice -->
+  <section id="advice" class="card advice" aria-labelledby="advice-h">
+    <div class="card-head">
+      <h2 id="advice-h">What to run next</h2>
+      <div class="actions">
+        <button type="button" class="btn primary" id="btn-advise">Get advice</button>
+        <button type="button" class="btn" id="btn-sim" title="Run the suggested settings on the virtual reactor and add the GC reading to the table">Run it on the virtual reactor</button>
+        <button type="button" class="btn" id="btn-sim5">Simulate 5 days</button>
+        <a class="btn ghost" id="dl-next" href="/api/export/next_run.csv" download>Download next_run.csv</a>
+      </div>
+    </div>
+    <p id="advice-msg" class="msg" role="status"></p>
+
+    <div id="advice-empty" class="empty">
+      <p><strong>Three steps.</strong> Set up the campaign on the left, add at least three runs below (or load the five screening runs on the virtual reactor), then press <em>Get advice</em>.</p>
+      <button type="button" class="btn" id="btn-example-2">Load the 5 screening runs on the virtual reactor</button>
+    </div>
+
+    <div id="advice-body" hidden>
+      <div class="tiles" id="tiles"></div>
+      <div class="expect">
+        <div class="expect-main">
+          <span class="label">Expected profit</span>
+          <span class="big mono" id="next-pred">–</span>
+          <span class="range mono" id="next-range"></span>
+        </div>
+        <div class="why">
+          <span class="label">Why this run</span>
+          <p id="next-why"></p>
+        </div>
+      </div>
+
+      <div class="subcards">
+        <div class="sub">
+          <h3>Where this is heading</h3>
+          <p class="sub-lead"><span class="pill" id="plan-steps"></span> <span id="plan-pred"></span></p>
+          <ul class="kv mono" id="plan-list"></ul>
+          <p class="hint">Firms up as runs come in: every GC reading sharpens the kinetics.</p>
+        </div>
+        <div class="sub">
+          <h3>Is another run worth it?</h3>
+          <p class="sub-lead"><span class="pill" id="worth-pill"></span></p>
+          <p id="worth-text"></p>
+          <ul class="kv mono" id="worth-list"></ul>
+        </div>
+        <div class="sub">
+          <h3>If you must run the plant today</h3>
+          <p class="sub-lead">Best proven settings, run <span id="today-run" class="mono"></span></p>
+          <ul class="kv mono" id="today-list"></ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ---------------------------------------------------------- runs -->
+  <section id="runs" class="card" aria-labelledby="runs-h">
+    <div class="card-head">
+      <h2 id="runs-h">Your runs</h2>
+      <div class="actions">
+        <button type="button" class="btn" id="btn-add">Add a run</button>
+        <label class="btn file"><input type="file" id="file" accept=".csv,text/csv">Import CSV</label>
+        <a class="btn ghost" id="dl-log" href="/api/export/log.csv" download>Export CSV</a>
+        <button type="button" class="btn" id="btn-example">Load 5 screening runs (virtual)</button>
+        <button type="button" class="btn danger ghost" id="btn-clear">Clear</button>
+      </div>
+    </div>
+    <p id="runs-msg" class="msg" role="status"></p>
+    <p class="hint">Set points as you set them; GC as it prints them (mole fractions or %). Profit, conversion and selectivity are worked out from the GC with the inert as internal standard. Order matters: the next suggestion starts from the last row.</p>
+
+    <form id="run-form" class="run-form" hidden autocomplete="off">
+      <h3 id="run-form-title">Add a run</h3>
+      <div class="grid5" id="run-inputs"></div>
+      <div class="gc-inputs"><span class="label">GC reading</span><div class="grid5" id="gc-inputs"></div></div>
+      <div class="form-actions">
+        <button type="submit" class="btn primary">Save run</button>
+        <button type="button" class="btn ghost" id="run-cancel">Cancel</button>
+        <span class="msg" id="run-msg" role="alert"></span>
+      </div>
+    </form>
+
+    <div class="table-wrap">
+      <table id="runs-table" class="runs-table">
+        <thead></thead><tbody></tbody>
+      </table>
+    </div>
+    <p class="hint" id="runs-note"></p>
+  </section>
+
+  <!-- ---------------------------------------------------------- chemistry -->
+  <section id="learned" class="card" aria-labelledby="learned-h">
+    <div class="card-head"><h2 id="learned-h">What the model learned about your chemistry</h2></div>
+    <p class="hint">From the GC readings, not just the profit numbers. Rate constants are per m² of catalyst, so they carry over to another loading.</p>
+    <div id="learned-empty" class="empty"><p>Get advice first.</p></div>
+    <div id="learned-body" hidden>
+      <div class="rx-cards" id="rx-cards"></div>
+      <ul class="notes" id="rx-notes"></ul>
+      <div class="charts2">
+        <figure class="fig"><figcaption>Rate constants vs temperature (Arrhenius plot). Dashed = learned, band = 90 % likely range<span id="arr-truth-note"></span></figcaption><div id="chart-arr" class="chart"></div></figure>
+        <figure class="fig"><figcaption>Every GC number vs what the learned model predicts for it. Closer to the line = better</figcaption><div id="chart-parity" class="chart"></div></figure>
+      </div>
+    </div>
+  </section>
+
+  <!-- ---------------------------------------------------------- explore -->
+  <section id="explore" class="card" aria-labelledby="explore-h">
+    <div class="card-head">
+      <h2 id="explore-h">Explore</h2>
+      <div class="actions seg" role="group" aria-label="Reference settings for the what-if charts">
+        <span class="label">What-if around:</span>
+        <button type="button" class="btn seg-btn active" data-ref="next">the next run</button>
+        <button type="button" class="btn seg-btn" data-ref="best">your best run</button>
+        <button type="button" class="btn seg-btn" data-ref="plan">the predicted best</button>
+      </div>
+    </div>
+    <div id="explore-empty" class="empty"><p>Get advice first.</p></div>
+    <div id="explore-body" hidden>
+      <figure class="fig"><figcaption>Profit of every run, the best so far, and the model's estimate (which smooths out GC noise)</figcaption><div id="chart-profit" class="chart"></div></figure>
+      <p class="hint">What the model expects if one knob moves and the others stay at the reference. Shaded = reachable from your last run in one step. Hover for values.</p>
+      <div class="landscape" id="landscape"></div>
+    </div>
+  </section>
+
+  <footer class="foot">
+    <p>Suggestions only: check every run against your plant's safety limits before running it. Kinetics and prices are placeholders until agreed. Runs on your own machine; nothing leaves it.</p>
+  </footer>
+</main>
+</div>
+
+<div id="tip" class="tip" role="tooltip" hidden></div>
+<div id="overlay" class="overlay" hidden aria-hidden="true"><div class="spinner" aria-hidden="true"></div><p id="overlay-text">Thinking…</p></div>
+
+<script src="app.js"></script>
+</body>
+</html>
