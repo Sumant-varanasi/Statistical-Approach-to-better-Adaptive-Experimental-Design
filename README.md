@@ -5,17 +5,25 @@ Project plan: the Google Doc linked in `gDoc-link`. Reactor model: `digital-twin
 (Prof. Khare's formulation) and `smart-advisor-model.md` (what the advisor adds).
 
 **What this is.** A digital twin of the Micromeritics gas-phase fixed-bed reactor, and a study of
-how to find its best operating point in as few experiments as possible. It grew in three stages:
+how to find its best operating point in as few experiments as possible. It grew in stages:
 a packed-bed twin with a first Bayesian optimiser (v1), a properly benchmarked Bayesian-optimisation
-package (v2), and a **physics-informed advisor** that learns the reaction kinetics from the GC
-readings and tells an operator what to run next, in plain English, through a web page (v3/v4).
+package (v2), a **physics-informed advisor** that learns the reaction kinetics from the GC
+readings and tells an operator what to run next, in plain English, through a web page (v3/v4),
+and a learning upgrade (v5) that adds product inhibition and catalyst ageing only when the data
+support them, plans several runs ahead, and respects product specs.
 
 **Headline result** (simulated reactor, placeholder kinetics and prices, 10 campaigns of 25 runs):
 the advisor reaches 90 % of the best possible profit in a median of **9–10 runs**, against **21 or
-more** for an experienced chemist's rules of thumb and **more than 25** for black-box Bayesian
+more** for a scripted rules-of-thumb policy and **more than 25** for black-box Bayesian
 optimisation (only 2 of its 20 campaigns got there at all), on both a simple and a complex reaction
 network, under the real operating protocol (catalyst loaded once, step limits between runs, five
-shared screening runs).
+shared screening runs). These are the v4 numbers (section 3.5). The v5 benchmark (170 campaigns,
+section 3.6) reaches the best point in 10 of 10 campaigns on the complex reactor and earns more
+along the way than v4 in 8 of 10.
+
+> **Status (20 October 2026).** v5 is committed; the mid-term presentation (17 October) is in
+> `presentation/`. The figures and `results/smart_demo_summary.md` still show the v4 benchmark;
+> `python khare_demo.py` rebuilds them from the finished v5 benchmark cache.
 
 > Every kinetic parameter, price and noise level in this repository is a **placeholder**. The
 > numbers and figures will change once the real kinetics and prices are agreed with Prof. Khare
@@ -28,7 +36,7 @@ shared screening runs).
 ```bash
 pip install -r requirements.txt        # numpy, scipy, matplotlib, scikit-learn
 python reactor_ui.py                   # the web interface: opens http://localhost:8765
-python khare_demo.py                   # the evidence: 4-part demo; first run ~10 min on 20 cores, ~1 h on 4, then cached
+python khare_demo.py                   # the evidence: 4-part demo; first run ~2.5 h on 10 cores, then cached
 python reactor_advisor.py --demo       # the same advisor on the command line (writes demo_log.csv)
 ```
 
@@ -39,23 +47,24 @@ To check the installation:
 
 ```bash
 python test_reactor_twin.py            # 11 checks, 1 s
-python test_reactor_ui.py              # 36 checks, ~1 min
+python test_reactor_ui.py              # 36 checks, ~2 min
 python test_smart.py                   # 53 checks, ~5 min
 python test_bo.py                      # 29 checks, ~5 min
 ```
 
 ---
 
-## 2. The three stages
+## 2. The stages
 
 | Stage | What it is | What it showed | Scripts |
 |---|---|---|---|
 | **v1 — twin + basic BO** | Packed-bed mole balances for A + B → C, A → D; a hand-written Gaussian-process optimiser with Expected Improvement over 5 knobs; brute-force comparison. | BO reached yield ≥ 0.99 in 17 experiments where random search needed 285 (one seed; over 10 seeds the gap is 22 vs ~104). Yield turned out to be too easy an objective: a broad plateau. | `reactor_twin.py`, `sweeps.py`, `bo_basic.py`, `bo_5knobs.py`, `simulation_campaign.py`, `compare.py` |
 | **v2 — BO package and benchmark** | `bo/`: fitted Matérn GP, four acquisition functions, batch mode, a neural-network surrogate, constrained BO, a harder profit objective, 20-seed benchmark with significance tests. | BO beats random, Latin-hypercube and Nelder–Mead (p < 0.001); constrained BO is essential when there is a product spec; ~25 % of plain-BO runs get stuck in a second optimum on the profit objective. | `bo/`, `run_benchmark.py`, `analyse_benchmark.py`, `surrogate_study.py`, `suggest_next.py`, `make_report.py` |
 | **v3/v4 — smart advisor + web UI** | `smart/`: the advisor knows the reactor physics, learns the kinetics from every GC reading, plans where the best profit is and walks there within the step limits a real reactor allows. A chemist's-rules baseline. A web page and a command-line tool for the operator. | Under the real protocol the advisor is 2–3× faster than a good chemist to 90 % of the best profit, and black-box BO cannot plan beyond one step. It still works with one reaction missing from its model. | `smart/`, `reactor_ui.py` + `ui/`, `reactor_advisor.py`, `khare_demo.py` |
+| **v5 — learning upgrade** | A ladder of kinetic models (plain → product inhibition → its adsorption heat → catalyst ageing) chosen by BIC; a receding-horizon planner that values the runs left; product and safety specs; a catalyst-ageing scenario with check runs; trust-region and GP-ensemble strategies in `bo/`. | Learned activation energies within 1 kJ/mol of the truth (the plain model missed one by 15). On the complex reactor v5 reaches the best point in 10/10 campaigns and earns more on the way than v4 in 8/10. Ageing is detected and reported, not solved. The new `bo/` strategies give no significant gain over GP + EI. | `smart/kinetics.py`, `smart/advisor.py`, `smart/benchmark.py`, `bo/` |
 
-Sections 3–5 describe the advisor (the current work); sections 6–7 keep the v2 and v1 material,
-which still runs unchanged.
+Sections 3–5 describe the advisor (the current work, v3–v5); sections 6–7 keep the v2 and v1
+material, which still runs unchanged.
 
 ---
 
@@ -100,18 +109,35 @@ reasons with a reactor model:
 | equilibrium limit from thermodynamics (ΔH, ΔS) | a Gaussian-process correction for whatever the physics misses |
 | economics (prices) | |
 
-Each round: (1) fit the kinetics to all GC readings (Bayesian least squares with a wide prior,
-`smart/kinetics.py`), with their uncertainty; (2) draw plausible versions of the chemistry;
-(3) **plan**: predict profit over the whole box, find where the model expects the best profit and
-how many runs away it is; (4) add the GP correction (its noise floor comes from the GC error, so
-noise is never mistaken for chemistry); (5) choose, among the runs reachable in one step, the one
-with the highest Expected Improvement, or, when nothing within reach beats the best run yet but
-the model is confident a better region exists, take the **purposeful step**: a full step on the
-bottleneck knob with the other knobs set to the best predicted values at that step.
+Each round (v5; details in `smart-advisor-model.md` section 8):
+
+1. **Fit the chemistry** to every GC mole fraction (Bayesian least squares with a wide prior,
+   `smart/kinetics.py`). A ladder of model classes is fitted: plain kinetics, then product
+   inhibition (Langmuir–Hinshelwood site blocking), then its adsorption heat, then catalyst
+   ageing over time on stream. The data choose by BIC with the GC's own noise; ageing is only
+   tried when a set point has been repeated (a check run), because only a repeat can tell drift
+   from kinetics.
+2. **Keep alternatives**: the best fit plus posterior draws, with the uncertainty inflated when
+   the physics fits worse than the GC noise explains.
+3. **Plan**: predict profit over the whole box, find where the model expects the best profit and
+   how many allowed steps away it is.
+4. **Correct**: a GP on the residual (measured − physics) with a noise floor from the GC error,
+   so noise is never mistaken for chemistry; the spread is calibrated against the advisor's own
+   past misses.
+5. **Decide** with a receding-horizon planner: from a shortlist of allowed first steps, roll
+   forward up to four runs and score each path under every plausible chemistry by the profit
+   earned on the way plus what the best point found is worth for the runs left. With a product
+   spec, only steps likely to meet it count; when none can, it takes the step most likely to get
+   back within spec ("recover").
+
+The v4 rule (one-step Expected Improvement plus a purposeful step toward the predicted best) is
+kept as `planner="greedy"` and benchmarked as `smart_v4`.
 
 The physics is **deliberately imperfect**: the virtual reactor used for testing has product
-inhibition and 1 % GC noise that the advisor's model does not contain, as any textbook model
-differs from a real reactor. A stress test also removes a whole reaction from the advisor's model.
+inhibition with a reactant-adsorption term the advisor never has, 1 % GC noise and, in the ageing
+scenario, severity-dependent catalyst decay that the advisor can only approximate by a constant
+rate, as any textbook model differs from a real reactor. A stress test also removes a whole
+reaction (C + B → E) from the advisor's model.
 
 ### 3.4 Two chemistries
 
@@ -119,18 +145,20 @@ differs from a real reactor. A stress test also removes a whole reaction from th
 |---|---|---|
 | reactions | A + B → C, A → D | A + B ⇌ C (reversible, exothermic), C + B → E (over-reaction), A → D (cracking) |
 | unknowns learned | 2 rate constants, 2 activation energies | 3 and 3 |
-| best possible profit at 1 g (placeholder prices) | 28.8 /h at 97 bar, 50/49/2 mL/min, 624 K | 22.4 /h at 43 bar, 50/49/2 mL/min, 529 K |
-| temperature window keeping ≥ 90 % of best profit | 72 K | 32 K |
-| share of the operating box that makes any profit | 5.5 % | 2.0 % |
+| best possible profit at 1 g, v4 virtual reactor | 28.8 /h at 97 bar, 50/49/2 mL/min, 624 K | 22.4 /h at 43 bar, 50/49/2 mL/min, 529 K |
+| best possible profit at 1 g, v5 virtual reactor | 27.1 /h at 81 bar, 50/49/2 mL/min, 611 K | 18.5 /h at 30 bar, 50/48/2 mL/min, 550 K |
+| temperature window keeping ≥ 90 % of best profit (v4) | 72 K | 32 K |
+| share of the operating box that makes any profit (v4 / v5) | 5.5 % / 4.5 % | 2.0 % / 1.0 % |
 
 On the complex network everything competes: hotter is faster but the equilibrium and the cracking
 take product away; more B converts more A but the over-reaction eats the product; pressure helps
 the equilibrium but costs compression; inert dilutes everything. The profitable window is narrow
-(`figures/smart_1_operating_window.png`).
+(`figures/smart_1_operating_window.png`). The v5 virtual reactor adds reactant adsorption to the
+inhibition, which moves the optimum (row above); scores are always relative to the reactor used.
 
-### 3.5 Results
+### 3.5 Results of the v4 advisor
 
-From `python khare_demo.py`: 10 campaigns per method and chemistry, each from a different
+From `python khare_demo.py` (run on 15 October, before v5): 10 campaigns per method and chemistry, each from a different
 plausible base case, 25 runs each (five weeks at one run per day). All methods see the same
 virtual reactor, the same GC noise and the **same 5 screening runs**; from run 6 on each
 proposes runs within the step limits. Score = **true** profit of the settings each method
@@ -139,16 +167,16 @@ would recommend, as % of the best possible profit at that catalyst loading.
 | Chemistry | Method | after 10 runs | after 15 | after 25 | runs to reach 90 % |
 |---|---|---|---|---|---|
 | simple | **Smart advisor** (physics + GP) | **93 %** | **95 %** | 96 % | **9.5** (10/10 campaigns) |
-| simple | Chemist's rules of thumb | 21 % | 74 % | 96 % | 21 (7/10) |
+| simple | Rules of thumb (scripted) | 21 % | 74 % | 96 % | 21 (7/10) |
 | simple | Plain BO (GP + EI, profit only) | 2 % | 15 % | 40 % | > 25 (2/10) |
 | simple | Random walk | −8 % | −6 % | −6 % | > 25 (0/10) |
 | complex | **Smart advisor** (physics + GP) | **99 %** | **98 %** | **97 %** | **9** (10/10) |
-| complex | Chemist's rules of thumb | 8 % | 61 % | 87 % | > 25 (4/10) |
+| complex | Rules of thumb (scripted policy) | 8 % | 61 % | 87 % | > 25 (4/10) |
 | complex | Plain BO (GP + EI, profit only) | −8 % | 6 % | 25 % | > 25 (0/10) |
 | complex | Random walk | −20 % | −20 % | −20 % | > 25 (0/10) |
 | complex | Smart advisor, **C + B → E missing from its model** | 62 % | 95 % | 99 % | 12 (10/10) |
 
-- **A good chemist gets there too, given enough runs**: after 25 runs the rules of thumb reach
+- **The rules of thumb get there too, given enough runs**: after 25 runs the rules of thumb reach
   96 % (simple) and 87 % (complex). After 25 runs smart and chemist are tied on the simple
   reaction (5/10 paired campaigns, p = 0.92); on the complex one smart is still ahead (9/10,
   p = 0.004).
@@ -181,9 +209,34 @@ that, `--seeds 5` halves the work). They are cached in `results/smart_bench/`, o
 campaign and budget (git-ignored, so a fresh clone builds them once); the demo then reruns in
 under a minute. Delete `results/smart_bench/*/smart*.npz` after changing the advisor.
 
-### 3.6 Baselines (all under the same step limits)
+### 3.6 Results of the v5 advisor
 
-- **Chemist's rules of thumb** (`ChemistPolicy`): read conversion and selectivity off the GC.
+`smart/benchmark.py` ran 170 campaigns (25 runs each, 10 seeds) in three scenarios: `simple`,
+`complex`, and `complex_deact` (the complex reactor with a catalyst losing about 2 % activity per
+day, the base case repeated as a check run every 5th run). Methods: v5, v4, the rules of thumb,
+plain BO, random walk, and v5 with C + B → E missing. The cache is in `results/smart_bench/`;
+`python khare_demo.py` turns it into figures and `results/smart_demo_summary.md` (not yet rerun,
+so the figures in `figures/` are still the v4 ones).
+
+What the run log already shows:
+
+- **Complex reactor**: v5 ends at the best possible profit (≥ 99 %) in **10 of 10** campaigns and
+  earns more along the way than v4 in **8 of 10**. Both end close to the best; the gain is in
+  the runs on the way, which is what the planner is for.
+- **Catalyst ageing**: v5 and v4 both end at **41–73 %** of the fresh-catalyst best, because by run
+  25 the catalyst really has lost much of its activity. v5 earns more than v4 in **8 of 10**
+  campaigns. Ageing is detected and reported, not solved.
+- **Wrong network** (C + B → E missing): in the first eight campaigns v5 ends at 75–99 % on the
+  complex reactor, lower than v4's 99 % in the same test.
+- **What it learns** (live run, complex reactor, 15 runs, 16 October): the data chose the model
+  with product inhibition (K_C = 0.031 /bar); activation energies 71 / 120 / 151 kJ/mol against
+  a truth of 70 / 120 / 150, rate constants within 1 %; recommended settings at 100 % of the best.
+  The plain model on similar data gave 69 / 119 / 165.
+
+### 3.7 Baselines (all under the same step limits)
+
+- **Rules of thumb** (`ChemistPolicy`, a scripted policy we wrote from the standard heuristics,
+  not a human): read conversion and selectivity off the GC.
   Selectivity poor → cooler with more pressure, then more B, then dilute; conversion poor → hotter
   with more pressure, then less flow, then less inert; both fine → more throughput, then pressure,
   then hotter. Repeat what worked, restart the rules from a new best, never repeat an experiment,
@@ -191,8 +244,11 @@ under a minute. Delete `results/smart_bench/*/smart*.npz` after changing the adv
 - **Plain BO**: v2's fitted GP (Matérn, one length-scale per knob, log P, rank output transform)
   + Expected Improvement on the profit numbers only, candidates within the step box.
 - **Random walk**: a random allowed step each run.
+- **Smart v4**: the previous advisor (plain kinetics, one-step EI + purposeful step), to measure
+  what the v5 ladder and planner add.
+- On the ageing scenario every method repeats the base case every 5th run (check runs).
 
-### 3.7 Limits (honest list)
+### 3.8 Limits (honest list)
 
 - The advisor needs the **reaction network** (which reactions happen). With one reaction missing
   it still works, but more slowly; with a badly wrong network the GP correction has to do the
@@ -203,7 +259,15 @@ under a minute. Delete `results/smart_bench/*/smart*.npz` after changing the adv
 - Under step limits the runs cover a narrow temperature range, so absolute activation energies are
   poorly pinned down; their ordering, which sets the best temperature, is.
 - One suggestion takes 5–20 s (a few thousand reactor simulations). Irrelevant next to a day-long run.
-- Kinetics, prices, GC noise, the inhibition and the step limits are placeholders.
+- Kinetics, prices, GC noise, the inhibition and the step limits are placeholders, and the
+  reactor is simulated: no real data has been used yet.
+- The rules-of-thumb baseline is a script, not a human; a blind test against a chemist is a next step.
+- Catalyst ageing is detected and reported, not compensated: on the ageing scenario every method
+  ends well below the fresh-catalyst best.
+- The adiabatic temperature rise is reported as a heat-load indicator. For this chemistry it is
+  hundreds of kelvin at any useful conversion, so it is not a usable limit until there is a heat model.
+- Only the two built-in reaction schemes can be used from the web page; another chemistry needs
+  a new entry in `smart/systems.py`.
 - Suggestions only: every run still needs a safety check (safety ranges and fixed knobs keep
   suggestions inside what is allowed; step limits set what the hardware allows).
 
@@ -223,10 +287,10 @@ own machine (Python's own `http.server`; nothing is installed, nothing leaves th
 
 | Part of the page | What it does |
 |---|---|
-| **Campaign** (left) | chemistry (the reactions written out), catalyst mass and BET area, largest change per run, safety ranges and fixed knobs, cost per run and operating hours, prices, the virtual-reactor seed. Settings are all-or-nothing: a rejected value changes nothing. |
-| **What to run next** | the five set points as tiles with the change from the last run, expected profit with a likely range, why this run; *where this is heading* (predicted best settings, how many runs away); *is another run worth it?* (in money when a cost per run is given); *if you must run the plant today*. Buttons: get advice, run it on the virtual reactor, simulate 5 days, download `next_run.csv`. |
-| **Your runs** | type a run (set points in °C, bar, mL/min; GC as % or fractions; catalyst mass per run), edit or delete rows, import / export the CSV log, load the 5 screening runs on the virtual reactor. Conversion, selectivity and profit are worked out from the GC with the inert as internal standard. |
-| **What the model learned** | a card per reaction (activation energy with its likely range, how much faster per +10 °C), the plain-English notes, the Arrhenius plot with the uncertainty band, every GC number against the model. On the virtual reactor the true chemistry is drawn too; on a real one it is not known and not shown. |
+| **Campaign** (left) | chemistry (the reactions written out), catalyst mass and BET area, largest change per run, safety ranges and fixed knobs, **product spec and budget** (minimum selectivity, maximum adiabatic temperature rise, runs you can still afford), cost per run and operating hours, prices, the virtual-reactor seed and catalyst ageing (% per day). Settings are all-or-nothing: a rejected value changes nothing. |
+| **What to run next** | the five set points as tiles with the change from the last run, expected profit with a likely range, why this run; *where this is heading* (predicted best settings, how many runs away); *is another run worth it?* (in money when a cost per run is given); *if you must run the plant today*; the probability of meeting the spec, and the mode (improve, walk toward the best, check, stay, recover). Buttons: get advice, run it on the virtual reactor, simulate 5 days, download `next_run.csv`. |
+| **Your runs** | type a run (set points in °C, bar, mL/min; GC as % or fractions; catalyst mass per run; hours on stream), edit or delete rows, import / export the CSV log, load the 5 screening runs on the virtual reactor. Conversion, selectivity, profit and the adiabatic temperature rise are worked out from the GC with the inert as internal standard. A set point repeated later in the log is what lets the model see catalyst drift. |
+| **What the model learned** | a card per reaction (activation energy with its likely range, how much faster per +10 °C), the plain-English notes (including product inhibition and catalyst ageing when the data show them), the Arrhenius plot with the uncertainty band, every GC number against the model. On the virtual reactor the true chemistry is drawn too; on a real one it is not known and not shown. |
 | **Explore** | profit of every run with the model's estimate; *what-if* charts: expected profit as each knob moves while the others stay at the next run, your best run or the predicted best, with the one-step reachable band shaded. |
 
 Light and dark themes, keyboard-navigable, works on a phone. The server keeps the fitted model
@@ -245,6 +309,8 @@ python reactor_advisor.py my_reactor_log.csv --system simple --surface-area 120
 python reactor_advisor.py my_reactor_log.csv --limit temperature=200:300 --fix flow_I=10
 python reactor_advisor.py my_reactor_log.csv --max-step temperature=20 --max-step pressure=5
 python reactor_advisor.py my_reactor_log.csv --trial-cost 500 --hours 6000
+python reactor_advisor.py my_reactor_log.csv --min-selectivity 0.9 --remaining 8   # product spec, runs left
+python reactor_advisor.py --demo --simulate-days 15 --deactivation 2 --check-every 5    # ageing catalyst, check runs
 ```
 
 It prints how each run went, what it learned about the chemistry in plain words, the next run
@@ -256,8 +322,10 @@ best proven settings, and writes `next_run.csv`. `--demo` writes its example run
 fractions or %):
 
 ```
-pressure_bar, flow_A_mL_min, flow_B_mL_min, flow_I_mL_min, temperature_C, catalyst_g, gc_A, gc_B, gc_C, gc_D, [gc_E,] gc_I
+pressure_bar, flow_A_mL_min, flow_B_mL_min, flow_I_mL_min, temperature_C, catalyst_g, gc_A, gc_B, gc_C, gc_D, [gc_E,] gc_I, [hours_h]
 ```
+
+`hours_h` (hours on stream for that run, default 24) is optional; it is what the ageing model uses.
 
 The same file is what the web page imports and exports.
 
@@ -266,7 +334,9 @@ The same file is what the web page imports and exports.
 Four parts, printing as it goes and saving one figure per part: (1) the two chemistries and how
 much room for error each leaves; (2) the head-to-head benchmark; (3) a live campaign on the
 complex reactor where the advisor explains every choice, then what it learned; (4) the bottom
-line in money and runs. Options: `--seeds 5` (quicker), `--workers N` (benchmark processes, default
+line in money and runs. Part 2 covers the three v5 scenarios (simple, complex, complex with an
+ageing catalyst) and adds `figures/smart_5_profit_earned.png` (profit earned over the campaign).
+Options: `--seeds 5` (quicker), `--workers N` (benchmark processes, default
 `cpu_count − 2`), `--budget 30` (longer campaigns; cached separately from the 25-run ones),
 `--skip-live`.
 
@@ -276,10 +346,10 @@ line in money and runs. Options: `--seeds 5` (quicker), `--workers N` (benchmark
 
 | File | What it does |
 |---|---|
-| `smart/systems.py` | both reaction networks (true kinetics for the virtual reactor and a chemist's guess for the advisor); the batch reactor simulator: a vectorised adaptive Rosenbrock solver (ROS2, L-stable, each experiment with its own step size; ~10× faster than LSODA for thousands of experiments, within 2·10⁻³ of it) plus the exact LSODA solver for the virtual reactor; surface-area coordinate; knobs, box, step limits, screening runs; economics |
-| `smart/kinetics.py` | kinetic parameter estimation from GC readings: Bayesian least squares (wide prior around the guess), Laplace uncertainty inflated when the physics fits worse than the GC noise explains; the experiments and their perturbed copies share integration steps so the derivatives are smooth |
-| `smart/advisor.py` | the advisor (`SmartAdvisor`: fit, plan, step-limited choice, purposeful step), the virtual reactor with inhibition and GC noise, profit and KPIs from a GC reading, the chemist / plain-BO / random-walk policies, campaigns, true optima for scoring (`smart/optima.json`) |
-| `smart/benchmark.py` | resumable multi-seed benchmark, one `.npz` per campaign in `results/smart_bench/` |
+| `smart/systems.py` | both reaction networks (true kinetics with Langmuir–Hinshelwood site blocking for the virtual reactor, and a chemist's guess for the advisor), heats of reaction and the adiabatic temperature rise; the batch reactor simulator: a vectorised adaptive Rosenbrock solver (ROS2, L-stable, each experiment with its own step size; ~10× faster than LSODA for thousands of experiments, within 2·10⁻³ of it) plus the exact LSODA solver for the virtual reactor; surface-area coordinate; knobs, box, step limits, screening runs; economics |
+| `smart/kinetics.py` | kinetic parameter estimation from GC readings: Bayesian least squares (wide prior around the guess), Laplace uncertainty inflated when the physics fits worse than the GC noise explains; the v5 ladder of model classes (plain, inhibition, adsorption heat, ageing) chosen by BIC, with ageing only when a set point was repeated |
+| `smart/advisor.py` | the advisor (`SmartAdvisor`: fit, plan, receding-horizon planner with specs and recover mode, the v4 greedy rule), the virtual reactor with inhibition, GC noise and catalyst ageing, profit and KPIs from a GC reading, the chemist / plain-BO / random-walk policies, campaigns, true optima for scoring (`smart/optima.json`) |
+| `smart/benchmark.py` | resumable multi-seed benchmark over the scenarios `simple`, `complex`, `complex_deact`, one `.npz` per campaign in `results/smart_bench/<scenario>/` |
 | `smart-advisor-model.md` | the model and protocol in equations: surface-area coordinate, inert knob, constraints, economics, the advisor's loop, the baselines |
 
 The advisor reuses `bo/gp.py` (the fitted Matérn GP) for its correction term and `bo/loop.py`'s
@@ -332,7 +402,7 @@ python analyse_benchmark.py    # tables, significance tests, figures/bench_*.png
 python surrogate_study.py      # GP vs NN prediction accuracy (~15 min)
 python demo_bo_1d.py           # teaching figure: BO step by step on temperature
 python make_report.py          # rebuilds report/results.html from the results
-python suggest_next.py --demo  # next-experiment tool (see 6.6)
+python suggest_next.py --demo  # next-experiment tool (see 6.7)
 ```
 `run_benchmark.py --seeds 5 --settings margin` for a quick run. Results go in `results/`
 (git-ignored); figures in `figures/`.
@@ -403,7 +473,27 @@ What holds up statistically (Holm-corrected, vs GP + EI):
 | `suggest_next.py` | next-experiment recommender for a CSV of real or simulated experiments |
 | `make_report.py`, `report/template.html` | builds `report/results.html` |
 
-### 6.6 Next-experiment tool (v2, black-box)
+### 6.6 v3 strategies: trust region and GP ensemble (October 2026)
+
+Two additions aimed at the stuck runs on the margin problem: a TuRBO-style **trust region**
+(Eriksson et al., NeurIPS 2019) that shrinks around the incumbent after failures and grows after
+successes, and a **GP ensemble** that keeps several hyper-parameter optima and averages Expected
+Improvement over them. Strategies `gp_ei_tr`, `gpe_ei`, `gpe_ei_tr`; 20 seeds, 50 experiments:
+
+| Method | Yield | Margin | Margin + noise |
+|---|---|---|---|
+| GP + EI | 0.0002 (95 %) | 0.0200 (40 %) | 0.0778 (10 %) |
+| GP + EI, log P & W_cat | 0.0002 (100 %) | **0.0026** (60 %) | **0.0255** (40 %) |
+| GP + EI, trust region | 0.0002 (100 %) | 0.0093 (50 %) | 0.0272 (50 %) |
+| GP ensemble + EI | 0.0002 (100 %) | 0.0194 (40 %) | 0.0524 (15 %) |
+| GP ensemble + EI, trust region | 0.0002 (100 %) | 0.0155 (45 %) | 0.0480 (5 %) |
+
+Median final regret (share of seeds within 1 % of the optimum). **None differs significantly from
+GP + EI** (Holm-corrected Wilcoxon, all p ≥ 0.33); the ensemble is 2–25× slower. Log-scaled inputs
+remain the most useful single change. Figure: `figures/bench_optimisers_v3.png`. The GP + EI
+baselines in this table are a fresh 20-seed run, so they differ slightly from section 6.4.
+
+### 6.7 Next-experiment tool (v2, black-box)
 
 ```bash
 python suggest_next.py experiments.csv --y Y_C --batch 4         # columns: P, V_A, V_B, T, Wcat, Y_C
@@ -624,11 +714,12 @@ profit objective and 20 seeds.
 | `bo_basic.py`, `bo_5knobs.py`, `simulation_campaign.py`, `compare.py` | v1 | first BO, brute force, overlay |
 | `bo/` (`gp.py`, `acquisition.py`, `nn.py`, `loop.py`, `problem.py`, `optima.json`) | v2 | the BO package |
 | `test_bo.py`, `run_benchmark.py`, `analyse_benchmark.py`, `surrogate_study.py`, `demo_bo_1d.py`, `suggest_next.py`, `make_report.py`, `report/` | v2 | checks, benchmark, studies, black-box next-experiment tool, results page |
-| `smart/` (`systems.py`, `kinetics.py`, `advisor.py`, `benchmark.py`, `optima.json`) | v3/v4 | the smart advisor |
+| `smart/` (`systems.py`, `kinetics.py`, `advisor.py`, `benchmark.py`, `optima.json`) | v3–v5 | the smart advisor |
 | `reactor_ui.py`, `ui/` (`index.html`, `app.css`, `app.js`) | v4 | the web interface |
 | `reactor_advisor.py` | v3/v4 | the command-line advisor |
 | `khare_demo.py` | v3/v4 | the 4-part demo for the supervisors |
-| `test_smart.py`, `test_reactor_ui.py` | v3/v4 | 53 + 36 checks |
+| `test_smart.py`, `test_reactor_ui.py` | v3–v5 | 53 + 36 checks |
+| `presentation/` | | mid-term deck (17 October 2026, speaker script in the notes) and `midterm_script.md` with timings and prepared answers |
 | `digital-twin-fixed-bed-reactor.md`, `smart-advisor-model.md` | docs | the reactor model and what the advisor adds |
 | `figures/` | all | every figure referenced above (committed) |
 | `results/` | all | CSVs, benchmark caches, demo output (git-ignored; regenerated by the scripts) |
@@ -641,7 +732,7 @@ profit objective and 20 seeds.
 | Command | Checks | Time | What is checked |
 |---|---|---|---|
 | `python test_reactor_twin.py` | 11 | 1 s | atom balances, inert, mole fractions, yield identity, analytical solution, input guard |
-| `python test_smart.py` | 53 | ~5 min | `smart/systems.py` matches `reactor_twin.py`; surface-area invariance; fast solver vs LSODA; atom balances on both networks; dilution; equilibrium from thermodynamics; GC → flows → profit; kinetics recovered from clean data; screening runs and every policy within the step limits; safety box, fixed knobs, custom step limits; log round trip |
+| `python test_smart.py` | 53 | ~5 min | `smart/systems.py` matches `reactor_twin.py`; surface-area invariance; fast solver vs LSODA; atom balances on both networks; dilution; equilibrium from thermodynamics; GC → flows → profit; kinetics recovered from clean data; screening runs and every policy within the step limits; safety box, fixed knobs, custom step limits; log round trip; v5: the model ladder picks plain / inhibition / ageing on data made that way, decay only with replicates, time on stream, adiabatic rise, virtual-reactor ageing, planner within step limits and spec (or recovering), calibration, check runs, cumulative profit |
 | `python test_reactor_ui.py` | 36 | ~1 min | the web server's campaign logic: validation messages, °C/K, GC in %, cold runs, export/import round trip, settings all-or-nothing, fixed knobs and step limits honoured, virtual reactor uses the table's catalyst mass, one fit at a time, a change during a fit discards it |
 | `python test_bo.py` | 29 | ~5 min | likelihood gradients, match with scikit-learn, ARD, posterior sampling, every v2 strategy runs, GP + EI converges on a toy problem |
 
@@ -653,15 +744,20 @@ Placeholder: the kinetics of both networks (`smart/systems.py`, `reactor_twin.py
 (`smart/systems.py`, `bo/problem.py`), the GC noise, the product inhibition of the virtual reactor,
 the step limits and the flow minimum. They are plausible numbers, not measured ones.
 
-Next, in order:
+Next, in order (as presented at the mid-term on 17 October 2026):
 
-1. **Real kinetics and prices** agreed with Prof. Khare; rerun `khare_demo.py` (delete
-   `results/smart_bench` first) and the v2 benchmark.
-2. **A real GC log** from the Micromeritics reactor: `reactor_ui.py` imports it as is. The first
-   question is how far the learned kinetics are from a textbook fit, and whether the GP correction
-   stays small.
-3. **Hardware constraints** from the instrument spec: MFC reference conditions, the real step
-   limits of the furnace and back-pressure regulator, the GC's minimum flow.
-4. Still open from v2: the stuck runs on the profit objective (a trust-region method would help),
-   more seeds for the comparisons that are not significant at 20, and the GP's over-confidence near
-   the optimum.
+1. **Make the numbers real.** No real data has been used yet. Collect real kinetics and prices
+   and a real GC log from the Micromeritics reactor with Prof. Khare (`reactor_ui.py` imports a
+   log as is); rerun `khare_demo.py` and the v2 benchmark; measure how far the textbook model is
+   from the real reactor and how much the GP correction must carry. Hardware limits (furnace and
+   pressure ramp rates, MFC reference conditions, the GC's minimum flow) become the step limits.
+2. **Your own chemistry.** Let the user type in their own reactions on the page, and let the
+   advisor propose runs that tell competing reaction networks apart (model discrimination).
+3. **Blind test against a chemist.** Same reactor, same run budget, judged blind on profit and
+   runs used: the fair version of the rules-of-thumb comparison.
+4. **Profit vs selectivity.** Show the trade-off curve (Pareto front) between profit and product
+   purity, so the operator picks the point that fits the contract.
+
+Also open: rerun `khare_demo.py` on the finished v5 benchmark to refresh the figures; a heat
+model so hot spots are predicted, not only flagged; deciding when to regenerate an ageing
+catalyst; more seeds for the comparisons that are not significant at 20.
