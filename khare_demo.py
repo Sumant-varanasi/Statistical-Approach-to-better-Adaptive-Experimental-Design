@@ -69,11 +69,11 @@ from smart import benchmark as B
 
 # colours (validated categorical slots, fixed per method across every figure)
 COL = {"plain_bo": "#2a78d6", "smart": "#eb6834", "chemist": "#1baf7a", "random_walk": "#eda100",
-       "smart_missing_E": "#e87ba4", "smart_v4": "#4a3aa7"}
-STYLE = {"plain_bo": "-", "smart": "-", "chemist": "--", "random_walk": ":", "smart_missing_E": "-.", "smart_v4": "--"}
+       "smart_missing_E": "#e87ba4", "smart_v4": "#4a3aa7", "smart_v6": "#b3261e", "smart_v6_missing_E": "#7a1a14"}
+STYLE = {"plain_bo": "-", "smart": "-", "chemist": "--", "random_walk": ":", "smart_missing_E": "-.", "smart_v4": "--", "smart_v6": "-", "smart_v6_missing_E": "-."}
 SYS_COL = {"simple": "#52514e", "complex": "#4a3aa7"}
 INK, INK2, GRID = "#0b0b0b", "#52514e", "#e5e4e0"
-SHORT = {"smart": "Smart v5", "smart_v4": "Smart v4", "plain_bo": "Plain BO", "chemist": "Chemist's rules",
+SHORT = {"smart_v6": "Smart v6", "smart_v6_missing_E": "Smart v6, wrong network", "smart": "Smart v5", "smart_v4": "Smart v4", "plain_bo": "Plain BO", "chemist": "Chemist's rules",
          "random_walk": "Random walk", "smart_missing_E": "Smart v5, wrong network"}
 SETTINGS = ("simple", "complex", "complex_deact")
 STABLE = ("simple", "complex")

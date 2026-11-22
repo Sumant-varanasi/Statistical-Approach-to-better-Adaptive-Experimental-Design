@@ -104,6 +104,7 @@ class Campaign:
         self.spec = {}                         # product / safety spec, e.g. {"S_C": 0.9, "dT_ad": 60}
         self.remaining = 10                    # runs the operator can still afford
         self.deactivation = 0.0                # virtual reactor only: activity lost per day, %
+        self.version = "v6"                     # advisor: "v6" (committee correction, default) or "v5" (GP correction)
         self.seed = 0
         self.runs = []                         # dicts: P, VA, VB, VI, T (K), W, gc (list), source
         self.vr = None
@@ -175,7 +176,7 @@ class Campaign:
             settings=dict(system=self.system, wcat=self.wcat, a_spec=self.a_spec, max_step=self.max_step,
                           lo=lo_u, hi=hi_u, fixed=fixed_u, prices=self.prices, trial_cost=self.trial_cost,
                           hours=self.hours, seed=self.seed, spec=self.spec, remaining=self.remaining,
-                          deactivation=self.deactivation),
+                          deactivation=self.deactivation, version=self.version),
             meta=dict(knobs=KNOB_KEYS, names=KNOB_NAMES, units=KNOB_UNITS, dec=KNOB_DEC,
                       box_lo=[LOW[0], LOW[1], LOW[2], LOW[3], rnd(C(LOW[4]), 2)], box_hi=[HIGH[0], HIGH[1], HIGH[2], HIGH[3], rnd(C(HIGH[4]), 2)],
                       min_total_flow=MIN_TOTAL_FLOW, species=self.species(), reactions=REACTIONS,
@@ -266,6 +267,10 @@ class Campaign:
                 new["remaining"] = int(b["remaining"])
                 if new["remaining"] < 1:
                     raise ValueError("runs you can still afford must be at least 1")
+            if "version" in b:
+                if b["version"] not in ("v5", "v6"):
+                    raise ValueError("the advisor version must be v5 or v6")
+                new["version"] = b["version"]
             if "deactivation" in b:
                 new["deactivation"] = float(b["deactivation"] or 0.0)
                 if not 0 <= new["deactivation"] < 50:
@@ -390,11 +395,12 @@ class Campaign:
         fixed = {i: (v - LOW[i]) / (HIGH[i] - LOW[i]) for i, v in self.fixed.items()}
         key = (self.system, self.a_spec, self.seed, float(phys6[-1, 5]), tuple(self.max_step), tuple(self.lo),
                tuple(self.hi), tuple(sorted(fixed.items())), tuple(sorted(self.prices.items())),
-               tuple(sorted(self.spec.items())))
+               tuple(sorted(self.spec.items())), self.version)
         adv = getattr(self, "_adv", None)
         if adv is None or getattr(self, "_adv_key", None) != key:
             adv = SmartAdvisor(S, wcat=phys6[-1, 5], a_spec=self.a_spec, seed=self.seed, lo=lo, hi=hi,
-                               fixed=fixed, max_step=self.max_step, spec=self.spec, remaining=self.remaining)
+                               fixed=fixed, max_step=self.max_step, spec=self.spec, remaining=self.remaining,
+                               correction="committee" if self.version == "v6" else "gp")
             self._adv, self._adv_key = adv, key
         adv.remaining = self.remaining
         adv.update(X, gc, prof, wcat_rows=phys6[:, 5], hours=self.hours_rows())
@@ -564,6 +570,14 @@ class Campaign:
         elif not adv.kin.has_replicates and len(adv.X) >= 8:
             notes.append("Whether the catalyst is losing activity cannot be told yet: no set point has been repeated. "
                          "A check run (repeat an earlier run) would show it.")
+        if getattr(adv, "committee", None) is not None:
+            w = adv.committee.weights
+            names = {"none": "no correction (the physics alone)", "gp": "the Gaussian process",
+                     "nn": "the neural-network ensemble"}
+            top = max(w, key=w.get)
+            parts = ", ".join(f"{names[k].split(' (')[0]} {100 * v:.0f} %" for k, v in w.items())
+            notes.append(f"Correction to the physics (v6 committee): {parts}. The model that best predicts runs it "
+                         f"was not trained on gets the most say; here that is {names[top]}.")
         resid = (adv.kin.predict_gc(physical(adv.X, adv.W), t=adv.t_rows) - adv.gc)[:, :-1]
         Tr = unscale(adv.X)[:, 4]
         return dict(reactions=reactions, notes=notes, miss_pct=rnd(100 * np.median(np.abs(resid)), 2),

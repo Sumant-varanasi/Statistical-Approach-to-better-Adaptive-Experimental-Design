@@ -69,6 +69,7 @@ function renderSetup() {
   $("s-cost").value = st.trial_cost ?? ""; $("s-hours").value = st.hours; $("s-seed").value = st.seed;
   $("s-spec-SC").value = st.spec.S_C ?? ""; $("s-spec-dT").value = st.spec.dT_ad ?? ""; $("s-remaining").value = st.remaining;
   $("s-deact").value = st.deactivation ?? 0;
+  $("s-version").value = st.version || "v6";
 
   const L = $("limits");
   L.innerHTML = "";
@@ -97,7 +98,7 @@ async function applySettings() {
     lo: [0, 1, 2, 3, 4].map((i) => +$("s-lo-" + i).value), hi: [0, 1, 2, 3, 4].map((i) => +$("s-hi-" + i).value),
     fixed: {}, prices: {}, trial_cost: $("s-cost").value === "" ? null : +$("s-cost").value, hours: +$("s-hours").value, seed: +$("s-seed").value,
     spec: { S_C: $("s-spec-SC").value === "" ? null : +$("s-spec-SC").value, dT_ad: $("s-spec-dT").value === "" ? null : +$("s-spec-dT").value },
-    remaining: +$("s-remaining").value, deactivation: +($("s-deact").value || 0),
+    remaining: +$("s-remaining").value, deactivation: +($("s-deact").value || 0), version: $("s-version").value,
   };
   for (let i = 0; i < 5; i++) if ($("s-fx-" + i).checked) {
     if ($("s-fxv-" + i).value === "") { setMsg("setup-msg", `give a value for the fixed ${knobLabel(i).toLowerCase()}`, "err"); return false; }

@@ -231,4 +231,42 @@ check("check runs are marked in the history and repeat the base case",
 check("cumulative profit is recorded", h["cum_true"].shape == (11,) and np.isclose(h["cum_true"][-1], h["y_true"].sum()))
 check("the v4 rule is still available for comparison", run_smart("simple", budget=7, seed=0, planner="greedy", models=("plain",))["strategy"] == "smart_v4")
 
+# ================================================================= v6: committee correction
+from smart.committee import ResidualCommittee, stacking_weights, MIN_NN
+
+# 19. stacking picks the member that predicts held-out data, and stays on the simplex
+lp = np.column_stack([np.full(20, -5.0), np.full(20, -1.0), np.full(20, -3.0)])
+w = stacking_weights(lp)
+check("stacking: weights sum to 1 and favour the best held-out predictor", abs(w.sum() - 1) < 1e-9 and w[1] > 0.8)
+check("stacking: on a tie the prior decides (simpler member first)",
+      stacking_weights(np.zeros((10, 2)), [1.0, 0.25])[0] > 0.7)
+
+rng_c = np.random.default_rng(0)
+Xc = rng_c.random((14, 5))
+phys_c = rng_c.normal(0, 10, 14)
+noise_c = 0.25
+r_noise = rng_c.normal(0, np.sqrt(noise_c), 14)
+cm = ResidualCommittee(seed=0).fit(Xc, r_noise, phys_c, noise_c)
+mu0, _, _ = cm.predict(rng_c.random((50, 5)), rng_c.normal(0, 10, 50))
+check("committee: correct physics -> the correction stays within the noise level", float(np.max(np.abs(mu0))) < 2 * np.sqrt(noise_c))
+r_smooth = 8 * np.sin(3 * Xc[:, 4]) + 4 * Xc[:, 0] + rng_c.normal(0, np.sqrt(noise_c), 14)
+cm2 = ResidualCommittee(seed=0).fit(Xc, r_smooth, phys_c, noise_c)
+check("committee: error that depends on the knobs -> the GP carries the weight", max(cm2.weights, key=cm2.weights.get) == "gp")
+r_phys = 0.3 * phys_c + rng_c.normal(0, np.sqrt(noise_c), 14)
+cm4 = ResidualCommittee(seed=0).fit(Xc, r_phys, phys_c, noise_c)
+check("committee: error that follows the physics prediction -> the networks carry the weight", max(cm4.weights, key=cm4.weights.get) == "nn")
+mu2, sd2, parts2 = cm2.predict(Xc[:3], phys_c[:3])
+check("committee: spread includes the members' disagreement", bool(np.all(sd2 + 1e-9 >= parts2["disagreement"])))
+cm3 = ResidualCommittee(seed=0).fit(Xc[:MIN_NN - 1], r_smooth[:MIN_NN - 1], phys_c[:MIN_NN - 1], noise_c)
+check("committee: networks only join once there are enough runs", "nn" not in cm3.weights and "nn" in cm2.weights)
+
+# 20. the v6 advisor plans within the step limits and keeps v5 available
+adv6 = SmartAdvisor(COMPLEX, seed=2, correction="committee", remaining=6)
+adv6.update(np.array(h5["X"]), np.array(h5["gc"]), np.array(h5["y_obs"]), hours=np.array(h5["hours"]))
+x6, info6 = adv6.suggest(h5["X"][-1])
+check("v6: suggestion within one step of the last run",
+      bool(np.all(np.abs(unscale(x6) - unscale(h5["X"][-1])) <= MAX_STEP + 1e-6)))
+check("v6: committee fitted and weights reported", adv6.committee is not None and abs(sum(adv6.committee.weights.values()) - 1) < 1e-9)
+check("v5 default still uses the single GP", SmartAdvisor(COMPLEX, seed=2).correction == "gp")
+
 print("\nAll smart-advisor checks passed.")

@@ -127,7 +127,7 @@ Score: the true profit of the settings the method would *recommend* after each r
 run by predicted or measured profit), as a share of the best possible profit at that catalyst
 loading (found by differential evolution on the true model).
 
-## 8. The advisor (v5)
+## 8. The advisor (v5, and v6 in 8.4)
 
 ### 8.1 Learning the chemistry: a ladder of model classes
 
@@ -202,6 +202,51 @@ Score: the true profit of the settings the method would *recommend* after each r
 catalyst's current activity, as a share of the best possible profit on a fresh catalyst; and
 the **cumulative profit earned** over the campaign (every run produces, so a campaign that
 wanders earns less).
+
+### 8.4 v6: a committee for the correction (`smart/committee.py`)
+
+v6 keeps everything above and changes only step 3 of 8.2, the correction of the physics.
+The residual $r_i = y_i - \hat f_{\text{phys}}(x_i)$ (measured profit minus the physics prediction
+at the best-fit chemistry) is predicted by three members:
+
+| Member | Prediction of $r$ | Joins from |
+|---|---|---|
+| `none` | $0$, with the GC noise variance $\sigma_n^2$: "the physics is right" | run 1 |
+| `gp` | the v5 Gaussian process on the knobs (Matérn 5/2, log P, length-scales ≥ 0.15) | run 4 |
+| `nn` | an ensemble of 8 one-hidden-layer tanh networks (16 units, L2 penalty), each on a bootstrap resample, inputs = the knobs (log P) **and** the physics prediction $\hat f_{\text{phys}}(x)$ | run 8 |
+
+The networks see the physics prediction, so they can learn an error that *follows* the physics
+(a missing reaction removes a share of the product wherever much product is made); the GP sees
+only the knobs and learns errors that vary smoothly across the box. Network outputs are clipped
+to the residual range seen plus half of it, so they cannot invent large corrections far from the data.
+
+**Weights by stacking** (Wolpert 1992; Yao et al. 2018). Every member predicts runs it was not
+trained on (leave-one-out up to 12 runs, 6-fold after), giving held-out densities
+$p_k(r_i)$. The weights maximise the held-out log score of the mixture,
+$$\max_{w \in \Delta} \sum_i \log \sum_k w_k\, p_k(r_i) + \sum_k (a_k - 1)\log w_k ,$$
+solved by EM, with Dirichlet pseudo-counts $a = (1, 0.5, 0.25)$ for (none, gp, nn): on equal
+held-out evidence the simpler member keeps the weight (Occam). The weights are re-estimated
+after every run, reported to the operator, and logged per run in the benchmark.
+
+**Prediction**: the mixture mean $\mu = \sum_k w_k \mu_k$ and variance
+$\sigma^2 = \sum_k w_k \sigma_k^2 + \sum_k w_k(\mu_k - \mu)^2$: the second term is the members'
+**disagreement**. It enters the planner's uncertainty like any other, so the planner is drawn to
+where the members disagree (query by committee, Seung et al. 1992).
+
+**Cost**: all networks of all held-out folds are trained in one vectorised L-BFGS run
+(`BatchMLP`); a committee fit takes about 1–2 s per run.
+
+In the library the v5 behaviour stays the default (`correction="gp"`), so every v5 result is
+reproduced unchanged; v6 is `correction="committee"` (`run_smart(..., correction="committee")`).
+The web page and `reactor_advisor.py` use v6 by default; `--advisor v5` or the *Advisor version*
+setting switch back. Benchmark methods: `smart_v6`, `smart_v6_missing_E`.
+
+**Result** (`python compare_v6.py`, 70 paired campaigns, `results/v6_summary.md`): with the
+correct reaction network v6 and v5 are indistinguishable (the committee keeps "none" at about
+55–60 % and the correction small). With C + B → E missing from the model v6 is at 65 % of the
+best profit after 10 runs against 34 % for v5, reaches 90 % in 14.5 runs against 18.5, and earns
+more over the campaign in 8 of 10 campaigns (Wilcoxon p = 0.014). In that case the GP carries
+85–90 % of the weight by the end and the networks 5–10 %.
 
 ## 9. Baselines
 

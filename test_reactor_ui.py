@@ -161,4 +161,17 @@ st = C.example(dict(seed=3))
 A = C.analyse()["analysis"]
 check("simple chemistry: 2 reactions learned", len(A["chemistry"]["reactions"]) == 2 and len(A["arrhenius"]["reactions"]) == 2)
 
+# the v6 advisor (committee correction) can be switched on from the page
+try:
+    C.settings(dict(version="v7"))
+    bad = False
+except ValueError:
+    bad = True
+check("advisor version is validated (v5 or v6 only)", bad and C.state()["settings"]["version"] == "v6")
+st = C.settings(dict(version="v6"))
+A = C.analyse()["analysis"]
+check("v6 advisor: advice produced and the committee weights are explained",
+      st["settings"]["version"] == "v6" and any("committee" in n for n in A["chemistry"]["notes"]))
+C.settings(dict(version="v6"))
+
 print("\nAll web-interface checks passed.")

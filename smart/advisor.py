@@ -51,6 +51,7 @@ from scipy.optimize import differential_evolution, minimize
 from .systems import (SYSTEMS, MODELS, LOW, HIGH, MAX_STEP, MIN_TOTAL_FLOW, WCAT, A_SPEC, DIM, R, T_REF,
                       unscale, scale, physical, feasible, step_scaled, base_case, screening_runs)
 from .kinetics import KineticFit, GC_NOISE_REL, GC_NOISE_ABS, HOURS_PER_RUN
+from .committee import ResidualCommittee
 from bo.gp import GP
 from bo.loop import LogInputs, copula_transform
 from bo.acquisition import expected_improvement
@@ -215,14 +216,16 @@ class SmartAdvisor:
     planner       "horizon" (v5 lookahead) or "greedy" (v4 one-step rule)
     horizon       runs the lookahead rolls forward (H)
     remaining     runs the operator can still afford (R); the planner weighs exploration by it
-    residual_gp   correct the physics with a GP on the profit residual (on by default)
+    residual_gp   correct the physics on the profit residual (on by default; False = physics only)
+    correction    "gp" (v5: one Gaussian process) or "committee" (v6: none / GP / neural-network
+                  ensemble, weighted by how well each predicts held-out runs; smart/committee.py)
     calibrate     scale the predictive spread by the advisor's own past misses
     models        kinetic model classes the fit may choose from (kinetics.MODELS); None = all
     """
 
     def __init__(self, system, wcat=WCAT, a_spec=A_SPEC, seed=0, n_theta=6, lo=None, hi=None,
                  fixed=None, max_step=None, residual_gp=True, spec=None, planner="horizon", horizon=4,
-                 remaining=10, calibrate=True, models=None):
+                 remaining=10, calibrate=True, models=None, correction="gp"):
         self.S = SYSTEMS[system] if isinstance(system, str) else system
         self.wcat, self.a_spec = float(wcat), float(a_spec)
         self.kin = KineticFit(self.S, a_spec=self.a_spec, seed=seed, **({} if models is None else dict(models=models)))
@@ -234,6 +237,8 @@ class SmartAdvisor:
         self.free = [i for i in range(DIM) if i not in self.fixed]
         self.step = step_scaled(max_step)
         self.use_gp = residual_gp
+        self.correction = correction if residual_gp else None
+        self.committee = None
         self.spec = {k: float(v) for k, v in (spec or {}).items() if v is not None and k in SPEC_KEYS}
         self.planner, self.horizon, self.remaining = planner, int(horizon), int(remaining)
         self.calibrate = calibrate
@@ -263,12 +268,19 @@ class SmartAdvisor:
         self.phys_at_data = self._physics(self.X, self.kin.theta[None], W=self.W, t=self.t_rows)[0]
         self.resid = self.y - self.phys_at_data
         self.gp = None
-        if self.use_gp and n >= 4:
+        self.committee = None
+        if self.correction and n >= 4:
             # the GP's noise is not allowed to drop below what the GC noise implies
             s = max(self.resid.std(), 1e-6)
-            nf = np.mean(profit_noise_sd(self.S, ph6, self.gc) ** 2) / s ** 2
-            gp = SmoothGP(seed=self.seed, noise_bounds=(min(nf, 0.5), max(1.0, 2 * nf)))
-            self.gp = LogInputs(gp, (0,), LOW, HIGH).fit(self.X, self.resid)     # GP sees log P
+            noise_var = float(np.mean(profit_noise_sd(self.S, ph6, self.gc) ** 2))
+            nf = noise_var / s ** 2
+            nb = (min(nf, 0.5), max(1.0, 2 * nf))
+            if self.correction == "committee":
+                self.committee = ResidualCommittee(seed=self.seed).fit(
+                    self.X, self.resid, self.phys_at_data, noise_var, gp_noise_bounds=nb)
+            else:
+                gp = SmoothGP(seed=self.seed, noise_bounds=nb)
+                self.gp = LogInputs(gp, (0,), LOW, HIGH).fit(self.X, self.resid)     # GP sees log P
         # calibration: z-scores of the measured profits against the predictive spread of an
         # observation at the data (physics disagreement + GP, noise included); inflate if > 1
         self.calib = 1.0
@@ -305,11 +317,19 @@ class SmartAdvisor:
         mu_p = np.nan_to_num(pr[0], nan=-1e3)          # best-estimate chemistry
         with np.errstate(invalid="ignore"):
             sd_p = np.nan_to_num(np.nanstd(pr, 0), nan=0.0)   # disagreement between plausible chemistries
+        mu_r, sd_r, extra = self._correct(Xc, mu_p, include_noise)
+        return (mu_p + mu_r, np.sqrt(sd_p ** 2 + sd_r ** 2 + 1e-9),
+                dict(mu_phys=mu_p, sd_phys=sd_p, mu_corr=mu_r, sd_corr=sd_r, **extra))
+
+    def _correct(self, Xc, mu_phys, include_noise=False):
+        """The correction to the physics at Xc: mean, sd, and (v6) the committee's parts."""
+        if self.committee is not None:
+            mu, sd, extra = self.committee.predict(Xc, mu_phys, include_noise=include_noise)
+            return mu, sd, extra
         if self.gp is not None:
-            mu_r, sd_r = self.gp.predict(Xc, include_noise=include_noise)
-        else:
-            mu_r, sd_r = np.zeros(len(Xc)), np.zeros(len(Xc))
-        return mu_p + mu_r, np.sqrt(sd_p ** 2 + sd_r ** 2 + 1e-9), dict(mu_phys=mu_p, sd_phys=sd_p, mu_corr=mu_r, sd_corr=sd_r)
+            mu, sd = self.gp.predict(Xc, include_noise=include_noise)
+            return mu, sd, {}
+        return np.zeros(len(Xc)), np.zeros(len(Xc)), {}
 
     def predict(self, Xc, parts=False, t=None):
         mu, sd, p = self._predict(Xc, t=t)
@@ -472,7 +492,7 @@ class SmartAdvisor:
         flat = T.reshape(-1, DIM)
         pr = self._physics(flat, self.thetas)                                   # (n_theta, m*H)
         pr = np.nan_to_num(pr, nan=-1e3)
-        mu_r, sd_r = (self.gp.predict(flat) if self.gp is not None else (np.zeros(len(flat)), np.zeros(len(flat))))
+        mu_r, sd_r, _ = self._correct(flat, pr[0])
         z = rng.standard_normal((self.n_theta, 1))
         f = pr + mu_r[None, :] + z * (sd_r * self.calib)[None, :]
         f = f.reshape(self.n_theta, len(M), H)
@@ -584,21 +604,24 @@ def _pack(h, **extra):
 
 
 def run_smart(system, budget=25, seed=0, wcat=WCAT, a_spec=A_SPEC, verbose=False, model=None, callback=None,
-              planner="horizon", models=None, deactivation=0.0, check_every=0, spec=None):
+              planner="horizon", models=None, deactivation=0.0, check_every=0, spec=None, correction="gp"):
     """One campaign with the smart advisor on the virtual reactor.
     model: name in systems.MODELS to give the advisor a deliberately WRONG reaction network
     (stress test); default = the right network (still without the reactant adsorption).
-    planner / models: "horizon" + all kinetic models = v5; "greedy" + ("plain",) = v4.
+    planner / models: "horizon" + all kinetic models = v5; "greedy" + ("plain",) = v4;
+    correction="committee" with the v5 planner = v6.
     callback(run_number, x, result, info) is called after every advisor-chosen run."""
     S, vr, h, base = start_campaign(system, seed, wcat, a_spec, deactivation)
     x_base = scale(base)[0]
     adv = SmartAdvisor(MODELS[model] if model else S, wcat=wcat, a_spec=a_spec, seed=seed, planner=planner,
-                       models=models, spec=spec, remaining=budget - 5)
+                       models=models, spec=spec, remaining=budget - 5, correction=correction)
     rng = np.random.default_rng(seed)
-    info_log = []
+    info_log, w_log = [], []
     while len(h["X"]) < budget:
         adv.remaining = budget - len(h["X"])
         adv.update(np.array(h["X"]), np.array(h["gc"]), np.array(h["y_obs"]), hours=np.array(h["hours"]))
+        if adv.committee is not None:
+            w_log.append([adv.committee.weights.get(k, 0.0) for k in ("none", "gp", "nn")])
         _score_rec(vr, h, adv.recommend())
         n = len(h["X"])
         if is_check_run(n, check_every):
@@ -617,10 +640,15 @@ def run_smart(system, budget=25, seed=0, wcat=WCAT, a_spec=A_SPEC, verbose=False
             print(f"smart {system} run {len(h['X']):2d}: measured {r['profit']:7.2f}  predicted "
                   f"{info.get('pred', float('nan')):7.2f} +- {info.get('sd', 0):.2f}   recommended (true) {h['rec'][-1]:7.2f}")
     name = "smart" if planner == "horizon" and models is None else "smart_v4"
+    if correction == "committee":
+        name = "smart_v6"
     if model:
         name += f"_{model}"
+    extra = {}
+    if adv.committee is not None:
+        extra["committee_weights"] = np.array(w_log)          # (updates, 3): none / gp / nn
     return _pack(h, strategy=name, system=system, seed=seed, base=base, theta=adv.kin.theta,
-                 kin_model=adv.kin.model, info=info_log, advisor=adv)
+                 kin_model=adv.kin.model, info=info_log, advisor=adv, **extra)
 
 
 # ----------------------------------------------------------------------------------- baselines

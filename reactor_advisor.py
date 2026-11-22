@@ -54,6 +54,11 @@ Product spec and budget
     --max-dT 60                keep the adiabatic temperature rise under 60 K (thermal safety)
     --remaining 8              runs you can still afford: the planner weighs exploration by it
 
+Advisor version
+    --advisor v5               correct the physics with one Gaussian process (v5) instead of the v6
+                               committee (Gaussian process + neural-network ensemble, weighted by
+                               held-out prediction; the default)
+
 Safety: the advisor only SUGGESTS.  Check every suggestion against your plant's safety limits
 (use --limit to keep it inside them) before running it.  Prices are placeholders: replace them.
 """
@@ -189,6 +194,11 @@ def explain_chemistry(adv, S, x_ref):
     if d["model"] == "inhib_decay":
         out.append(f"   - The catalyst is losing about {100 * d['loss_per_run']:.1f} % of its activity per run "
                    f"(likely {100 * d['loss_lo']:.1f}-{100 * d['loss_hi']:.1f} %); the advice allows for it.")
+    if getattr(adv, "committee", None) is not None:
+        w = adv.committee.weights
+        out.append("   - Correction to the physics (v6 committee): " + ", ".join(
+            f"{ {'none': 'none', 'gp': 'Gaussian process', 'nn': 'neural networks'}[k]} {100 * v:.0f} %" for k, v in w.items())
+            + " (weights from how well each predicts runs it was not trained on).")
     resid = (adv.kin.predict_gc(physical(adv.X, adv.W), t=adv.t_rows) - adv.gc)[:, :-1]
     out.append(f"   - How well this chemistry explains your GC readings: typical miss "
                f"{100 * np.median(np.abs(resid)):.2f} percentage points of composition.")
@@ -243,7 +253,8 @@ def advise(args, user, gc, S, hours=None):
     lo, hi, fixed, step = parse_knob_args(args)
     spec = {k: v for k, v in dict(S_C=args.min_selectivity, dT_ad=args.max_dT).items() if v is not None}
     adv = SmartAdvisor(S, wcat=wcat_rows[-1], a_spec=args.surface_area, seed=args.seed,
-                       lo=lo, hi=hi, fixed=fixed, max_step=step, spec=spec, remaining=args.remaining)
+                       lo=lo, hi=hi, fixed=fixed, max_step=step, spec=spec, remaining=args.remaining,
+                       correction="committee" if args.advisor == "v6" else "gp")
     adv.update(X, gc, profit, wcat_rows=wcat_rows, hours=hours)
     x_next, info = adv.suggest(X[-1], np.random.default_rng(args.seed))
     ib = adv.recommend()
@@ -412,6 +423,8 @@ def main():
     ap.add_argument("--remaining", type=int, default=10, help="runs you can still afford (default 10)")
     ap.add_argument("--deactivation", type=float, default=0.0, help="virtual reactor only: activity lost per day, %% (default 0)")
     ap.add_argument("--check-every", type=int, default=0, help="--simulate-days only: repeat the base case every N days")
+    ap.add_argument("--advisor", choices=("v5", "v6"), default="v6",
+                    help="v6: committee of GP + neural networks (default); v5: one GP correction")
     ap.add_argument("--seed", type=int, default=0)
     args = ap.parse_args()
     if args.log is None:                       # never overwrite a real log with demo data

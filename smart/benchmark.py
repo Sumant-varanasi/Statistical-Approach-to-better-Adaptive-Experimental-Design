@@ -9,13 +9,16 @@ Settings (scenarios)
                    faster when hotter and with more A); the protocol repeats the base case every
                    5th run as a check run, so drift can be seen at all
 Methods
+    smart_v6     the v6 advisor: v5 + a committee correction (none / GP / neural-network ensemble,
+                 weighted by held-out prediction; smart/committee.py)
     smart        the v5 advisor: kinetics ladder (inhibition, its heat, decay) + horizon planner
     smart_v4     the v4 advisor: plain kinetics + one-step Expected Improvement with the purposeful step
     chemist      an experienced operator's rules of thumb + momentum (advisor.ChemistPolicy)
     plain_bo     black-box BO (v2's fitted GP + EI) under the same step limits, profit only
     random_walk  a random allowed step each run
 Stress test (complex only)
-    smart_missing_E   the v5 advisor with the over-reaction C + B -> E left out of its model
+    smart_missing_E     the v5 advisor with the over-reaction C + B -> E left out of its model
+    smart_v6_missing_E  the same for v6
 
 Every method sees the same virtual reactor, the same GC noise and the SAME 5 screening runs
 for a given seed; profit is always computed from the noisy GC reading.  Each campaign is
@@ -39,6 +42,7 @@ SETTINGS = {
     "complex_deact": dict(system="complex", deactivation=0.02 / 24.0, check_every=5),
 }
 METHODS = {
+    "smart_v6": "Smart advisor v6 (v5 + committee correction: GP + neural networks)",
     "smart": "Smart advisor v5 (kinetics ladder + horizon planner)",
     "smart_v4": "Smart advisor v4 (plain kinetics + one-step EI)",
     "chemist": "Chemist's rules of thumb",
@@ -46,7 +50,8 @@ METHODS = {
     "random_walk": "Random walk",
 }
 # stress test, complex system only: advisor whose model is missing the over-reaction
-STRESS = {"smart_missing_E": "Smart advisor v5, over-reaction C+B->E missing from its model"}
+STRESS = {"smart_missing_E": "Smart advisor v5, over-reaction C+B->E missing from its model",
+          "smart_v6_missing_E": "Smart advisor v6, over-reaction C+B->E missing from its model"}
 LABELS = {**METHODS, **STRESS}
 SETTING_LABEL = {"simple": "Simple reaction  (A+B->C, A->D)",
                  "complex": "Complex reaction  (A+B<=>C, C+B->E, A->D)",
@@ -73,6 +78,10 @@ def run_one(setting, method, seed, budget):
         return advisor.run_smart(cfg["system"], planner="greedy", models=("plain",), **common)
     if method == "smart_missing_E":
         return advisor.run_smart(cfg["system"], model="complex_missing_E", **common)
+    if method == "smart_v6":
+        return advisor.run_smart(cfg["system"], correction="committee", **common)
+    if method == "smart_v6_missing_E":
+        return advisor.run_smart(cfg["system"], model="complex_missing_E", correction="committee", **common)
     return advisor.run_baseline(cfg["system"], method, **common)
 
 
