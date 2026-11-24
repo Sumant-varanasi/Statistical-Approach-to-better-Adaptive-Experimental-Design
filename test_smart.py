@@ -1,4 +1,4 @@
-"""Checks for the smart advisor (smart/ and reactor_advisor.py).  Run:  python test_smart.py  (~2 min)"""
+"""Checks for the smart advisor (smart/ and reactor_advisor.py).  Run:  python test_smart.py  (~7 min)"""
 import os
 import copy
 import tempfile
@@ -268,5 +268,140 @@ check("v6: suggestion within one step of the last run",
       bool(np.all(np.abs(unscale(x6) - unscale(h5["X"][-1])) <= MAX_STEP + 1e-6)))
 check("v6: committee fitted and weights reported", adv6.committee is not None and abs(sum(adv6.committee.weights.values()) - 1) < 1e-9)
 check("v5 default still uses the single GP", SmartAdvisor(COMPLEX, seed=2).correction == "gp")
+
+# ================================================================= v7: hybrid committee, neural network alone, ablations
+from smart.committee import ProfitEnsemble, MEMBERS, ALL_MEMBERS, HYBRID_MEMBERS
+from smart.advisor import NNOnlyPolicy, POLICIES
+from smart import benchmark as B
+
+
+def rmse(e):
+    return float(np.sqrt(np.mean(np.square(e))))
+
+
+# 21. the stand-alone network (member 'direct') takes over when the physics is useless and stays out when it is right
+rng_d = np.random.default_rng(7)
+nd = 25
+Xd7, Xq7 = rng_d.random((nd, 5)), rng_d.random((200, 5))
+f7 = lambda Z: 20 * np.sin(3 * Z[:, 4]) + 10 * Z[:, 0] - 8 * Z[:, 1] * Z[:, 2]     # profit: a smooth function of the knobs
+y7 = f7(Xd7) + rng_d.normal(0, 0.5, nd)
+phys_bad, phys_bad_q = rng_d.normal(0, 10, nd), rng_d.normal(0, 10, 200)            # a "physics" unrelated to the profit
+ch = ResidualCommittee(seed=0, members=HYBRID_MEMBERS).fit(Xd7, y7 - phys_bad, phys_bad, 0.25)
+check(f"hybrid: useless physics, 25 runs -> the stand-alone network carries the weight ({ch.describe()})",
+      max(ch.weights, key=ch.weights.get) == "direct")
+mu_h, _, parts_h = ch.predict(Xq7, phys_bad_q)
+e_h, e_p = rmse(phys_bad_q + mu_h - f7(Xq7)), rmse(phys_bad_q - f7(Xq7))
+check(f"hybrid: and then predicts unseen runs better than the physics alone (error {e_h:.1f} against {e_p:.1f})", e_h < e_p)
+check("hybrid: the direct member's prediction of the profit is the stand-alone network's (the physics cancels)",
+      np.allclose(parts_h["member_mu"]["direct"] + phys_bad_q, ch.models["direct"].predict(Xq7)[0]))
+failed = ch.predict(Xq7[:4], np.full(4, -1e3), phys_ok=np.array([False, True, False, True]))[2]["member_mu"]["direct"]
+check("hybrid: where the physics model gave no answer the stand-alone network does not overrule the penalty",
+      failed[0] == failed[2] == 0.0 and failed[1] > 900 and failed[3] > 900)
+P7, VA7, VB7, VI7, T7 = unscale(Xd7).T
+F7, F07 = COMPLEX.simulate(P7, VA7, VB7, VI7, W, T7, truth=True)
+phys_ok = COMPLEX.profit(F7, F07, P7, W)                                             # the physics is right: only GC noise is left
+cr = ResidualCommittee(seed=0, members=HYBRID_MEMBERS).fit(Xd7, rng_d.normal(0, 0.5, nd), phys_ok, 0.25)
+check(f"hybrid: correct physics -> the stand-alone network gets little weight ({100 * cr.weights['direct']:.0f} %)",
+      cr.weights["direct"] < 0.1)
+pe = ProfitEnsemble(0).fit(Xd7, y7)
+check("stand-alone network: predictions stay within the profits seen plus half their range",
+      bool(np.all(pe.predict(rng_d.random((500, 5)))[0] <= y7.max() + 0.5 * (y7.max() - y7.min()) + 1e-9))
+      and bool(np.all(pe.predict(rng_d.random((500, 5)))[0] >= y7.min() - 0.5 * (y7.max() - y7.min()) - 1e-9)))
+# a held-out run must not help the networks that are scored on it: run 0 is far hotter and far more profitable than
+# the rest (profit = 100 x the temperature knob), so networks trained without it may promise at most the best of the
+# OTHER runs plus half their range; if run 0 itself set that limit they could "predict" it far better than they can
+Xl = np.full((12, 5), 0.5)
+Xl[:, 4] = 0.2 * rng_d.random(12)
+Xl[0, 4] = 1.0
+yl = 100 * Xl[:, 4] + rng_d.normal(0, 0.3, 12)
+ml, vl = ProfitEnsemble(0).fit(Xl, yl, 0.09).heldout(Xl, yl, [np.array([i]) for i in range(12)])
+top_l = yl[1:].max() + 0.5 * (yl[1:].max() - yl[1:].min())
+check(f"stand-alone network: a held-out run does not widen the range it is judged against "
+      f"(run 0 measured {yl[0]:.0f}, predicted without it {ml[0]:.1f}, limit from the other runs {top_l:.1f})",
+      ml[0] <= top_l + 1e-9 and bool(np.all(vl >= 0.09 - 1e-12)))
+# and on the smooth data above (6 folds): raise one run's profit by 100; the networks trained without that run must
+# not follow it (all folds' networks share one optimiser run, so a small move in no particular direction is expected)
+folds7 = ResidualCommittee.folds(nd, np.random.default_rng(0))
+i7 = int(np.argmax(y7))
+y7b = y7.copy()
+y7b[i7] += 100.0
+m7a = ProfitEnsemble(0).fit(Xd7, y7, 0.25).heldout(Xd7, y7, folds7)[0]
+m7b = ProfitEnsemble(0).fit(Xd7, y7b, 0.25).heldout(Xd7, y7b, folds7)[0]
+check(f"stand-alone network: raising a held-out run's profit by 100 moves its own held-out prediction by less than 1 "
+      f"({m7a[i7]:.2f} -> {m7b[i7]:.2f})", abs(m7b[i7] - m7a[i7]) < 1.0)
+
+# 22. any subset of members that contains 'none' works; the v6 default is unchanged
+for mem in (("none",), ("none", "gp"), ("none", "nn"), ("none", "direct"), ("none", "gp", "direct"), ALL_MEMBERS):
+    c = ResidualCommittee(seed=0, members=mem).fit(Xd7[:14], (y7 - phys_bad)[:14], phys_bad[:14], 0.25)
+    mu, sd, _ = c.predict(Xq7[:5], phys_bad_q[:5])
+    check(f"committee works with members {' + '.join(mem)}",
+          tuple(c.weights) == mem and abs(sum(c.weights.values()) - 1) < 1e-9 and np.isfinite(mu).all()
+          and bool(np.all(sd > 0)) and c.weight_row() == [c.weights.get(k, 0.0) for k in ALL_MEMBERS])
+try:
+    ResidualCommittee(members=("gp", "nn"))
+    refused = False
+except ValueError:
+    refused = True
+check("committee refuses a member list without 'none'", refused)
+check("v6 default members unchanged (none, gp, nn)", ResidualCommittee(seed=0).members == ("none", "gp", "nn") == MEMBERS
+      and tuple(cm2.weights) == MEMBERS)
+cm2h = ResidualCommittee(seed=0, members=HYBRID_MEMBERS).fit(Xc, r_smooth, phys_c, noise_c)
+m6, m7 = cm2.predict(Xc[:3], phys_c[:3])[2]["member_mu"], cm2h.predict(Xc[:3], phys_c[:3])[2]["member_mu"]
+check("adding the direct member leaves what the GP and the correction networks compute unchanged",
+      all(np.array_equal(m6[k], m7[k]) for k in ("gp", "nn")))
+
+# 23. the v7 (hybrid) advisor: a short campaign, its suggestion, and the logged weights
+h7 = run_smart("complex", budget=10, seed=2, correction="hybrid")
+adv7 = h7["advisor"]
+ph7 = unscale(h7["X"])
+check("v7: campaign is named smart_v7 and every run is within one step of the previous one, feasible",
+      h7["strategy"] == "smart_v7" and bool(np.all(np.abs(np.diff(ph7, axis=0)) <= MAX_STEP + 1e-6)) and feasible(ph7).all())
+x7, info7 = adv7.suggest(h7["X"][-1])
+check("v7: suggestion within one step of the last run, in the box, feasible",
+      bool(np.all(np.abs(unscale(x7) - unscale(h7["X"][-1])) <= MAX_STEP + 1e-6)) and (x7 >= 0).all() and (x7 <= 1).all()
+      and feasible(unscale(x7))[0])
+check("v7: the stand-alone network has joined the committee and the weights sum to 1",
+      adv7.members == HYBRID_MEMBERS and "direct" in adv7.committee.weights and abs(sum(adv7.committee.weights.values()) - 1) < 1e-9)
+w7 = h7["committee_weights"]
+check("v7: logged weights are (updates, 4) in the order none / gp / nn / direct, with the member names",
+      w7.shape == (5, 4) and list(h7["weight_columns"]) == list(ALL_MEMBERS) and list(h7["committee_members"]) == list(HYBRID_MEMBERS)
+      and np.allclose(w7.sum(1), 1) and h7["committee_weights_final"].shape == (4,) and h7["committee_heldout_rmse"].shape == (5, 4))
+check("v7: the networks have weight 0 until there are enough runs, and a weight after",
+      bool(np.all(w7[:MIN_NN - 5, 2:] == 0)) and bool(np.all(w7[MIN_NN - 5:, 2:] > 0)))
+ha = run_smart("simple", budget=7, seed=0, correction="committee", members=("none", "gp"))
+check("ablation (v6 without its networks): logged weights (updates, 4), absent members at 0, members named",
+      ha["committee_weights"].shape == (2, 4) and bool(np.all(ha["committee_weights"][:, 2:] == 0))
+      and list(ha["committee_members"]) == ["none", "gp"] and ha["strategy"] == "smart_v6")
+h6 = run_smart("simple", budget=7, seed=0, correction="committee")
+check("v6 with its default members: logged weights stay (updates, 3) and nothing else is added",
+      h6["committee_weights"].shape == (2, 3) and "weight_columns" not in h6 and h6["strategy"] == "smart_v6"
+      and h6["advisor"].members == MEMBERS)
+try:
+    SmartAdvisor(COMPLEX, correction="hybird")
+    refused = False
+except ValueError:
+    refused = True
+check("an unknown correction name is refused instead of silently falling back to v5", refused)
+
+# 24. the neural network alone as a baseline policy, and the benchmark's list of methods
+h = run_baseline("simple", "nn_only", budget=14, seed=1)
+ph = unscale(h["X"])
+check("nn_only: every run within one step of the previous one, in the box, feasible",
+      bool(np.all(np.abs(np.diff(ph, axis=0)) <= MAX_STEP + 1e-6)) and feasible(ph).all() and len(h["rec"]) == 14
+      and bool(np.all(ph >= LOW - 1e-9)) and bool(np.all(ph <= HIGH + 1e-9)) and h["strategy"] == "nn_only")
+pol = NNOnlyPolicy(step, np.zeros(DIM), np.ones(DIM), seed=1)
+check("nn_only: recommends one of the tested runs", pol.recommend(h0) in range(len(h0["X"])))
+new = ("nn_only", "smart_v7", "smart_v6_nonn", "smart_v6_nogp", "smart_v7_missing_E", "smart_v6_nonn_missing_E", "smart_v6_nogp_missing_E")
+check("benchmark: the v7 methods are listed, labelled, and every listed method can be run",
+      all(m in B.LABELS for m in new) and all(m in B.SMART_KWARGS or m in POLICIES for m in B.LABELS)
+      and all(m in B.STRESS for m in new[4:]) and all(m in B.METHODS for m in new[:4]))
+check("benchmark: stress tests do not apply to the simple reaction, everything else applies everywhere",
+      not any(B.applies(m, "simple") for m in B.STRESS) and all(B.applies(m, "complex") for m in B.LABELS)
+      and all(B.applies(m, "simple") for m in B.METHODS))
+check("benchmark: the v5 / v6 methods are run with the same arguments as before",
+      B.SMART_KWARGS["smart"] == {} and B.SMART_KWARGS["smart_v6"] == dict(correction="committee")
+      and B.SMART_KWARGS["smart_v4"] == dict(planner="greedy", models=("plain",))
+      and B.SMART_KWARGS["smart_missing_E"] == dict(model="complex_missing_E")
+      and B.SMART_KWARGS["smart_v6_missing_E"] == dict(model="complex_missing_E", correction="committee"))
 
 print("\nAll smart-advisor checks passed.")

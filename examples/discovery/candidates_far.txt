@@ -1,0 +1,4 @@
+# Very different: only two reactions, different orders, nothing makes E, no equilibrium
+# (C is made at a rate that ignores B; D comes from C falling apart).
+A + B -> C ; orders A=1, B=0
+C -> D + B

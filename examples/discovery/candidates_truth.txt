@@ -1,0 +1,4 @@
+# The reactions the complex example data were calculated from.
+A + B <=> C
+C + B -> E
+A -> D

@@ -51,7 +51,7 @@ from scipy.optimize import differential_evolution, minimize
 from .systems import (SYSTEMS, MODELS, LOW, HIGH, MAX_STEP, MIN_TOTAL_FLOW, WCAT, A_SPEC, DIM, R, T_REF,
                       unscale, scale, physical, feasible, step_scaled, base_case, screening_runs)
 from .kinetics import KineticFit, GC_NOISE_REL, GC_NOISE_ABS, HOURS_PER_RUN
-from .committee import ResidualCommittee
+from .committee import ResidualCommittee, ProfitEnsemble, MEMBERS, HYBRID_MEMBERS, ALL_MEMBERS
 from bo.gp import GP
 from bo.loop import LogInputs, copula_transform
 from bo.acquisition import expected_improvement
@@ -195,6 +195,7 @@ def keep_feasible(C):
 
 
 # =================================================================================== the advisor
+COMMITTEES = {"committee": MEMBERS, "hybrid": HYBRID_MEMBERS}     # correction -> its default committee members
 SPEC_KEYS = {"S_C": ("min", "selectivity"), "X_A": ("min", "conversion"), "dT_ad": ("max", "adiabatic temperature rise")}
 
 
@@ -217,16 +218,27 @@ class SmartAdvisor:
     horizon       runs the lookahead rolls forward (H)
     remaining     runs the operator can still afford (R); the planner weighs exploration by it
     residual_gp   correct the physics on the profit residual (on by default; False = physics only)
-    correction    "gp" (v5: one Gaussian process) or "committee" (v6: none / GP / neural-network
+    correction    "gp" (v5: one Gaussian process), "committee" (v6: none / GP / neural-network
                   ensemble, weighted by how well each predicts held-out runs; smart/committee.py)
+                  or "hybrid" (v7: the v6 committee plus a stand-alone neural network that
+                  predicts the profit from the knobs alone, without the physics; the advisor
+                  trusts whichever has predicted unseen runs better)
+    members       committee members to use, a subset of committee.ALL_MEMBERS containing "none";
+                  None = the default of the chosen correction (v6: none, gp, nn; v7: all four).
+                  Leaving one out shows what it contributes.
     calibrate     scale the predictive spread by the advisor's own past misses
     models        kinetic model classes the fit may choose from (kinetics.MODELS); None = all
     """
 
     def __init__(self, system, wcat=WCAT, a_spec=A_SPEC, seed=0, n_theta=6, lo=None, hi=None,
                  fixed=None, max_step=None, residual_gp=True, spec=None, planner="horizon", horizon=4,
-                 remaining=10, calibrate=True, models=None, correction="gp"):
-        self.S = SYSTEMS[system] if isinstance(system, str) else system
+                 remaining=10, calibrate=True, models=None, correction="gp", members=None):
+        if correction not in (None, "gp") + tuple(COMMITTEES):
+            raise ValueError(f"correction must be 'gp', 'committee' or 'hybrid', got {correction!r}")
+        if members is not None and correction not in COMMITTEES:
+            raise ValueError(f"members only applies to correction='committee' or 'hybrid' (got correction={correction!r}); "
+                             "it would be ignored")
+        self.S =SYSTEMS[system] if isinstance(system, str) else system
         self.wcat, self.a_spec = float(wcat), float(a_spec)
         self.kin = KineticFit(self.S, a_spec=self.a_spec, seed=seed, **({} if models is None else dict(models=models)))
         self.n_theta = n_theta
@@ -238,6 +250,9 @@ class SmartAdvisor:
         self.step = step_scaled(max_step)
         self.use_gp = residual_gp
         self.correction = correction if residual_gp else None
+        self.members = None                     # committee members (v6 / v7 only)
+        if self.correction in COMMITTEES:
+            self.members = ResidualCommittee(members=COMMITTEES[correction] if members is None else members).members
         self.committee = None
         self.spec = {k: float(v) for k, v in (spec or {}).items() if v is not None and k in SPEC_KEYS}
         self.planner, self.horizon, self.remaining = planner, int(horizon), int(remaining)
@@ -275,8 +290,8 @@ class SmartAdvisor:
             noise_var = float(np.mean(profit_noise_sd(self.S, ph6, self.gc) ** 2))
             nf = noise_var / s ** 2
             nb = (min(nf, 0.5), max(1.0, 2 * nf))
-            if self.correction == "committee":
-                self.committee = ResidualCommittee(seed=self.seed).fit(
+            if self.correction in COMMITTEES:
+                self.committee = ResidualCommittee(seed=self.seed, members=self.members).fit(
                     self.X, self.resid, self.phys_at_data, noise_var, gp_noise_bounds=nb)
             else:
                 gp = SmoothGP(seed=self.seed, noise_bounds=nb)
@@ -323,6 +338,9 @@ class SmartAdvisor:
 
     def _correct(self, Xc, mu_phys, include_noise=False):
         """The correction to the physics at Xc: mean, sd, and (v6) the committee's parts."""
+        if self.committee is not None and "direct" in self.committee.active:
+            # v7: where the physics gave no answer (the -1e3 penalty) the stand-alone network must not overrule it
+            return self.committee.predict(Xc, mu_phys, include_noise=include_noise, phys_ok=np.asarray(mu_phys) > -999.0)
         if self.committee is not None:
             mu, sd, extra = self.committee.predict(Xc, mu_phys, include_noise=include_noise)
             return mu, sd, extra
@@ -604,24 +622,36 @@ def _pack(h, **extra):
 
 
 def run_smart(system, budget=25, seed=0, wcat=WCAT, a_spec=A_SPEC, verbose=False, model=None, callback=None,
-              planner="horizon", models=None, deactivation=0.0, check_every=0, spec=None, correction="gp"):
+              planner="horizon", models=None, deactivation=0.0, check_every=0, spec=None, correction="gp",
+              members=None):
     """One campaign with the smart advisor on the virtual reactor.
     model: name in systems.MODELS to give the advisor a deliberately WRONG reaction network
     (stress test); default = the right network (still without the reactant adsorption).
     planner / models: "horizon" + all kinetic models = v5; "greedy" + ("plain",) = v4;
-    correction="committee" with the v5 planner = v6.
+    correction="committee" with the v5 planner = v6; correction="hybrid" = v7 (v6 plus a stand-alone
+    neural network on the profit).  members: committee members to use (None = the default of the
+    correction), e.g. ("none", "gp") = v6 without its neural networks.
+    Logged weights: v6 with its default members keeps committee_weights as (updates, 3), none / gp /
+    nn.  Every other committee logs (updates, 4) in the order of weight_columns (none / gp / nn /
+    direct, 0 for a member that is absent or has not joined yet), plus committee_members (the
+    members used), committee_weights_final (after the last run) and committee_heldout_rmse
+    (updates, 4): how far each member was from runs it had not seen (NaN if absent).
     callback(run_number, x, result, info) is called after every advisor-chosen run."""
     S, vr, h, base = start_campaign(system, seed, wcat, a_spec, deactivation)
     x_base = scale(base)[0]
     adv = SmartAdvisor(MODELS[model] if model else S, wcat=wcat, a_spec=a_spec, seed=seed, planner=planner,
-                       models=models, spec=spec, remaining=budget - 5, correction=correction)
+                       models=models, spec=spec, remaining=budget - 5, correction=correction, members=members)
+    legacy = correction == "committee" and adv.members == MEMBERS      # the v6 log format, read by compare_v6.py
     rng = np.random.default_rng(seed)
-    info_log, w_log = [], []
+    info_log, w_log, e_log = [], [], []
     while len(h["X"]) < budget:
         adv.remaining = budget - len(h["X"])
         adv.update(np.array(h["X"]), np.array(h["gc"]), np.array(h["y_obs"]), hours=np.array(h["hours"]))
-        if adv.committee is not None:
+        if adv.committee is not None and legacy:
             w_log.append([adv.committee.weights.get(k, 0.0) for k in ("none", "gp", "nn")])
+        elif adv.committee is not None:
+            w_log.append(adv.committee.weight_row())
+            e_log.append(adv.committee.weight_row("heldout_rmse", np.nan))
         _score_rec(vr, h, adv.recommend())
         n = len(h["X"])
         if is_check_run(n, check_every):
@@ -642,19 +672,26 @@ def run_smart(system, budget=25, seed=0, wcat=WCAT, a_spec=A_SPEC, verbose=False
     name = "smart" if planner == "horizon" and models is None else "smart_v4"
     if correction == "committee":
         name = "smart_v6"
+    elif correction == "hybrid":
+        name = "smart_v7"
     if model:
         name += f"_{model}"
     extra = {}
-    if adv.committee is not None:
+    if adv.committee is not None and legacy:
         extra["committee_weights"] = np.array(w_log)          # (updates, 3): none / gp / nn
+    elif adv.committee is not None:
+        extra.update(committee_weights=np.array(w_log),       # (updates, 4): none / gp / nn / direct
+                     weight_columns=np.array(ALL_MEMBERS), committee_members=np.array(adv.members),
+                     committee_weights_final=np.array(adv.committee.weight_row()),
+                     committee_heldout_rmse=np.array(e_log))
     return _pack(h, strategy=name, system=system, seed=seed, base=base, theta=adv.kin.theta,
                  kin_model=adv.kin.model, info=info_log, advisor=adv, **extra)
 
 
 # ----------------------------------------------------------------------------------- baselines
 class ChemistPolicy:
-    """What an experienced operator does by hand: read conversion and selectivity off the GC,
-    apply rules of thumb, and keep whatever worked.
+    """A scripted rules-of-thumb policy (a fixed script, not a person): read conversion and
+    selectivity off the GC, apply rules of thumb, and keep whatever worked.
 
       selectivity poor (< 0.85): cooler (side reactions have the higher activation energy),
                                  compensating with more pressure; then more B; then dilute
@@ -769,6 +806,47 @@ class PlainBOPolicy:
         return int(np.argmax(self.gp.predict(self.X)[0]))
 
 
+class NNOnlyPolicy:
+    """A neural network alone, under the same step limits: the candidates and the recommendation
+    rule of PlainBOPolicy, but the model is a deep ensemble of small networks (knobs -> profit,
+    committee.ProfitEnsemble) and Expected Improvement uses the ensemble's mean and the spread
+    between its networks.  No physics and no GC composition: like plain BO it sees one profit
+    number per run.  It is the baseline that shows what the neural network can do on its own."""
+
+    def __init__(self, step, lo, hi, seed=0, fixed=None):
+        self.step, self.lo, self.hi, self.fixed = step, lo, hi, dict(fixed or {})
+        self.rng = np.random.default_rng(seed + 37)
+        self.seed = seed
+        self.nn = None
+
+    def _fit(self, h):
+        X, Y = np.array(h["X"]), np.array(h["y_obs"])
+        self.nn = ProfitEnsemble(self.seed).fit(X, Y)
+        self.X = X
+        self.mu_X = self.nn.predict(X)[0]
+
+    def next(self, h):
+        self._fit(h)
+        X = self.X
+        x_last = X[-1]
+        blo, bhi = step_box(x_last, self.step, self.lo, self.hi, self.fixed)
+        x_best = X[int(np.argmax(self.mu_X))]
+        C = np.vstack([sobol_in(blo, bhi, 512, self.rng),
+                       np.clip(x_best + self.rng.normal(0, 0.3, (128, DIM)) * self.step, blo, bhi)])
+        for i, v in self.fixed.items():
+            C[:, i] = v
+        C = C[feasible(unscale(C))]
+        if len(C) == 0:
+            return x_last.copy()
+        mu, sd = self.nn.predict(C)
+        return C[int(np.argmax(expected_improvement(mu, sd, float(np.max(self.mu_X)))))]
+
+    def recommend(self, h):
+        if self.nn is None or len(self.X) != len(h["X"]):
+            self._fit(h)
+        return int(np.argmax(self.mu_X))
+
+
 class RandomWalkPolicy:
     """Trial and error with no rules at all: a random allowed step from the previous run."""
 
@@ -789,7 +867,8 @@ class RandomWalkPolicy:
         return int(np.argmax(h["y_obs"]))
 
 
-POLICIES = {"chemist": ChemistPolicy, "plain_bo": PlainBOPolicy, "random_walk": RandomWalkPolicy}
+POLICIES = {"chemist": ChemistPolicy, "plain_bo": PlainBOPolicy, "random_walk": RandomWalkPolicy,
+            "nn_only": NNOnlyPolicy}
 
 
 def run_baseline(system, method, budget=25, seed=0, wcat=WCAT, a_spec=A_SPEC, max_step=None,

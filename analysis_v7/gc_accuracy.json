@@ -1,0 +1,113 @@
+{
+ "mystery_noisy.csv": {
+  "interpolate": {
+   "mechanism": {
+    "rmse_mol_pct": 0.1553483849540627,
+    "x_noise": 0.7688054210314974
+   },
+   "nn": {
+    "rmse_mol_pct": 5.557027488376492,
+    "x_noise": 45.54213763786496
+   }
+  },
+  "extrapolate": {
+   "mechanism": {
+    "rmse_mol_pct": 0.1427193039737978,
+    "x_noise": 0.7097979773158619
+   },
+   "nn": {
+    "rmse_mol_pct": 5.5467584945342425,
+    "x_noise": 57.69009936792929
+   },
+   "found": [
+    "1.  A + 2 B -> E    r1 = k1 P_A P_B^2",
+    "2.  A + B <=> C     r2 = k2 (P_A P_B - P_C / K2)",
+    "3.  C -> B + D      r3 = k3 P_C"
+   ],
+   "found_model": "plain",
+   "train_T_C": [
+    232.0,
+    368.0
+   ],
+   "test_T_C": [
+    372.0,
+    406.0
+   ],
+   "seconds": 34.440184116363525
+  }
+ },
+ "complex_noisy.csv": {
+  "interpolate": {
+   "mechanism": {
+    "rmse_mol_pct": 0.16080398387409678,
+    "x_noise": 0.7827336569252102
+   },
+   "nn": {
+    "rmse_mol_pct": 7.360550919059393,
+    "x_noise": 69.66406784843574
+   }
+  },
+  "extrapolate": {
+   "mechanism": {
+    "rmse_mol_pct": 0.17619977143417523,
+    "x_noise": 0.868963489313475
+   },
+   "nn": {
+    "rmse_mol_pct": 8.354644999110434,
+    "x_noise": 82.49452778722909
+   },
+   "found": [
+    "1.  A -> D         r1 = k1 P_A",
+    "2.  B + C -> E     r2 = k2 P_B P_C",
+    "3.  A + B <=> C    r3 = k3 (P_A P_B - P_C / K3)"
+   ],
+   "found_model": "plain",
+   "train_T_C": [
+    232.0,
+    368.0
+   ],
+   "test_T_C": [
+    372.0,
+    406.0
+   ],
+   "seconds": 104.49274969100952
+  }
+ },
+ "complex_real.csv": {
+  "interpolate": {
+   "mechanism": {
+    "rmse_mol_pct": 0.17150050788674503,
+    "x_noise": 0.8769585522307941
+   },
+   "nn": {
+    "rmse_mol_pct": 7.1575270148426835,
+    "x_noise": 68.56442944295485
+   }
+  },
+  "extrapolate": {
+   "mechanism": {
+    "rmse_mol_pct": 0.1377258680456547,
+    "x_noise": 0.7893082653066293
+   },
+   "nn": {
+    "rmse_mol_pct": 8.4427943105684,
+    "x_noise": 84.49247298308924
+   },
+   "found": [
+    "1.  A -> D         r1 = k1 P_A",
+    "2.  B + C -> E     r2 = k2 P_B P_C",
+    "3.  A + B <=> C    r3 = k3 (P_A P_B - P_C / K3)"
+   ],
+   "found_model": "inhib",
+   "train_T_C": [
+    232.0,
+    368.0
+   ],
+   "test_T_C": [
+    372.0,
+    406.0
+   ],
+   "seconds": 48.24277400970459
+  }
+ }
+}

@@ -1,0 +1,8 @@
+# The reactions mystery_exact.csv and mystery_noisy.csv were calculated from (the answer).
+# Rate constants at 300 C per gram of catalyst (100 m2/g) and activation energies:
+#   k1 = 2e-06, Ea1 = 65 kJ/mol
+#   k2 = 1e-06, Ea2 = 110 kJ/mol
+#   k3 = 6e-08, Ea3 = 85 kJ/mol
+A + B <=> C
+C -> D + B
+A + 2 B -> E
