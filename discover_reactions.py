@@ -59,6 +59,10 @@ def lines_fit(f, indent="  "):
 
 
 def report_ranking(res, source=""):
+    """Plain-text lines (a list of str) reporting a rank_candidates result: the table of candidates,
+    the verdict, what the data cannot decide, notes and cautions about the log, and the fitted numbers
+    of the best candidate.  Needs the keys ranking, best, decided, undecided and n_runs (notes and
+    cautions if present)."""
     out = [f"Which candidate network do the data support?   ({res['n_runs']} runs{', ' + source if source else ''})", ""]
     w = max(len(f["name"]) for f in res["ranking"])
     w = max(w, 9) + 2
@@ -76,13 +80,18 @@ def report_ranking(res, source=""):
         out.append(f"The data support '{res['best']}'.")
     if not res["decided"]:
         out += res["undecided"]
-    if res["n_runs"] < D.FEW_RUNS:
+    if "cautions" in res:
+        out += res.get("notes", []) + res["cautions"]
+    elif res["n_runs"] < D.FEW_RUNS:                 # a result saved by an older version
         out.append(D._few_runs_note(res["n_runs"]))
     out += ["", f"The {'best' if fits else 'least bad'} candidate, '{res['best']}':"] + lines_fit(res["ranking"][0])
     return out
 
 
 def report_discovery(res, source=""):
+    """Plain-text lines (a list of str) reporting a discover result: how the search went (path), the
+    summary (which already holds the notes and cautions about the log), the fitted numbers of the best
+    network and the runners-up.  Needs the keys n_fits, seconds, path, summary, best and runners_up."""
     out = [f"Reaction search{' on ' + source if source else ''}: {res['n_fits']} network fits in {res['seconds']:.0f} s", ""]
     out += ["How the search went:"] + ["  " + p for p in res["path"]] + [""]
     out += res["summary"] + [""]
@@ -96,6 +105,9 @@ def report_discovery(res, source=""):
 
 
 def report_next_run(nr):
+    """Plain-text lines (a list of str) reporting a discriminating_run result: the run, the GC readings
+    each network predicts there and what one such run would add to the BIC difference.  Needs the keys
+    message, predicted, expected_bic_gap (and step_limited)."""
     out = ["The run that would best tell the top two networks apart:", "  " + nr["message"], "",
            "  predicted GC reading (mol-%):   " + "".join(f"{s:>8}" for s in next(iter(nr["predicted"].values())))]
     for name, y in nr["predicted"].items():
@@ -119,6 +131,8 @@ def strip(obj):
 
 # =================================================================================== command line
 def main():
+    """The command line: read the log, rank candidates or search, print the report, optionally the
+    next run and a JSON file.  Every expected problem ends with a plain sentence, not a traceback."""
     ap = argparse.ArgumentParser(description="Find out which reactions happen in the reactor from the GC log.",
                                  epilog="See the top of this file and examples/discovery/WORKED_EXAMPLE.md.")
     ap.add_argument("log", help="run log (CSV)")
@@ -134,6 +148,9 @@ def main():
     ap.add_argument("--json", metavar="FILE", help="also save the full result as JSON")
     ap.add_argument("--quiet", action="store_true", help="no progress lines")
     args = ap.parse_args()
+    if args.json and not os.path.isdir(os.path.dirname(os.path.abspath(args.json))):
+        raise SystemExit(f"Cannot save the result to {args.json}: the folder {os.path.dirname(os.path.abspath(args.json))} "
+                         "does not exist. Create it first or choose another place.")
 
     try:
         data = D.load_data(args.log, a_spec=args.surface_area)
@@ -184,8 +201,11 @@ def main():
         except ValueError as e:
             print(f"\nNo run to suggest: {e}")
     if args.json:
-        with open(args.json, "w", encoding="utf-8") as fh:
-            json.dump(strip(out), fh, indent=1)
+        try:
+            with open(args.json, "w", encoding="utf-8") as fh:
+                json.dump(strip(out), fh, indent=1)
+        except OSError as e:
+            raise SystemExit(f"Could not save the result to {args.json}: {e.strerror or e}.")
         print(f"\nSaved {args.json}")
 
 

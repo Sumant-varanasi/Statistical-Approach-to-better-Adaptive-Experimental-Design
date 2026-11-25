@@ -6,7 +6,7 @@
 <title>Reactor Advisor</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="app.css">
+<link rel="stylesheet" href="app.css?v=7c">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23c8521f'/%3E%3Cpath d='M10 7h12v4h-2v9a4 4 0 0 1-8 0V11h-2z' fill='white'/%3E%3C/svg%3E">
 </head>
 <body>
@@ -18,7 +18,7 @@
     <span id="chem-badge" class="badge">complex</span>
   </div>
   <nav class="jump" aria-label="Sections">
-    <a href="#advice">Advice</a><a href="#runs">Runs</a><a href="#learned">Chemistry</a><a href="#explore">Explore</a>
+    <a href="#advice">Advice</a><a href="#runs">Runs</a><a href="#learned">Chemistry</a><a href="#explore">Explore</a><a href="#finder">Reaction finder</a>
   </nav>
   <div class="top-right">
     <span id="status" class="status" role="status" aria-live="polite">no runs yet</span>
@@ -70,10 +70,11 @@
       <label>Correction to the physics
         <select id="s-version">
           <option value="v6">v6: committee (Gaussian process + neural networks)</option>
+          <option value="v7">v7: v6 + a neural network alone; checks and repairs the reactions</option>
           <option value="v5">v5: one Gaussian process</option>
         </select>
       </label>
-      <p class="hint">Both use the same physics and planner. v6 lets a Gaussian process and an ensemble of small neural networks both correct the physics, and trusts each by how well it predicts runs it was not trained on.</p>
+      <p class="hint">All use the same physics and planner. v6 lets a Gaussian process and an ensemble of small neural networks both correct the physics, and trusts each by how well it predicts runs it was not trained on. v7 adds a neural network that predicts profit from the knobs alone (no physics) to that committee, and after every run checks whether its reactions still explain the GC readings; if not, it changes them one step at a time with the reaction finder (Get advice can then take up to a minute).</p>
     </details>
 
     <details class="fold">
@@ -166,6 +167,17 @@
           <ul class="kv mono" id="today-list"></ul>
         </div>
       </div>
+
+      <details class="fold opt" id="tradeoff-fold">
+        <summary>Optional: profit vs purity trade-off <span class="hint">(skip this if you only want the most profitable run)</span></summary>
+        <p class="hint">The advice above aims for the most profit. Sometimes a purer product is worth a little profit: less by-product to separate, or a customer's specification. This curve shows the best profit the model expects at each selectivity to C, so you can pick a compromise. Nothing changes unless you press <em>Aim here</em> on a row, which sets that selectivity as the minimum in your product spec and asks for advice again.</p>
+        <div class="actions"><button type="button" class="btn" id="btn-tradeoff">Show the trade-off curve</button><span class="msg" id="tradeoff-msg" role="status"></span></div>
+        <div id="tradeoff-body" hidden>
+          <figure class="fig"><figcaption>Best profit the model expects at each selectivity (line); dots = points you can aim for, bars = 90 % likely range of the profit; squares = your best and last runs as measured</figcaption><div id="chart-tradeoff" class="chart"></div></figure>
+          <ul class="notes" id="tradeoff-notes"></ul>
+          <div class="table-wrap"><table class="runs-table" id="tradeoff-table"><thead></thead><tbody></tbody></table></div>
+        </div>
+      </details>
     </div>
   </section>
 
@@ -209,6 +221,12 @@
     <p class="hint">From the GC readings, not just the profit numbers. Rate constants are per m² of catalyst, so they carry over to another loading.</p>
     <div id="learned-empty" class="empty"><p>Get advice first.</p></div>
     <div id="learned-body" hidden>
+      <div class="sub net-box" id="net-box" hidden>
+        <h3>Reaction network in use <span class="badge">v7</span></h3>
+        <ol class="mono net-lines" id="net-lines"></ol>
+        <div id="net-changed" hidden><p class="hint">Changed from the network you set up:</p><ol class="mono net-lines given" id="net-given"></ol></div>
+        <ul class="notes" id="net-notes"></ul>
+      </div>
       <div class="rx-cards" id="rx-cards"></div>
       <ul class="notes" id="rx-notes"></ul>
       <div class="charts2">
@@ -237,6 +255,89 @@
     </div>
   </section>
 
+  <!-- ---------------------------------------------------------- reaction finder -->
+  <section id="finder" class="card" aria-labelledby="finder-h">
+    <div class="card-head"><h2 id="finder-h">Reaction finder</h2><span class="badge">v7</span></div>
+    <p class="hint">Which reactions happen in the bed? The finder fits whole reaction networks (rate laws and mole balances) to every GC number and compares them in units of the GC's own noise; an extra reaction has to earn its place (BIC). It works on its own data: an example file, your own CSV log, or the runs in the table above. Nothing here changes the campaign.</p>
+
+    <div class="finder-steps">
+      <div class="fstep">
+        <h3><span class="num">1</span> The data</h3>
+        <div class="seg f-src" role="group" aria-label="Where the data come from">
+          <button type="button" class="btn seg-btn active" data-src="example">An example file</button>
+          <button type="button" class="btn seg-btn" data-src="upload">Upload a CSV</button>
+          <button type="button" class="btn seg-btn" data-src="runs">The runs in the table</button>
+        </div>
+        <div id="f-src-example">
+          <label>Example <select id="f-example"></select></label>
+          <p class="hint" id="f-example-text"></p>
+          <p class="hint"><a id="f-example-dl" href="#" download>Download this file</a> · every number in these files is calculated from the reactions; one run is worked through by hand in <span class="mono">examples/discovery/WORKED_EXAMPLE.md</span></p>
+        </div>
+        <div id="f-src-upload" hidden>
+          <label class="btn file"><input type="file" id="f-file" accept=".csv,text/csv">Choose a CSV file</label>
+          <p class="hint" id="f-file-name">Columns as in the run table's Export CSV: pressure_bar, flow_A_mL_min, flow_B_mL_min, flow_I_mL_min, temperature_C, catalyst_g, gc_A … gc_E, gc_I, and optionally hours_h.</p>
+        </div>
+        <div id="f-src-runs" hidden><p class="hint" id="f-runs-text">Uses the runs in the table above, as they are now.</p></div>
+      </div>
+
+      <div class="fstep">
+        <h3><span class="num">2</span> What to ask</h3>
+        <div class="fmodes">
+          <div class="fmode">
+            <h4>Find the reactions automatically</h4>
+            <p class="hint">Builds a network one reaction at a time from every atom-balanced reaction among A, B, C, D, E (and tries other reaction orders), keeping a change only if it clearly improves the fit. Usually 1–3 minutes.</p>
+            <label>Start from <select id="f-start"><option value="">no reactions (search from scratch)</option></select></label>
+            <button type="button" class="btn primary" id="f-discover">Find the reactions</button>
+          </div>
+          <div class="fmode">
+            <h4>Rank candidate networks</h4>
+            <p class="hint">Type the networks you suspect, one reaction per line: <span class="mono">A + B &lt;=&gt; C</span> runs both ways, <span class="mono">C + B -&gt; E</span> one way, <span class="mono">; orders B=0</span> changes a rate law. Lines starting with # are comments. About 10–60 s.</p>
+            <div id="f-cands" class="f-cands"></div>
+            <div class="actions">
+              <button type="button" class="btn" id="f-add">Add a candidate</button>
+              <button type="button" class="btn" id="f-load-ex">Load the 4 example candidates</button>
+              <button type="button" class="btn primary" id="f-rank">Rank them</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="f-progress" class="f-progress" hidden>
+      <div class="f-prog-head"><div class="spinner small" aria-hidden="true"></div><span id="f-prog-title" class="mono"></span><button type="button" class="btn ghost danger" id="f-stop">Stop</button></div>
+      <ol class="f-log mono" id="f-log"></ol>
+    </div>
+    <p id="f-msg" class="msg" role="status"></p>
+
+    <div id="f-result" hidden>
+      <div class="f-verdict" id="f-verdict"></div>
+      <div class="f-answer" id="f-answer" hidden></div>
+      <h3>Every network compared</h3>
+      <div class="table-wrap"><table class="runs-table f-table" id="f-table"><thead></thead><tbody></tbody></table></div>
+      <p class="hint">Typical miss = root-mean-square difference between the network and the GC, in units of the GC noise (a right network misses by about 0.5–1). BIC difference = how much worse than the best, counting the extra numbers a bigger network fits: below 6 the data cannot tell the two apart, above 10 the evidence against is very strong.</p>
+      <div class="charts2">
+        <div class="fig">
+          <h3>Fitted rate constants of the best network</h3>
+          <div class="table-wrap"><table class="runs-table f-table" id="f-k"><thead></thead><tbody></tbody></table></div>
+          <p class="hint" id="f-k-note"></p>
+        </div>
+        <figure class="fig"><figcaption>Every GC number vs what the best network predicts for it. Closer to the line = better</figcaption><div id="chart-f-parity" class="chart"></div></figure>
+      </div>
+      <ul class="notes" id="f-summary"></ul>
+      <details class="fold" id="f-path-fold"><summary>How the search got there</summary><ol class="f-path" id="f-path"></ol></details>
+      <div class="sub">
+        <h3>The next run that would tell the top two apart</h3>
+        <p class="hint">When two networks explain the data about equally well, one well-chosen run settles it: the set point where their predicted GC readings differ most (allowing for how uncertain each fit still is).</p>
+        <div class="actions">
+          <label class="inline"><input type="checkbox" id="f-step"> within one step of the last run in the log</label>
+          <button type="button" class="btn" id="f-next">Find that run</button>
+          <span class="msg" id="f-next-msg" role="status"></span>
+        </div>
+        <div id="f-next-body" hidden></div>
+      </div>
+    </div>
+  </section>
+
   <footer class="foot">
     <p>Suggestions only: check every run against your plant's safety limits before running it. Kinetics and prices are placeholders until agreed. Runs on your own machine; nothing leaves it.</p>
   </footer>
@@ -246,6 +347,6 @@
 <div id="tip" class="tip" role="tooltip" hidden></div>
 <div id="overlay" class="overlay" hidden aria-hidden="true"><div class="spinner" aria-hidden="true"></div><p id="overlay-text">Thinking…</p></div>
 
-<script src="app.js"></script>
+<script src="app.js?v=7c"></script>
 </body>
 </html>

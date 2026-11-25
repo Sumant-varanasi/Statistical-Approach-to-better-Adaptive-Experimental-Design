@@ -163,15 +163,84 @@ check("simple chemistry: 2 reactions learned", len(A["chemistry"]["reactions"]) 
 
 # the v6 advisor (committee correction) can be switched on from the page
 try:
-    C.settings(dict(version="v7"))
+    C.settings(dict(version="v8"))
     bad = False
 except ValueError:
     bad = True
-check("advisor version is validated (v5 or v6 only)", bad and C.state()["settings"]["version"] == "v6")
+check("advisor version is validated (v5, v6 or v7 only)", bad and C.state()["settings"]["version"] == "v6")
 st = C.settings(dict(version="v6"))
 A = C.analyse()["analysis"]
 check("v6 advisor: advice produced and the committee weights are explained",
       st["settings"]["version"] == "v6" and any("committee" in n for n in A["chemistry"]["notes"]))
-C.settings(dict(version="v6"))
+check("v5 / v6 show no reaction-network box", A["chemistry"]["network"] is None)
+
+# ---- v7: the advisor that checks its reactions (complex chemistry, 5 screening runs)
+C.clear()
+C.settings(dict(system="complex"))
+C.example(dict(seed=0))
+st = C.settings(dict(version="v7"))
+A = C.analyse()["analysis"]
+nw = A["chemistry"]["network"]
+check("v7 advisor: advice produced, network box with the reactions in use and the last check",
+      st["settings"]["version"] == "v7" and nw is not None and len(nw["lines"]) == 3 and nw["check"]
+      and any("v7 committee" in n for n in A["chemistry"]["notes"]))
+check("v7: the network it was given is kept when it explains the data (no change, true lines still shown)",
+      not nw["changed"] and A["arrhenius"]["reactions"][0]["truth"] is not None)
+json.dumps(A, allow_nan=False)
+
+# ---- optional: profit vs selectivity trade-off
+expect_error("trade-off curve needs advice first", UI.Campaign().tradeoff)
+T = C.tradeoff()["tradeoff"]
+json.dumps(T, allow_nan=False)
+s = [p["selectivity"] for p in T["points"]]
+pr = [p["profit"] for p in T["points"]]
+check("trade-off: points by rising selectivity and falling profit, three markers",
+      len(T["points"]) >= 2 and s == sorted(s) and pr == sorted(pr, reverse=True)
+      and set(T["markers"]) >= {"most_profitable", "balanced", "most_selective"})
+check("trade-off changes nothing by itself (no spec set)", C.state()["settings"]["spec"] == {})
+st = C.tradeoff_aim(dict(i=T["markers"]["balanced"]))
+check("'Aim here' sets the minimum selectivity of that point and asks for new advice",
+      abs(st["settings"]["spec"]["S_C"] - T["points"][T["markers"]["balanced"]]["min_selectivity_spec"]) < 1e-3
+      and not st["analysis_ready"])
+expect_error("'Aim here' needs the curve again after the settings changed", C.tradeoff_aim, dict(i=0))
+C.settings(dict(spec={}, version="v6"))
+
+# ---- the reaction finder (runs in its own process)
+import time
+F = UI.Finder(C)
+ex = F.examples()
+check("finder: 7 example files and the 4 example candidates", len(ex["examples"]) == 7 and [c["key"] for c in ex["candidates"]] == ["truth", "close", "similar", "far"])
+check("finder: example files can be downloaded", "pressure_bar" in F.example_file("mystery_noisy.csv") and "A + B" in F.example_file("candidates_truth.txt"))
+expect_error("finder refuses a file outside the examples", F.example_file, "../../reactor_ui.py")
+expect_error("finder names the candidate with a typing error", F.start,
+             dict(mode="rank", source="example", example="complex_short_campaign.csv", candidates=[dict(name="mine", text="A + B => Q")]))
+expect_error("finder needs at least one candidate to rank", F.start, dict(mode="rank", source="example", example="complex_short_campaign.csv", candidates=[]))
+cand = {c["key"]: c for c in ex["candidates"]}
+F.start(dict(mode="rank", source="example", example="complex_short_campaign.csv",
+             candidates=[dict(name="far", text=cand["far"]["text"]), dict(name="truth", text=cand["truth"]["text"])]))
+expect_error("one finder job at a time", F.start, dict(mode="discover", source="example", example="mystery_noisy.csv"))
+t0 = time.time()
+while F.status()["job"]["status"] == "running" and time.time() - t0 < 300:
+    time.sleep(0.5)
+j = F.status()["job"]
+json.dumps(j, allow_nan=False)
+R = j["result"]
+check("finder ranks the true network first on the 8-run campaign and says it matches the answer file",
+      j["status"] == "done" and R["best"] == "truth" and R["networks"][0]["fits_noise"] and R["answer"]["match"]
+      and R["networks"][1]["delta_bic"] > 10)
+check("finder result has rate constants and a parity chart for every run",
+      len(R["networks"][0]["rate_constants"]) == 3 and len(R["parity"]["meas"]) == 8 and len(R["parity"]["pred"]) == 8)
+nr = F.next_run(dict(from_last=True))["next_run"]
+x = [nr["run"][k] for k in ("pressure_bar", "flow_A_mL_min", "flow_B_mL_min", "flow_I_mL_min", "temperature_C")]
+last = UI.D.load_data(UI.os.path.join(UI.EX_DIR, "complex_short_campaign.csv"))["phys"][-1, :5]
+step = np.abs(np.array(x) - np.array([last[0], last[1], last[2], last[3], last[4] - 273.15]))
+check("next run to tell them apart stays within one allowed step of the last run", bool(np.all(step <= MAX_STEP + 0.51)) and nr["step_limited"])
+F.start(dict(mode="discover", source="runs"))
+time.sleep(1.0)
+F.stop()
+t0 = time.time()
+while F.status()["job"]["status"] == "running" and time.time() - t0 < 30:
+    time.sleep(0.2)
+check("a running search can be stopped at once", F.status()["job"]["status"] == "stopped")
 
 print("\nAll web-interface checks passed.")

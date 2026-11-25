@@ -51,8 +51,12 @@
    "unexplained": [],
    "not_made": [],
    "fits_noise": true,
-   "seconds": 0.9575338363647461,
+   "seconds": 2.3842990398406982,
    "a_spec": 100.0,
+   "worst_run": 7,
+   "run_share": 0.0746953280751546,
+   "one_run": false,
+   "rest_within_allowance": true,
    "rate_constants": [
     {
      "reaction": "A + B <=> C",
@@ -157,8 +161,12 @@
     "unexplained": [],
     "not_made": [],
     "fits_noise": true,
-    "seconds": 0.871361494064331,
+    "seconds": 2.226370334625244,
     "a_spec": 100.0,
+    "worst_run": 7,
+    "run_share": 0.07469126729085913,
+    "one_run": false,
+    "rest_within_allowance": true,
     "rate_constants": [
      {
       "reaction": "A + B <=> C",
@@ -263,8 +271,12 @@
     "unexplained": [],
     "not_made": [],
     "fits_noise": true,
-    "seconds": 1.0217890739440918,
+    "seconds": 2.937749147415161,
     "a_spec": 100.0,
+    "worst_run": 7,
+    "run_share": 0.07306661312733033,
+    "one_run": false,
+    "rest_within_allowance": true,
     "rate_constants": [
      {
       "reaction": "A + B <=> C",
@@ -369,8 +381,12 @@
     "unexplained": [],
     "not_made": [],
     "fits_noise": true,
-    "seconds": 0.9090478420257568,
+    "seconds": 2.6661336421966553,
     "a_spec": 100.0,
+    "worst_run": 7,
+    "run_share": 0.07306957120089327,
+    "one_run": false,
+    "rest_within_allowance": true,
     "rate_constants": [
      {
       "reaction": "A + B <=> C",
@@ -451,7 +467,7 @@
   ],
   "complete": true,
   "n_fits": 203,
-  "seconds": 40.32192587852478,
+  "seconds": 113.53638744354248,
   "library_size": 22,
   "detected": {
    "C": 21.834678165321833,
@@ -460,6 +476,10 @@
   },
   "stopped_early": false,
   "restarts": 0,
+  "n_runs": 30,
+  "n_settings": 30,
+  "notes": [],
+  "cautions": [],
   "summary": [
    "The reactions that explain the data best:",
    "   1.  A + B <=> C     r1 = k1 (P_A P_B - P_C / K1)",
@@ -521,8 +541,12 @@
    "unexplained": [],
    "not_made": [],
    "fits_noise": true,
-   "seconds": 0.1581867535909017,
+   "seconds": 0.24703431129455566,
    "a_spec": 100.0,
+   "worst_run": 4,
+   "run_share": 0.09993544817799642,
+   "one_run": false,
+   "rest_within_allowance": true,
    "rate_constants": [
     {
      "reaction": "A + B <=> C",
@@ -626,8 +650,12 @@
     "unexplained": [],
     "not_made": [],
     "fits_noise": true,
-    "seconds": 0.10476291179656982,
+    "seconds": 0.5534145832061768,
     "a_spec": 100.0,
+    "worst_run": 4,
+    "run_share": 0.09995952145685899,
+    "one_run": false,
+    "rest_within_allowance": true,
     "rate_constants": [
      {
       "reaction": "A + B <=> C",
@@ -731,8 +759,12 @@
     "unexplained": [],
     "not_made": [],
     "fits_noise": true,
-    "seconds": 0.9072604179382324,
+    "seconds": 2.6535191535949707,
     "a_spec": 100.0,
+    "worst_run": 28,
+    "run_share": 0.42384277634852263,
+    "one_run": false,
+    "rest_within_allowance": true,
     "rate_constants": [
      {
       "reaction": "A + B <=> C",
@@ -837,8 +869,12 @@
     "unexplained": [],
     "not_made": [],
     "fits_noise": true,
-    "seconds": 0.852257490158081,
+    "seconds": 2.4927210807800293,
     "a_spec": 100.0,
+    "worst_run": 28,
+    "run_share": 0.42365736307416946,
+    "one_run": false,
+    "rest_within_allowance": true,
     "rate_constants": [
      {
       "reaction": "A + B <=> C",
@@ -919,7 +955,7 @@
   ],
   "complete": true,
   "n_fits": 201,
-  "seconds": 41.12302589416504,
+  "seconds": 99.32004356384277,
   "library_size": 22,
   "detected": {
    "C": 21.754421754421756,
@@ -928,6 +964,10 @@
   },
   "stopped_early": false,
   "restarts": 0,
+  "n_runs": 30,
+  "n_settings": 30,
+  "notes": [],
+  "cautions": [],
   "summary": [
    "The reactions that explain the data best:",
    "   1.  A + B <=> C     r1 = k1 (P_A P_B - P_C / K1)",
@@ -989,8 +1029,12 @@
    "unexplained": [],
    "not_made": [],
    "fits_noise": true,
-   "seconds": 0.6853752136230469,
+   "seconds": 2.2806363105773926,
    "a_spec": 100.0,
+   "worst_run": 4,
+   "run_share": 0.1231303608009371,
+   "one_run": false,
+   "rest_within_allowance": true,
    "rate_constants": [
     {
      "reaction": "A -> D",
@@ -1104,8 +1148,12 @@
     "unexplained": [],
     "not_made": [],
     "fits_noise": true,
-    "seconds": 1.9668688774108887,
+    "seconds": 5.247016429901123,
     "a_spec": 100.0,
+    "worst_run": 26,
+    "run_share": 0.1134840797866603,
+    "one_run": false,
+    "rest_within_allowance": true,
     "rate_constants": [
      {
       "reaction": "A -> D",
@@ -1231,8 +1279,12 @@
     "unexplained": [],
     "not_made": [],
     "fits_noise": true,
-    "seconds": 0.9804527759552002,
+    "seconds": 2.560443878173828,
     "a_spec": 100.0,
+    "worst_run": 26,
+    "run_share": 0.11287515350755004,
+    "one_run": false,
+    "rest_within_allowance": true,
     "rate_constants": [
      {
       "reaction": "A -> D",
@@ -1358,8 +1410,12 @@
     "unexplained": [],
     "not_made": [],
     "fits_noise": true,
-    "seconds": 1.2798511981964111,
+    "seconds": 3.710822343826294,
     "a_spec": 100.0,
+    "worst_run": 26,
+    "run_share": 0.11388328671294183,
+    "one_run": false,
+    "rest_within_allowance": true,
     "rate_constants": [
      {
       "reaction": "A -> D",
@@ -1485,8 +1541,12 @@
     "unexplained": [],
     "not_made": [],
     "fits_noise": true,
-    "seconds": 1.2301366329193115,
+    "seconds": 3.5850963592529297,
     "a_spec": 100.0,
+    "worst_run": 26,
+    "run_share": 0.11283734735740909,
+    "one_run": false,
+    "rest_within_allowance": true,
     "rate_constants": [
      {
       "reaction": "A -> D",
@@ -1582,7 +1642,7 @@
   ],
   "complete": true,
   "n_fits": 190,
-  "seconds": 52.18155789375305,
+  "seconds": 138.54233980178833,
   "library_size": 22,
   "detected": {
    "C": 33.548100000000005,
@@ -1591,6 +1651,10 @@
   },
   "stopped_early": false,
   "restarts": 0,
+  "n_runs": 30,
+  "n_settings": 30,
+  "notes": [],
+  "cautions": [],
   "summary": [
    "The reactions that explain the data best:",
    "   1.  A -> D         r1 = k1 P_A",
@@ -1653,8 +1717,12 @@
     "unexplained": [],
     "not_made": [],
     "fits_noise": true,
-    "seconds": 2.0541069507598877,
+    "seconds": 6.562511444091797,
     "a_spec": 100.0,
+    "worst_run": 4,
+    "run_share": 0.13759589168120354,
+    "one_run": false,
+    "rest_within_allowance": true,
     "rate_constants": [
      {
       "reaction": "A + B <=> C",
@@ -1764,8 +1832,12 @@
     ],
     "not_made": [],
     "fits_noise": false,
-    "seconds": 3.3279263973236084,
+    "seconds": 11.248236179351807,
     "a_spec": 100.0,
+    "worst_run": 9,
+    "run_share": 0.2431503649005047,
+    "one_run": false,
+    "rest_within_allowance": false,
     "rate_constants": [
      {
       "reaction": "A + B <=> C",
@@ -1875,8 +1947,12 @@
     ],
     "not_made": [],
     "fits_noise": false,
-    "seconds": 8.369466066360474,
+    "seconds": 23.774979829788208,
     "a_spec": 100.0,
+    "worst_run": 28,
+    "run_share": 0.277606972117056,
+    "one_run": false,
+    "rest_within_allowance": false,
     "rate_constants": [
      {
       "reaction": "A + B -> C",
@@ -1993,8 +2069,12 @@
      "E"
     ],
     "fits_noise": false,
-    "seconds": 1.4223268032073975,
+    "seconds": 3.4840004444122314,
     "a_spec": 100.0,
+    "worst_run": 13,
+    "run_share": 0.4473011341335059,
+    "one_run": false,
+    "rest_within_allowance": false,
     "rate_constants": [
      {
       "reaction": "A + B -> C ; orders A=1, B=0",
@@ -2046,7 +2126,10 @@
    "E": 37.99530000000001
   },
   "n_runs": 30,
-  "seconds": 15.17628026008606,
+  "n_settings": 30,
+  "notes": [],
+  "cautions": [],
+  "seconds": 45.07693886756897,
   "summary": [
    "1. truth: fits the data within the GC noise; best.",
    "2. close: cannot explain E, B, C, D, A: typical miss 10.9x, 7.8x, 6.4x, 3.0x, 2.3x the GC noise (1.15 mol-%, 0.96 mol-%, 0.79 mol-%, 0.47 mol-%, 0.24 mol-%); ruled out against the best (BIC difference 7121).",
@@ -2107,8 +2190,12 @@
     "unexplained": [],
     "not_made": [],
     "fits_noise": true,
-    "seconds": 2.149641752243042,
+    "seconds": 5.9924092292785645,
     "a_spec": 100.0,
+    "worst_run": 2,
+    "run_share": 0.1027379808546773,
+    "one_run": false,
+    "rest_within_allowance": true,
     "rate_constants": [
      {
       "reaction": "A + B <=> C",
@@ -2218,8 +2305,12 @@
     ],
     "not_made": [],
     "fits_noise": false,
-    "seconds": 2.1060521602630615,
+    "seconds": 5.4158289432525635,
     "a_spec": 100.0,
+    "worst_run": 9,
+    "run_share": 0.24470315691615063,
+    "one_run": false,
+    "rest_within_allowance": false,
     "rate_constants": [
      {
       "reaction": "A + B <=> C",
@@ -2329,8 +2420,12 @@
     ],
     "not_made": [],
     "fits_noise": false,
-    "seconds": 9.048023223876953,
+    "seconds": 25.25642466545105,
     "a_spec": 100.0,
+    "worst_run": 28,
+    "run_share": 0.27755282437479234,
+    "one_run": false,
+    "rest_within_allowance": false,
     "rate_constants": [
      {
       "reaction": "A + B -> C",
@@ -2447,8 +2542,12 @@
      "E"
     ],
     "fits_noise": false,
-    "seconds": 1.878401279449463,
+    "seconds": 3.8637173175811768,
     "a_spec": 100.0,
+    "worst_run": 13,
+    "run_share": 0.45044708670021455,
+    "one_run": false,
+    "rest_within_allowance": false,
     "rate_constants": [
      {
       "reaction": "A + B -> C ; orders A=1, B=0",
@@ -2500,7 +2599,10 @@
    "E": 38.5043
   },
   "n_runs": 30,
-  "seconds": 15.184744834899902,
+  "n_settings": 30,
+  "notes": [],
+  "cautions": [],
+  "seconds": 40.53481888771057,
   "summary": [
    "1. truth: fits the data within the GC noise; best.",
    "2. close: cannot explain E, B, C, D, A: typical miss 11.1x, 7.8x, 6.6x, 3.2x, 2.5x the GC noise (1.11 mol-%, 0.94 mol-%, 0.78 mol-%, 0.56 mol-%, 0.29 mol-%); ruled out against the best (BIC difference 7198).",
@@ -2561,8 +2663,12 @@
     "unexplained": [],
     "not_made": [],
     "fits_noise": true,
-    "seconds": 1.6305832862854004,
+    "seconds": 6.610790967941284,
     "a_spec": 100.0,
+    "worst_run": 4,
+    "run_share": 0.123130363174413,
+    "one_run": false,
+    "rest_within_allowance": true,
     "rate_constants": [
      {
       "reaction": "A + B <=> C",
@@ -2679,8 +2785,12 @@
     ],
     "not_made": [],
     "fits_noise": false,
-    "seconds": 2.5446109771728516,
+    "seconds": 8.69240665435791,
     "a_spec": 100.0,
+    "worst_run": 9,
+    "run_share": 0.25453934014756563,
+    "one_run": false,
+    "rest_within_allowance": false,
     "rate_constants": [
      {
       "reaction": "A + B <=> C",
@@ -2797,8 +2907,12 @@
     ],
     "not_made": [],
     "fits_noise": false,
-    "seconds": 7.349996328353882,
+    "seconds": 18.990395069122314,
     "a_spec": 100.0,
+    "worst_run": 28,
+    "run_share": 0.2861876574898979,
+    "one_run": false,
+    "rest_within_allowance": false,
     "rate_constants": [
      {
       "reaction": "A + B -> C",
@@ -2915,8 +3029,12 @@
      "E"
     ],
     "fits_noise": false,
-    "seconds": 1.682433843612671,
+    "seconds": 4.504118919372559,
     "a_spec": 100.0,
+    "worst_run": 13,
+    "run_share": 0.46391026696124715,
+    "one_run": false,
+    "rest_within_allowance": false,
     "rate_constants": [
      {
       "reaction": "A + B -> C ; orders A=1, B=0",
@@ -2968,7 +3086,10 @@
    "E": 37.95433795433796
   },
   "n_runs": 30,
-  "seconds": 13.210196018218994,
+  "n_settings": 30,
+  "notes": [],
+  "cautions": [],
+  "seconds": 38.80362319946289,
   "summary": [
    "1. truth: fits the data within the GC noise; best.",
    "2. close: cannot explain E, B, C, D, A: typical miss 10.6x, 7.7x, 6.6x, 3.1x, 2.2x the GC noise (1.09 mol-%, 0.95 mol-%, 0.76 mol-%, 0.53 mol-%, 0.27 mol-%); ruled out against the best (BIC difference 6827).",
@@ -3028,8 +3149,12 @@
    "unexplained": [],
    "not_made": [],
    "fits_noise": true,
-   "seconds": 0.13030234972635904,
+   "seconds": 0.6148795286814371,
    "a_spec": 100.0,
+   "worst_run": 2,
+   "run_share": 0.10274920683378579,
+   "one_run": false,
+   "rest_within_allowance": true,
    "rate_constants": [
     {
      "reaction": "A + B <=> C",
@@ -3135,8 +3260,12 @@
     "unexplained": [],
     "not_made": [],
     "fits_noise": true,
-    "seconds": 0.2282103697458903,
+    "seconds": 0.8118505477905273,
     "a_spec": 100.0,
+    "worst_run": 13,
+    "run_share": 0.10065201029397819,
+    "one_run": false,
+    "rest_within_allowance": true,
     "rate_constants": [
      {
       "reaction": "A + B <=> C",
@@ -3256,8 +3385,12 @@
     ],
     "not_made": [],
     "fits_noise": false,
-    "seconds": 1.1088898181915283,
+    "seconds": 2.1787679195404053,
     "a_spec": 100.0,
+    "worst_run": 29,
+    "run_share": 0.3648228460999664,
+    "one_run": false,
+    "rest_within_allowance": true,
     "rate_constants": [
      {
       "reaction": "A + B -> C",
@@ -3380,6 +3513,10 @@
     "fits_noise": false,
     "seconds": 0.0,
     "a_spec": 100.0,
+    "worst_run": 9,
+    "run_share": 0.21488606000228175,
+    "one_run": false,
+    "rest_within_allowance": false,
     "rate_constants": [
      {
       "reaction": "A + B <=> C",
@@ -3453,7 +3590,7 @@
   ],
   "complete": true,
   "n_fits": 177,
-  "seconds": 42.69630241394043,
+  "seconds": 114.4916410446167,
   "library_size": 22,
   "detected": {
    "C": 33.08,
@@ -3462,6 +3599,10 @@
   },
   "stopped_early": false,
   "restarts": 0,
+  "n_runs": 30,
+  "n_settings": 30,
+  "notes": [],
+  "cautions": [],
   "summary": [
    "The reactions that explain the data best:",
    "   1.  A + B <=> C    r1 = k1 (P_A P_B - P_C / K1)",
@@ -3523,8 +3664,12 @@
    "unexplained": [],
    "not_made": [],
    "fits_noise": true,
-   "seconds": 0.14686942100524902,
+   "seconds": 0.2984781265258789,
    "a_spec": 100.0,
+   "worst_run": 2,
+   "run_share": 0.10275232223531142,
+   "one_run": false,
+   "rest_within_allowance": true,
    "rate_constants": [
     {
      "reaction": "A + B <=> C",
@@ -3630,8 +3775,12 @@
     "unexplained": [],
     "not_made": [],
     "fits_noise": true,
-    "seconds": 0.20945397290316495,
+    "seconds": 0.38867360895330255,
     "a_spec": 100.0,
+    "worst_run": 2,
+    "run_share": 0.09530004234464134,
+    "one_run": false,
+    "rest_within_allowance": true,
     "rate_constants": [
      {
       "reaction": "A + B <=> C",
@@ -3752,8 +3901,12 @@
     ],
     "not_made": [],
     "fits_noise": false,
-    "seconds": 0.44459064801534015,
+    "seconds": 0.7804903189341227,
     "a_spec": 100.0,
+    "worst_run": 13,
+    "run_share": 0.2578580058966935,
+    "one_run": false,
+    "rest_within_allowance": false,
     "rate_constants": [
      {
       "reaction": "A + B <=> C",
@@ -3874,8 +4027,12 @@
     ],
     "not_made": [],
     "fits_noise": false,
-    "seconds": 0.4447912375132243,
+    "seconds": 0.7809238433837891,
     "a_spec": 100.0,
+    "worst_run": 13,
+    "run_share": 0.24684056088928852,
+    "one_run": false,
+    "rest_within_allowance": false,
     "rate_constants": [
      {
       "reaction": "A + B <=> C",
@@ -3962,7 +4119,7 @@
   ],
   "complete": true,
   "n_fits": 171,
-  "seconds": 41.42108869552612,
+  "seconds": 81.86879396438599,
   "library_size": 22,
   "detected": {
    "C": 33.08,
@@ -3971,6 +4128,10 @@
   },
   "stopped_early": false,
   "restarts": 0,
+  "n_runs": 30,
+  "n_settings": 30,
+  "notes": [],
+  "cautions": [],
   "summary": [
    "The reactions that explain the data best:",
    "   1.  A + B <=> C    r1 = k1 (P_A P_B - P_C / K1)",
@@ -4032,8 +4193,12 @@
    "unexplained": [],
    "not_made": [],
    "fits_noise": true,
-   "seconds": 0.24815988540649414,
+   "seconds": 0.5537433624267578,
    "a_spec": 100.0,
+   "worst_run": 2,
+   "run_share": 0.10274678422458408,
+   "one_run": false,
+   "rest_within_allowance": true,
    "rate_constants": [
     {
      "reaction": "A + B <=> C",
@@ -4141,8 +4306,12 @@
     ],
     "not_made": [],
     "fits_noise": false,
-    "seconds": 0.24838789304097494,
+    "seconds": 0.554247776667277,
     "a_spec": 100.0,
+    "worst_run": 9,
+    "run_share": 0.21487887792775948,
+    "one_run": false,
+    "rest_within_allowance": false,
     "rate_constants": [
      {
       "reaction": "A + B <=> C",
@@ -4251,8 +4420,12 @@
     ],
     "not_made": [],
     "fits_noise": false,
-    "seconds": 0.17818709782191686,
+    "seconds": 0.3419989858354841,
     "a_spec": 100.0,
+    "worst_run": 29,
+    "run_share": 0.5201249403520048,
+    "one_run": true,
+    "rest_within_allowance": false,
     "rate_constants": [
      {
       "reaction": "A + B <=> C",
@@ -4362,8 +4535,12 @@
     ],
     "not_made": [],
     "fits_noise": false,
-    "seconds": 0.22251222008153013,
+    "seconds": 0.5693732186367637,
     "a_spec": 100.0,
+    "worst_run": 9,
+    "run_share": 0.2848883483051673,
+    "one_run": false,
+    "rest_within_allowance": false,
     "rate_constants": [
      {
       "reaction": "A + B <=> C",
@@ -4443,7 +4620,7 @@
   ],
   "complete": true,
   "n_fits": 65,
-  "seconds": 13.574418306350708,
+  "seconds": 31.890374660491943,
   "library_size": 22,
   "detected": {
    "C": 33.08,
@@ -4452,6 +4629,10 @@
   },
   "stopped_early": false,
   "restarts": 0,
+  "n_runs": 30,
+  "n_settings": 30,
+  "notes": [],
+  "cautions": [],
   "summary": [
    "The reactions that explain the data best:",
    "   1.  A + B <=> C    r1 = k1 (P_A P_B - P_C / K1)",
@@ -4513,8 +4694,12 @@
    "unexplained": [],
    "not_made": [],
    "fits_noise": true,
-   "seconds": 0.310178279876709,
+   "seconds": 0.7398421764373779,
    "a_spec": 100.0,
+   "worst_run": 5,
+   "run_share": 0.36282552326311546,
+   "one_run": false,
+   "rest_within_allowance": true,
    "rate_constants": [
     {
      "reaction": "A -> D",
@@ -4628,8 +4813,12 @@
     "unexplained": [],
     "not_made": [],
     "fits_noise": true,
-    "seconds": 0.4104123115539551,
+    "seconds": 0.922109842300415,
     "a_spec": 100.0,
+    "worst_run": 5,
+    "run_share": 0.4032218601896362,
+    "one_run": false,
+    "rest_within_allowance": true,
     "rate_constants": [
      {
       "reaction": "A -> D",
@@ -4755,8 +4944,12 @@
     "unexplained": [],
     "not_made": [],
     "fits_noise": true,
-    "seconds": 1.3525619506835938,
+    "seconds": 3.03408145904541,
     "a_spec": 100.0,
+    "worst_run": 5,
+    "run_share": 0.37911303321080564,
+    "one_run": false,
+    "rest_within_allowance": true,
     "rate_constants": [
      {
       "reaction": "A -> D",
@@ -4882,8 +5075,12 @@
     "unexplained": [],
     "not_made": [],
     "fits_noise": true,
-    "seconds": 1.738990068435669,
+    "seconds": 4.346009731292725,
     "a_spec": 100.0,
+    "worst_run": 5,
+    "run_share": 0.32384289772467534,
+    "one_run": false,
+    "rest_within_allowance": true,
     "rate_constants": [
      {
       "reaction": "A -> D",
@@ -5015,8 +5212,12 @@
     ],
     "not_made": [],
     "fits_noise": false,
-    "seconds": 3.8591103553771973,
+    "seconds": 6.158650636672974,
     "a_spec": 100.0,
+    "worst_run": 4,
+    "run_share": 0.4440043830941571,
+    "one_run": false,
+    "rest_within_allowance": false,
     "rate_constants": [
      {
       "reaction": "2 A + B -> C + D ; orders A=2, B=0",
@@ -5141,8 +5342,12 @@
     ],
     "not_made": [],
     "fits_noise": false,
-    "seconds": 2.1528730392456055,
+    "seconds": 2.4355392456054688,
     "a_spec": 100.0,
+    "worst_run": 4,
+    "run_share": 0.3920047705742629,
+    "one_run": false,
+    "rest_within_allowance": false,
     "rate_constants": [
      {
       "reaction": "2 A + B -> C + D",
@@ -5235,7 +5440,7 @@
   ],
   "complete": true,
   "n_fits": 250,
-  "seconds": 43.12206983566284,
+  "seconds": 87.23600196838379,
   "library_size": 22,
   "detected": {
    "C": 40.6816,
@@ -5244,6 +5449,10 @@
   },
   "stopped_early": false,
   "restarts": 1,
+  "n_runs": 8,
+  "n_settings": 8,
+  "notes": [],
+  "cautions": [],
   "summary": [
    "The reactions that explain the data best:",
    "   1.  A -> D         r1 = k1 P_A",
@@ -5306,8 +5515,12 @@
     "unexplained": [],
     "not_made": [],
     "fits_noise": true,
-    "seconds": 2.4263687133789062,
+    "seconds": 5.341098070144653,
     "a_spec": 100.0,
+    "worst_run": 5,
+    "run_share": 0.36282552326561046,
+    "one_run": false,
+    "rest_within_allowance": true,
     "rate_constants": [
      {
       "reaction": "A + B <=> C",
@@ -5423,8 +5636,12 @@
     ],
     "not_made": [],
     "fits_noise": false,
-    "seconds": 2.707247018814087,
+    "seconds": 6.5295422077178955,
     "a_spec": 100.0,
+    "worst_run": 3,
+    "run_share": 0.28568978521062743,
+    "one_run": false,
+    "rest_within_allowance": false,
     "rate_constants": [
      {
       "reaction": "A + B <=> C",
@@ -5534,8 +5751,12 @@
     ],
     "not_made": [],
     "fits_noise": false,
-    "seconds": 2.8647942543029785,
+    "seconds": 6.200246095657349,
     "a_spec": 100.0,
+    "worst_run": 3,
+    "run_share": 0.3755108999114913,
+    "one_run": false,
+    "rest_within_allowance": false,
     "rate_constants": [
      {
       "reaction": "A + B -> C",
@@ -5652,8 +5873,12 @@
      "E"
     ],
     "fits_noise": false,
-    "seconds": 2.398573637008667,
+    "seconds": 5.598721265792847,
     "a_spec": 100.0,
+    "worst_run": 6,
+    "run_share": 0.2742513083769194,
+    "one_run": false,
+    "rest_within_allowance": false,
     "rate_constants": [
      {
       "reaction": "A + B -> C ; orders A=1, B=0",
@@ -5712,7 +5937,10 @@
    "E": 47.8329
   },
   "n_runs": 8,
-  "seconds": 10.399112224578857,
+  "n_settings": 8,
+  "notes": [],
+  "cautions": [],
+  "seconds": 23.67581844329834,
   "summary": [
    "1. truth: fits the data within the GC noise; best.",
    "2. close: cannot explain B, C, E, D: typical miss 13.8x, 6.9x, 4.7x, 2.9x the GC noise (1.08 mol-%, 1.01 mol-%, 1.21 mol-%, 0.66 mol-%); ruled out against the best (BIC difference 2142).",
@@ -5772,8 +6000,12 @@
    "unexplained": [],
    "not_made": [],
    "fits_noise": true,
-   "seconds": 1.0354804992675781,
+   "seconds": 1.6762495040893555,
    "a_spec": 100.0,
+   "worst_run": 12,
+   "run_share": 0.0826466746773813,
+   "one_run": false,
+   "rest_within_allowance": true,
    "rate_constants": [
     {
      "reaction": "B + C -> E ; orders B=0, C=1",
@@ -5880,8 +6112,12 @@
     "unexplained": [],
     "not_made": [],
     "fits_noise": true,
-    "seconds": 0.2480950905726506,
+    "seconds": 0.43416388218219465,
     "a_spec": 100.0,
+    "worst_run": 12,
+    "run_share": 0.09705010935590774,
+    "one_run": false,
+    "rest_within_allowance": true,
     "rate_constants": [
      {
       "reaction": "2 A + B -> C + D",
@@ -6005,6 +6241,10 @@
     "fits_noise": false,
     "seconds": 0.0,
     "a_spec": 100.0,
+    "worst_run": 29,
+    "run_share": 0.2795770451951478,
+    "one_run": false,
+    "rest_within_allowance": false,
     "rate_constants": [
      {
       "reaction": "B + C -> E ; orders B=0, C=2",
@@ -6116,8 +6356,12 @@
     ],
     "not_made": [],
     "fits_noise": false,
-    "seconds": 0.6355223655700684,
+    "seconds": 1.0157187779744465,
     "a_spec": 100.0,
+    "worst_run": 28,
+    "run_share": 0.24832461328324018,
+    "one_run": false,
+    "rest_within_allowance": false,
     "rate_constants": [
      {
       "reaction": "2 A + B -> C + D ; orders A=1, B=1",
@@ -6202,7 +6446,7 @@
   ],
   "complete": true,
   "n_fits": 145,
-  "seconds": 34.448482275009155,
+  "seconds": 62.8255033493042,
   "library_size": 22,
   "detected": {
    "C": 35.14233514233515,
@@ -6211,6 +6455,10 @@
   },
   "stopped_early": false,
   "restarts": 0,
+  "n_runs": 30,
+  "n_settings": 30,
+  "notes": [],
+  "cautions": [],
   "summary": [
    "The reactions that explain the data best:",
    "   1.  B + C -> E     r1 = k1 P_C   (zero order in B)",

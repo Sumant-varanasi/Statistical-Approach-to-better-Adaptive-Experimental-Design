@@ -8,7 +8,9 @@ Everything the command-line tool (reactor_advisor.py) does, in a page a chemist 
 without a terminal: set up the campaign (chemistry, catalyst, step limits, safety ranges,
 economics), type in or import runs, get the next run with the reasons, see what the model
 learned, explore what the model expects when a knob moves, and try it all on the virtual
-reactor first.
+reactor first.  Also (v7): the reaction finder (which reactions do the GC readings support?
+smart/discovery.py, with worked example files), the v7 advisor that checks and repairs its
+own reaction network, and an optional profit vs selectivity trade-off curve (smart/pareto.py).
 
 No extra packages: Python's own http.server + the smart/ package.  Runs on your own machine
 and nothing leaves it.  One campaign at a time (the page is the campaign).
@@ -35,8 +37,13 @@ from smart.systems import (SYSTEMS, LOW, HIGH, MAX_STEP, MIN_TOTAL_FLOW, WCAT, A
                            unscale, scale, physical, feasible, base_case, screening_runs, theta_to_physical)
 from smart.advisor import SmartAdvisor, VirtualReactor, profit_from_gc, kpis_from_gc, dT_ad_from_gc, step_box
 from smart.kinetics import HOURS_PER_RUN
+from smart import discovery as D
+from smart.pareto import tradeoff as pareto_tradeoff, spec_for_point
 
 UI_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ui")
+EX_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "examples", "discovery")
+VERSIONS = ("v5", "v6", "v7")
+REVISE_SECONDS = 60.0                  # v7 on the page: longest check-and-repair of the network per Get advice
 KNOB_KEYS = ["P", "VA", "VB", "VI", "T"]
 KNOB_NAMES = ["Pressure", "Flow of A", "Flow of B", "Inert flow", "Temperature"]
 KNOB_UNITS = ["bar", "mL/min", "mL/min", "mL/min", "°C"]
@@ -104,7 +111,10 @@ class Campaign:
         self.spec = {}                         # product / safety spec, e.g. {"S_C": 0.9, "dT_ad": 60}
         self.remaining = 10                    # runs the operator can still afford
         self.deactivation = 0.0                # virtual reactor only: activity lost per day, %
-        self.version = "v6"                     # advisor: "v6" (committee correction, default) or "v5" (GP correction)
+        self.version = "v6"                     # advisor: "v6" (committee correction, default), "v5" (GP correction) or
+                                               # "v7" (v6 + the neural network alone, and the reaction network is checked and repaired)
+        self.progress = None                   # what a long fit is doing right now (v7 network search), for the page
+        self.tradeoff_res = None               # the optional profit vs selectivity curve, while the advice it came from holds
         self.seed = 0
         self.runs = []                         # dicts: P, VA, VB, VI, T (K), W, gc (list), source
         self.vr = None
@@ -116,6 +126,7 @@ class Campaign:
     def _invalidate(self):
         """Call under self.lock whenever the runs or the settings change."""
         self.analysis = None
+        self.tradeoff_res = None
         self.rev += 1
 
     # ------------------------------------------------------------------ helpers
@@ -268,8 +279,8 @@ class Campaign:
                 if new["remaining"] < 1:
                     raise ValueError("runs you can still afford must be at least 1")
             if "version" in b:
-                if b["version"] not in ("v5", "v6"):
-                    raise ValueError("the advisor version must be v5 or v6")
+                if b["version"] not in VERSIONS:
+                    raise ValueError("the advisor version must be v5, v6 or v7")
                 new["version"] = b["version"]
             if "deactivation" in b:
                 new["deactivation"] = float(b["deactivation"] or 0.0)
@@ -398,12 +409,26 @@ class Campaign:
                tuple(sorted(self.spec.items())), self.version)
         adv = getattr(self, "_adv", None)
         if adv is None or getattr(self, "_adv_key", None) != key:
+            v7 = self.version == "v7"
             adv = SmartAdvisor(S, wcat=phys6[-1, 5], a_spec=self.a_spec, seed=self.seed, lo=lo, hi=hi,
                                fixed=fixed, max_step=self.max_step, spec=self.spec, remaining=self.remaining,
-                               correction="committee" if self.version == "v6" else "gp")
+                               correction={"v5": "gp", "v6": "committee", "v7": "hybrid"}[self.version],
+                               revise=v7, revise_seconds=REVISE_SECONDS if v7 else None)
             self._adv, self._adv_key = adv, key
         adv.remaining = self.remaining
-        adv.update(X, gc, prof, wcat_rows=phys6[:, 5], hours=self.hours_rows())
+        t0 = time.time()
+
+        def progress(info):
+            self.progress = dict(message=str(info.get("message", "")), elapsed=round(time.time() - t0, 1))
+
+        self.progress = None
+        try:
+            if getattr(adv, "revise", False):
+                adv.update(X, gc, prof, wcat_rows=phys6[:, 5], hours=self.hours_rows(), progress=progress)
+            else:
+                adv.update(X, gc, prof, wcat_rows=phys6[:, 5], hours=self.hours_rows())
+        finally:
+            self.progress = None
         return S, adv, X, prof
 
     def analyse(self, b=None):
@@ -521,20 +546,38 @@ class Campaign:
             out.update(verdict="yes", text="Worth running. Enter a cost per run and your operating hours to weigh it in money.")
         return out
 
+    @staticmethod
+    def _rx_list(adv, S):
+        """The reactions the advisor is working with, as cards for the page, and whether they are
+        still the network it was given (v7 may have changed it; then there is no 'true' line to show)."""
+        net, start = getattr(adv, "S", S), getattr(adv, "S_start", None)
+        if start is None or net is start:
+            return REACTIONS[S.name], False
+        given = {r.key(): rx for r, rx in zip(D.reactions_from_system(start), REACTIONS[S.name])}
+        out = []
+        for j, r in enumerate(D.reactions_from_system(net)):
+            eq = r.equation().replace("<=>", "⇌").replace("->", "→")
+            rx = given.get(r.key())
+            out.append(dict(name=rx["name"] if rx else f"Reaction {j + 1}", eq=eq,
+                            role=rx["role"] if rx else "found from your GC data (not in the network you started with)"))
+        return out, True
+
     def _chemistry_block(self, adv, S, X):
         th = adv.kin.split(adv.kin.samples(400, np.random.default_rng(1)))["kin"]
         Ea = th[:, 1::2] * R * T_REF / 1000.0
         P, VA, VB, VI, T = unscale(X[-1])[0]
         reactions = []
+        rxs, changed = self._rx_list(adv, S)
+        truth = self.truth_known() and not changed
         k_t, E_t = theta_to_physical(S.theta_true)
-        for j, rx in enumerate(REACTIONS[S.name]):
+        for j, rx in enumerate(rxs):
             e_med, e_lo, e_hi = np.median(Ea[:, j]), *np.percentile(Ea[:, j], [10, 90])
             f10 = np.exp(e_med * 1000 / R * (1 / T - 1 / (T + 10)))
             reactions.append(dict(**rx, Ea=rnd(e_med, 0), Ea_lo=rnd(e_lo, 0), Ea_hi=rnd(e_hi, 0),
-                                  factor10=rnd(f10, 2), Ea_true=(rnd(E_t[j], 0) if self.truth_known() else None)))
+                                  factor10=rnd(f10, 2), Ea_true=(rnd(E_t[j], 0) if truth else None)))
         notes = []
         e = np.median(Ea, 0)
-        worse = [REACTIONS[S.name][j]["name"].lower() for j in range(1, S.nr) if e[j] > e[0]]
+        worse = [] if changed else [rxs[j]["name"].lower() for j in range(1, len(rxs)) if e[j] > e[0]]
         if worse:
             notes.append(f"Heat helps the unwanted {' and '.join(worse)} more than the main reaction: hotter is "
                          f"faster, but you lose product. There is a best temperature.")
@@ -573,30 +616,46 @@ class Campaign:
         if getattr(adv, "committee", None) is not None:
             w = adv.committee.weights
             names = {"none": "no correction (the physics alone)", "gp": "the Gaussian process",
-                     "nn": "the neural-network ensemble"}
+                     "nn": "the neural-network ensemble",
+                     "direct": "the neural network alone (no physics: profit straight from the knobs)"}
             top = max(w, key=w.get)
-            parts = ", ".join(f"{names[k].split(' (')[0]} {100 * v:.0f} %" for k, v in w.items())
-            notes.append(f"Correction to the physics (v6 committee): {parts}. The model that best predicts runs it "
-                         f"was not trained on gets the most say; here that is {names[top]}.")
+            parts = ", ".join(f"{names.get(k, k).split(' (')[0]} {100 * v:.0f} %" for k, v in w.items())
+            notes.append(f"Correction to the physics ({self.version} committee): {parts}. The model that best predicts runs "
+                         f"it was not trained on gets the most say; here that is {names.get(top, top)}.")
         resid = (adv.kin.predict_gc(physical(adv.X, adv.W), t=adv.t_rows) - adv.gc)[:, :-1]
         Tr = unscale(adv.X)[:, 4]
         return dict(reactions=reactions, notes=notes, miss_pct=rnd(100 * np.median(np.abs(resid)), 2),
                     T_range=[rnd(C(Tr.min()), 0), rnd(C(Tr.max()), 0)], at_T=rnd(C(T), 0),
-                    truth_known=self.truth_known(), model=d["model"],
+                    truth_known=truth, model=d["model"],
                     K_C=rnd(d.get("K_C"), 4), loss_per_day=rnd(d.get("loss_per_day"), 4),
-                    has_replicates=bool(adv.kin.has_replicates))
+                    has_replicates=bool(adv.kin.has_replicates), network=self._network_block(adv, changed))
+
+    @staticmethod
+    def _network_block(adv, changed):
+        """v7: the reaction network the advisor works with, what it changed and why (None for v5 / v6)."""
+        if not getattr(adv, "revise", False):
+            return None
+        m = getattr(adv, "misfit", None) or {}
+        pretty = lambda lines: [ln.replace("<=>", "⇌").replace("->", "→") for ln in lines]
+        return dict(lines=pretty(D.format_network(D.reactions_from_system(adv.S))),
+                    given=pretty(D.format_network(D.reactions_from_system(adv.S_start))),
+                    changed=bool(changed),
+                    revisions=[dict(run=r.get("run"), change=r.get("change"), words=r.get("words")) for r in adv.revisions],
+                    log=[dict(run=r.get("run"), outcome=r.get("outcome"), words=r.get("words")) for r in adv.revision_log[-6:]],
+                    check=m.get("words"), miss_x_noise=rnd(m.get("x_noise"), 2))
 
     def _arrhenius_block(self, adv, S):
         Tg = np.linspace(450, 850, 60)
         draws = adv.kin.split(adv.kin.samples(200, np.random.default_rng(0)))["kin"]
         out = dict(x=(1000 / Tg).round(4).tolist(), T_C=[rnd(C(t), 0) for t in Tg], reactions=[])
-        for j, rx in enumerate(REACTIONS[S.name]):
+        rxs, changed = self._rx_list(adv, S)
+        for j, rx in enumerate(rxs):
             lg = lambda th: (th[2 * j] - th[2 * j + 1] * (T_REF / Tg - 1)) / np.log(10)
             band = np.array([lg(d) for d in draws])
             lo, hi = np.percentile(band, [5, 95], 0)
             out["reactions"].append(dict(name=rx["name"], eq=rx["eq"], learned=lg(adv.kin.theta_kin).round(3).tolist(),
                                          lo=lo.round(3).tolist(), hi=hi.round(3).tolist(),
-                                         truth=(lg(S.theta_true).round(3).tolist() if self.truth_known() else None)))
+                                         truth=(lg(S.theta_true).round(3).tolist() if self.truth_known() and not changed else None)))
         return out
 
     def _parity_block(self, adv, S):
@@ -649,6 +708,42 @@ class Campaign:
                                      fixed=i in adv.fixed))
         return out
 
+    # ------------------------------------------------------------------ optional: profit vs selectivity
+    def tradeoff(self, b=None):
+        """The profit vs selectivity trade-off curve of the advisor as last fitted (smart/pareto.py).
+        Optional: nothing else on the page uses it, and it changes nothing in the advice."""
+        if not self.model_lock.acquire(blocking=False):
+            raise ValueError("The advisor is still working on the previous request. Wait for it to finish.")
+        try:
+            with self.lock:
+                if self.analysis is None or getattr(self, "_adv", None) is None:
+                    raise ValueError("Get advice first: the curve is drawn from the model the advice was based on.")
+                an, rev, adv = self.analysis, self.rev, self._adv
+            res = finite(pareto_tradeoff(adv, n_points=12, seed=self.seed))
+            for pt in res["points"]:
+                pt["T_C"] = rnd(pt.get("T_C"), 0)
+            with self.lock:
+                if self.rev != rev or self.analysis is not an:
+                    raise ValueError("The runs or settings changed meanwhile. Get advice again, then ask for the curve.")
+                self.tradeoff_res = res
+            return dict(tradeoff=res)
+        finally:
+            self.model_lock.release()
+
+    def tradeoff_aim(self, b):
+        """'Aim for this point': set the minimum selectivity that makes the advisor look for the best
+        profit at that purity (the other specs are kept).  The advice must be asked for again."""
+        with self.lock:
+            res = self.tradeoff_res
+            if res is None:
+                raise ValueError("Show the trade-off curve first.")
+            i = int(b.get("i", -1))
+            if not 0 <= i < len(res["points"]):
+                raise ValueError("no such point on the curve")
+            spec = spec_for_point(res["points"][i], spec=self.spec)
+        spec["S_C"] = float(np.clip(round(spec["S_C"], 4), 1e-4, 1.0))
+        return self.settings(dict(spec=spec))
+
     # ------------------------------------------------------------------ the virtual reactor
     def simulate(self, b):
         """Run the suggested next run on the virtual reactor and add it to the table."""
@@ -686,13 +781,317 @@ class Campaign:
         w.writerow([nx["P"], nx["VA"], nx["VB"], nx["VI"], nx["T"], self.runs[-1]["W"], nx["pred"], nx["lo"], nx["hi"]])
         return buf.getvalue()
 
+# =================================================================================== the reaction finder
+FINDER_EXAMPLES = [
+    dict(file="mystery_noisy.csv", answer="mystery_reactions.txt", mode="discover",
+         title="Mystery reactions, with GC noise",
+         text="30 runs of a kinetic study, calculated from three reactions that are not the built-in ones, with the "
+              "GC's noise added. Press 'Find the reactions' (about 1-2 minutes) and compare with the answer."),
+    dict(file="mystery_exact.csv", answer="mystery_reactions.txt", mode="discover",
+         title="Mystery reactions, exact",
+         text="The same 30 runs calculated exactly from the reactions (no noise)."),
+    dict(file="complex_noisy.csv", answer="candidates_truth.txt", mode="rank",
+         title="Complex network, with GC noise",
+         text="30 runs calculated from A + B ⇌ C, C + B → E, A → D with GC noise. Rank the four example candidates "
+              "(the true network, one quite close, one relatively the same, one very different)."),
+    dict(file="complex_exact.csv", answer="candidates_truth.txt", mode="rank",
+         title="Complex network, exact",
+         text="The same 30 runs calculated exactly (no noise)."),
+    dict(file="complex_real.csv", answer="candidates_truth.txt", mode="rank",
+         title="Complex network on the virtual 'real' reactor",
+         text="The same 30 runs measured on the virtual reactor: product and reactant block catalyst sites (physics "
+              "the plain rate laws do not have), plus GC noise."),
+    dict(file="complex_short_campaign.csv", answer="candidates_truth.txt", mode="rank",
+         title="Start of a campaign: only 8 runs",
+         text="The 5 screening runs plus 3 step-limited runs on the virtual reactor. Ranking the candidates takes "
+              "about 10 s; the automatic search may need several new starts here (minutes)."),
+    dict(file="zero_order_noisy.csv", answer="candidates_close.txt", mode="discover",
+         title="A rate law that does not follow its equation",
+         text="30 runs where the over-reaction C + B → E runs at r = k P_C (zero order in B), with GC noise. "
+              "Can the automatic search find the order? (2-3 minutes)"),
+]
+FINDER_CANDIDATES = [
+    dict(key="truth", file="candidates_truth.txt", name="True network"),
+    dict(key="close", file="candidates_close.txt", name="Quite close"),
+    dict(key="similar", file="candidates_similar.txt", name="Relatively the same"),
+    dict(key="far", file="candidates_far.txt", name="Very different"),
+]
+FINDER_MAX_SECONDS = 900.0              # longest automatic search the page waits for
+
+
+def _finder_child():
+    """The reaction finder in a process of its own (started by Finder._run as
+    'python -c "import reactor_ui; reactor_ui._finder_child()"'): the job arrives pickled on stdin;
+    progress lines and the result go back as one JSON object per line on stdout.  A plain child
+    process rather than multiprocessing, which on Windows would re-run the script that started
+    the server (or a test) inside the child."""
+    import pickle
+    os.environ.setdefault("OMP_NUM_THREADS", "1")
+    warnings.filterwarnings("ignore")
+    out = sys.stdout
+    sys.stdout = sys.stderr                     # nothing but the protocol on the real stdout
+
+    def send(obj):
+        out.write(json.dumps(finite(obj)) + "\n")
+        out.flush()
+
+    try:
+        mode, data, cands, start, max_seconds = pickle.load(sys.stdin.buffer)
+        progress = lambda info: send(dict(log=[float(info.get("elapsed_s", 0.0)), str(info.get("message", ""))]))
+        if mode == "rank":
+            res = D.rank_candidates([(name, D.parse_network(text)) for name, text in cands], data, progress=progress)
+        else:
+            res = D.discover(data, start=start, progress=progress, max_seconds=max_seconds)
+        send(dict(done=res))
+    except ValueError as e:
+        send(dict(error=str(e)))
+    except Exception as e:
+        send(dict(error=f"{type(e).__name__}: {e}"))
+
+
+def _pretty(lines):
+    return [ln.replace("<=>", "⇌").replace("->", "→") for ln in lines]
+
+
+class Finder:
+    """Runs the reaction finder (smart/discovery.py) in the background for the page: one job at a
+    time, with its progress messages, so a search of a minute or two does not block the page."""
+
+    def __init__(self, campaign):
+        self.camp = campaign
+        self.lock = threading.Lock()
+        self.run_lock = threading.Lock()       # one next-run search at a time
+        self.job = None
+        self.n = 0
+
+    # ------------------------------------------------------------------ inputs
+    def examples(self, b=None):
+        ex = []
+        for e in FINDER_EXAMPLES:
+            fp = os.path.join(EX_DIR, e["file"])
+            if os.path.isfile(fp):
+                ex.append(dict(file=e["file"], title=e["title"], text=e["text"], mode=e["mode"]))
+        cands = []
+        for c in FINDER_CANDIDATES:
+            fp = os.path.join(EX_DIR, c["file"])
+            if os.path.isfile(fp):
+                with open(fp, encoding="utf-8") as fh:
+                    cands.append(dict(key=c["key"], name=c["name"], text=fh.read().strip()))
+        return dict(examples=ex, candidates=cands, max_seconds=FINDER_MAX_SECONDS)
+
+    def example_file(self, name):
+        if name not in {e["file"] for e in FINDER_EXAMPLES} | {c["file"] for c in FINDER_CANDIDATES} | {"mystery_reactions.txt"}:
+            raise ValueError("no such example file")
+        with open(os.path.join(EX_DIR, name), encoding="utf-8") as fh:
+            return fh.read()
+
+    def _data(self, b):
+        src = b.get("source", "example")
+        if src == "example":
+            e = next((e for e in FINDER_EXAMPLES if e["file"] == b.get("example")), None)
+            if e is None:
+                raise ValueError("choose one of the example files")
+            return D.load_data(os.path.join(EX_DIR, e["file"])), e["title"], e
+        if src == "upload":
+            text = b.get("text") or ""
+            if not text.strip():
+                raise ValueError("the uploaded file is empty")
+            return D.load_data(text), b.get("name") or "your file", None
+        if src == "runs":
+            with self.camp.lock:
+                n = len(self.camp.runs)
+                if n < 3:
+                    raise ValueError("there are fewer than 3 runs in the table: load or type some runs first")
+                text = self.camp.export_log()
+                a_spec = self.camp.a_spec
+            return D.load_data(text, a_spec=a_spec), f"the {n} runs in the table", None
+        raise ValueError("unknown data source")
+
+    @staticmethod
+    def _network(text, name):
+        try:
+            net = D.parse_network(text)
+        except ValueError as e:                # ReactionError is a ValueError: say which candidate
+            raise ValueError(f"'{name}': {e}") from None
+        if not net:
+            raise ValueError(f"'{name}' has no reactions")
+        return net
+
+    # ------------------------------------------------------------------ the job
+    def start(self, b):
+        mode = b.get("mode")
+        if mode not in ("discover", "rank"):
+            raise ValueError("choose 'find the reactions' or 'rank candidates'")
+        data, label, ex = self._data(b)
+        cands, start = [], None
+        if mode == "rank":
+            seen = set()
+            for i, c in enumerate(b.get("candidates") or [], 1):
+                text = (c.get("text") or "").strip()
+                if not text:
+                    continue
+                name = (c.get("name") or "").strip() or f"candidate {i}"
+                while name in seen:
+                    name += " (2)"
+                seen.add(name)
+                self._network(text, name)              # a typing error shows now, not in the background
+                cands.append((name, text))
+            if not cands:
+                raise ValueError("type at least one candidate network (one reaction per line, e.g. A + B <=> C)")
+        elif (b.get("start") or "").strip():
+            self._network(b["start"], "the network to repair")
+            start = b["start"]
+        with self.lock:
+            if self.job is not None and self.job["status"] == "running":
+                raise ValueError("The reaction finder is still working on the previous request: wait, or press Stop.")
+            self.n += 1
+            job = dict(id=self.n, mode=mode, status="running", log=[], started=time.time(), finished=None,
+                       label=label, n_runs=int(len(data["gc"])), result=None, error=None, cancel=False,
+                       repair=start is not None, example=ex["file"] if ex else None)
+            self.job = job
+        threading.Thread(target=self._run, args=(job, data, cands, start, ex), daemon=True).start()
+        return self.status()
+
+    def _run(self, job, data, cands, start, ex):
+        """Runs the search in a separate process (_finder_child), so that it neither slows the
+        advice (Python runs one thread at a time) nor has to be waited for when Stop is pressed."""
+        import pickle
+        import subprocess
+
+        def finish(**kw):
+            with self.lock:
+                job.update(finished=time.time(), **kw)
+
+        proc = None
+        try:
+            here = os.path.dirname(os.path.abspath(__file__))
+            proc = subprocess.Popen([sys.executable, "-c", f"import sys; sys.path.insert(0, {here!r}); "
+                                     "import reactor_ui; reactor_ui._finder_child()"],
+                                    stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, cwd=here)
+            with self.lock:
+                job["proc"] = proc
+                cancelled = job["cancel"]
+            if cancelled:
+                proc.kill()
+            proc.stdin.write(pickle.dumps((job["mode"], data, cands, start, FINDER_MAX_SECONDS)))
+            proc.stdin.close()
+            for line in proc.stdout:
+                try:
+                    msg = json.loads(line)
+                except ValueError:
+                    continue
+                if "log" in msg:
+                    with self.lock:
+                        job["log"].append(dict(t=round(msg["log"][0], 1), msg=msg["log"][1]))
+                        del job["log"][:-300]
+                elif "done" in msg:
+                    res = msg["done"]
+                    return finish(status="done", result=self._view(res, data, job["mode"], ex), raw=res, data=data)
+                elif "error" in msg:
+                    return finish(status="error", error=msg["error"])
+            if job["cancel"]:
+                return finish(status="stopped", error="Stopped.")
+            finish(status="error", error="the reaction finder stopped unexpectedly")
+        except Exception as e:                  # keep the page alive whatever happens
+            if job["cancel"]:
+                return finish(status="stopped", error="Stopped.")
+            finish(status="error", error=f"{type(e).__name__}: {e}")
+        finally:
+            if proc is not None and proc.poll() is None:
+                proc.kill()
+
+    def stop(self, b=None):
+        with self.lock:
+            j = self.job
+            if j is not None and j["status"] == "running":
+                j["cancel"] = True
+                if j.get("proc") is not None:
+                    j["proc"].kill()          # the reading thread then sees the end of the output
+        return self.status()
+
+    def status(self, b=None):
+        with self.lock:
+            j = self.job
+            if j is None:
+                return dict(job=None)
+            end = j["finished"] or time.time()
+            pub = {k: v for k, v in j.items() if k not in ("raw", "data", "log", "cancel", "proc")}
+            pub["log"] = list(j["log"][-12:])
+            pub["elapsed"] = round(end - j["started"], 1)
+            pub["stopping"] = bool(j["cancel"]) and j["status"] == "running"
+            return dict(job=pub)
+
+    # ------------------------------------------------------------------ what the page shows
+    @staticmethod
+    def _fit_view(f):
+        keep = ("name", "rank", "equations", "reactions", "verdict", "x_noise", "bic", "delta_bic", "weight",
+                "tied_with_best", "fits_noise", "model", "model_words", "n_params", "n_reactions", "unexplained",
+                "not_made", "differs_by", "inhibition")
+        out = {k: f.get(k) for k in keep if k in f}
+        out["equations"] = _pretty(f.get("equations", []))
+        out["miss"] = {sp: dict(x_noise=rnd(m["x_noise"], 2), mol_pct=rnd(m["mol_pct"], 3))
+                       for sp, m in (f.get("miss") or {}).items()}
+        out["rate_constants"] = [dict(reaction=r["reaction"].replace("<=>", "⇌").replace("->", "→"),
+                                      rate_law=r["rate_law"], k=r["k_ref"], k_lo=r["k_ref_low"], k_hi=r["k_ref_high"],
+                                      units=r["k_units"], Ea=rnd(r["Ea_kJ"], 1), Ea_sd=rnd(r["Ea_sd_kJ"], 1))
+                                 for r in f.get("rate_constants", [])]
+        return finite(out)
+
+    def _view(self, res, data, mode, ex):
+        fits = res["ranking"] if mode == "rank" else [res["best"]] + list(res.get("runners_up", []))
+        best = fits[0]
+        sp = list(data["species"][:-1])
+        pred = np.asarray(best.get("predicted_gc") or np.zeros_like(data["gc"]))
+        out = dict(mode=mode, networks=[self._fit_view(f) for f in fits[:8]], best=best["name"],
+                   decided=bool(res.get("decided", True)), undecided=list(res.get("undecided", [])),
+                   summary=list(res.get("summary", [])), cautions=list(res.get("cautions", [])),
+                   notes=list(res.get("notes", [])), detected={k: rnd(v, 3) for k, v in (res.get("detected") or {}).items()},
+                   n_runs=int(res.get("n_runs", len(data["gc"]))), n_settings=res.get("n_settings"),
+                   seconds=rnd(res.get("seconds"), 1), n_fits=res.get("n_fits"), restarts=res.get("restarts"),
+                   path=list(res.get("path", [])) if mode == "discover" else [],
+                   stopped_early=bool(res.get("stopped_early", False)), complete=res.get("complete"),
+                   parity=dict(species=sp, meas=np.asarray(data["gc"])[:, :len(sp)].round(5).tolist(),
+                               pred=pred[:, :len(sp)].round(5).tolist()),
+                   answer=None)
+        if ex and ex.get("answer"):
+            ans = D.read_network_file(os.path.join(EX_DIR, ex["answer"]))
+            found = D.parse_network(best["reactions"]) if best.get("reactions") else []
+            out["answer"] = dict(file=ex["answer"], equations=_pretty(D.format_network(ans)),
+                                 match=bool(found) and D.network_key(found) == D.network_key(ans))
+        return finite(out)
+
+    def next_run(self, b):
+        """The next run that would best tell the two best networks apart (discovery.discriminating_run)."""
+        with self.lock:
+            j = self.job
+            if j is None or j["status"] != "done":
+                raise ValueError("run the reaction finder first")
+            raw, data = j["raw"], j["data"]
+        n_nets = len(raw.get("ranking") or [raw.get("best")] + list(raw.get("runners_up", [])))
+        if n_nets < 2:
+            raise ValueError("there is only one network: give at least two candidates to compare")
+        if not self.run_lock.acquire(blocking=False):
+            raise ValueError("still working on the previous next-run search")
+        try:
+            step = bool(b.get("from_last"))
+            nr = D.discriminating_run(raw, data, x_last=data["phys"][-1, :5] if step else None,
+                                      max_step=np.array(self.camp.max_step, float) if step else None)
+        finally:
+            self.run_lock.release()
+        keep = ("run", "networks", "predicted", "difference_x_noise", "separation", "separation_uncertain",
+                "expected_bic_gap", "best_so_far", "step_limited", "message")
+        return dict(next_run=finite({k: nr.get(k) for k in keep}))
+
+
 
 CAMP = Campaign()
+FINDER = Finder(CAMP)
 ROUTES = {
     "/api/settings": CAMP.settings, "/api/runs/add": CAMP.add_run, "/api/runs/update": CAMP.update_run,
     "/api/runs/delete": CAMP.delete_run, "/api/runs/clear": CAMP.clear, "/api/runs/import": CAMP.import_csv,
     "/api/example": CAMP.example, "/api/analyse": CAMP.analyse, "/api/simulate": CAMP.simulate,
-    "/api/landscape": CAMP.landscape,
+    "/api/landscape": CAMP.landscape, "/api/tradeoff": CAMP.tradeoff, "/api/tradeoff/aim": CAMP.tradeoff_aim,
+    "/api/finder/start": FINDER.start, "/api/finder/stop": FINDER.stop, "/api/finder/next_run": FINDER.next_run,
 }
 MIME = {".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8", ".js": "application/javascript; charset=utf-8",
         ".svg": "image/svg+xml", ".png": "image/png"}
@@ -736,6 +1135,16 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(CAMP.export_log(), "text/csv", download="reactor_log.csv")
             if path == "/api/export/next_run.csv":
                 return self._send(CAMP.export_next(), "text/csv", download="next_run.csv")
+            if path == "/api/progress":
+                return self._json(dict(progress=CAMP.progress))
+            if path == "/api/finder/examples":
+                return self._json(FINDER.examples())
+            if path == "/api/finder/status":
+                return self._json(FINDER.status())
+            if path.startswith("/examples/discovery/"):
+                name = os.path.basename(path)
+                ctype = "text/csv" if name.endswith(".csv") else "text/plain; charset=utf-8"
+                return self._send(FINDER.example_file(name), ctype, download=name)
             name = os.path.basename(path)
             fp = os.path.join(UI_DIR, name)
             ext = os.path.splitext(name)[1]

@@ -230,6 +230,23 @@ check("a bad run log is refused in plain words that name the run and the column 
       and load_fails(head_ + "10,20,20,10,300,1,0,0,0,0,0,0\n", "Run 1", "no GC reading")
       and load_fails("pressure_bar,flow_A_mL_min\n1,2\n", "missing the columns", "gc_A")
       and load_fails(head_.replace(",", ";") + "10;20;20;10;300;1;0.2;0.3;0.2;0.1;0.1;0.1\n", "separated by commas"))
+row_ = "10,20,20,10,300,1,0.2,0.3,0.2,0.1,0.1,0.1\n"
+spaced = D.load_data(head_.replace(",", ", ") + row_.replace(",", ", "))
+utf16 = D.load_data((head_ + row_).encode("utf-16"))
+check("load_data reads a header with spaces after the commas and a UTF-16 file (with its byte-order mark) like the plain file",
+      np.allclose(spaced["gc"], D.load_data(head_ + row_)["gc"]) and np.allclose(utf16["phys"], spaced["phys"]))
+check("load_data in plain words: an empty source, a file that does not exist, text in an encoding it cannot read, and an "
+      "EMPTY GC cell (a reading left out is not a reading of zero: the run and the column are named)",
+      load_fails("", "empty") and load_fails("not a csv", "Could not find the file") and load_fails("missing_log.csv", "Could not find")
+      and load_fails(b"\xe9\xe8" + (head_ + row_).encode("latin-1"), "UTF-8", "CSV UTF-8")
+      and load_fails(head_ + row_ + "10,20,20,10,300,1,0.2,0.3,0.2,0.1,,0.1\n", "Run 2", "gc_E", "empty", "write 0"))
+noE_ = D.load_data(head_.replace(",gc_E", "") + "10,20,20,10,300,1,0.2,0.3,0.2,0.1,0.2\n")
+hotK = D.load_data(head_ + "10,20,20,10,650,1,0.2,0.3,0.2,0.1,0.1,0.1\n")
+check("a log without a gc_E column is read with E = 0 and a note that says so; a temperature above the box (typed in "
+      "kelvin?) gets a note; both notes are repeated in the summaries",
+      noE_["gc"][0, 4] == 0 and any("no gc_E column" in n_ for n_ in noE_["notes"])
+      and any("kelvin" in n_ for n_ in hotK["notes"]) and not D.load_data(head_ + row_)["notes"]
+      and any("no gc_E column" in s_ for s_ in D.rank_candidates({"t": "A + B <=> C"}, noE_, models=("plain",), n_starts=1)["summary"]))
 
 # ----------------------------------------------------------------------------------- 5. ranking the candidates
 ranks = {}
@@ -280,6 +297,22 @@ try:
     models_ok = False
 except ValueError as e:
     models_ok = "'decay'" in str(e) and "'plain'" in str(e) and "'inhib'" in str(e)
+dup6 = D.make_data(np.repeat(dn_["phys"][7:8], 6, 0), np.repeat(dn_["gc"][7:8], 6, 0))
+dup_rk = D.rank_candidates({"truth": D.CANDIDATES["truth"]}, dup6, models=("plain",), n_starts=1)
+check("six repeats of ONE setting count as one setting: the result carries the few-runs caution, which says so (a 30-run "
+      "study of 30 settings carries no caution)",
+      D.n_settings(dup6) == 1 and dup_rk["n_settings"] == 1 and "only 1 different setting" in dup_rk["summary"][-1]
+      and D.n_settings(dn_) == 30 and not D._cautions(dn_, 6))
+from smart.systems import SYSTEMS, SIMPLE
+from smart.advisor import start_campaign
+_, _, hsim, _ = start_campaign("simple", 0)
+dsim = D.make_data(np.column_stack([unscale(np.array(hsim["X"])), np.ones(5)]), np.array(hsim["gc"]))
+fs_ = D.fit_network(SYSTEMS["simple"], dsim, n_starts=1)
+rs_ = D.rank_candidates({"current model": SIMPLE, "A only": "A -> D"}, dsim, n_starts=1)
+check(f"the built-in simple system (5 GC columns, no E) can be fitted and ranked as a ReactionSystem object, not only as "
+      f"text (typical miss {fs_['x_noise']:.2f} times the GC noise)",
+      fs_["n_reactions"] == 2 and np.isfinite(fs_["x_noise"]) and fs_["x_noise"] < 2 and rs_["best"] == "current model"
+      and abs(fs_["bic"] - D.fit_network(D.network_text(SIMPLE), dsim, n_starts=1)["bic"]) < 1e-6)
 check("edge cases in plain words: no candidates given; a log in which nothing reacts; a log with a single run carries a "
       "caution; a model class that discovery does not use is refused",
       empty_ok and nothing["best"]["reactions"] == [] and "No reaction is needed" in nothing["summary"][0]
@@ -340,6 +373,39 @@ check("misfit(): the allowance for model error (2 % of the reading + 0.2 mol-%) 
       "network that makes no E is outside it as well",
       m_truth["x_allow"] < m_truth["x_noise"] and m_far["x_allow"] < m_far["x_noise"] and not m_far["within_allowance"]
       and m_far["x_allow"] > 1 and len(json.dumps(m_far)) > 50)
+d_bad = dict(d, gc=d["gc"].copy())
+d_bad["gc"][7, 3] = 0.0                                    # one wrong reading: D of run 8 typed as 0
+d_bad["gc"][7] /= d_bad["gc"][7].sum()
+m_bad = D.misfit(D.CANDIDATES["truth"], d_bad, np.array(f_truth["predicted_gc"]), f_truth["n_params"])
+print("     one wrong reading: " + m_bad["verdict"])
+check("misfit(): when one run carries the misfit (a wrong reading), it says which run and that its GC reading should be "
+      "checked; the other runs are explained within the allowance",
+      not m_bad["fits"] and m_bad["one_run"] and m_bad["worst_run"] == 8 and m_bad["rest_within_allowance"]
+      and m_bad["worst_reading"]["species"] == "D" and "run 8 alone accounts for" in m_bad["verdict"]
+      and not m_truth["one_run"] and "alone accounts" not in m_truth["verdict"])
+# site blocking at a GIVEN strength in the batch fit (what one_step_revision screens with when the caller's fit found it)
+# The reference is the network's own simulator with the same inhibition, integrating the same rows the same way (each
+# run with its perturbed copies, which share step sizes), as the kinetic fit does; the kinetic fit's 'inhib' model
+# itself perturbs ln K_C as well, so its step sizes, and its numbers at the 1e-7 level, differ.
+S_t = D.build_system(D.CANDIDATES["truth"])
+th_t = S_t.theta_guess + 0.3
+K_t = np.exp(np.log(0.03) + D.PRIOR_E * (D.T_REF / d["phys"][:, 4] - 1.0))
+n_r, p_t, eps_t = len(d["gc"]), len(th_t), 1e-4
+TH_t = np.repeat(th_t[None], p_t + 1, 0)
+TH_t[1:] += eps_t * np.eye(p_t)
+ph_t = np.tile(d["phys"], (p_t + 1, 1))
+F_t, _ = S_t.simulate(ph_t[:, 0], ph_t[:, 1], ph_t[:, 2], ph_t[:, 3], ph_t[:, 5], ph_t[:, 4], theta=np.repeat(TH_t, n_r, 0),
+                      groups=np.tile(np.arange(n_r), p_t + 1), a_spec=d["a_spec"], inhib=np.tile(K_t, p_t + 1))
+Y_t = (F_t / F_t.sum(1, keepdims=True)).reshape(p_t + 1, n_r, -1)[..., :-1]
+sig_t = D.GC_REL * d["gc"][:, :-1] + D.GC_ABS
+r_t = ((Y_t[0] - d["gc"][:, :-1]) / sig_t).ravel()
+J_t = ((Y_t[1:] - Y_t[0][None]) / eps_t / sig_t[None]).reshape(p_t, -1).T
+st_t = D._batch_lm([D.parse_network(D.CANDIDATES["truth"])], d, [th_t], n_iter=0, inhib=[K_t])[0]
+st_0 = D._batch_lm([D.parse_network(D.CANDIDATES["truth"])], d, [th_t], n_iter=0)[0]
+check("the batch fit with site blocking at a given strength gives the residuals and derivatives of the network's own "
+      "simulator with that site blocking (and differs from plain rate laws)",
+      np.abs(r_t - st_t["r"][:r_t.size]).max() < 1e-9 and np.abs(J_t - st_t["J"][:r_t.size]).max() < 1e-6
+      and np.abs(r_t - st_0["r"][:r_t.size]).max() > 0.1)
 no_E = "A + B <=> C\nA -> D"                               # the complex network with the over-reaction left out
 t = time.time()
 one = {n_: D.one_step_revision(net_, d) for n_, net_ in (("no E", no_E), ("close", D.CANDIDATES["close"]), ("truth", D.CANDIDATES["truth"]))}
@@ -356,6 +422,17 @@ check("one step from 'close' (one order wrong): the best single change puts the 
 check("one step from the true network: no single change explains the data better (and no reaction is offered for adding, "
       "because every species is already explained)",
       one["truth"]["moves"][0]["gain"] < 0 and not any(m_["kind"] == "add" for m_ in one["truth"]["moves"]))
+t = time.time()
+one_sb = D.one_step_revision(no_E, d, inhib=np.full(len(d["gc"]), 0.03))
+n_sb = sum(m_["site_blocking"] for m_ in one_sb["moves"])
+print(f"     one step from 'no E' with site blocking (K_C = 0.03 /bar) as a second footing: best is to {one_sb['moves'][0]['what']}; "
+      f"{n_sb} of {one_sb['n_tried']} changes fitted better with it ({time.time() - t:.0f} s)")
+check("one step with site blocking at a given strength as a second footing (what the advisor passes when its own fit found "
+      "site blocking): the same changes are tried, each says which footing its fit used, and from the network without "
+      "C + B -> E the best change still adds it",
+      one_sb["n_tried"] == one["no E"]["n_tried"] and all(isinstance(m_["site_blocking"], bool) for m_ in one_sb["moves"])
+      and one_sb["moves"][0]["kind"] == "add" and same(one_sb["moves"][0]["reactions"], D.CANDIDATES["truth"])
+      and isinstance(one_sb["current"]["site_blocking"], bool))
 all_moves = [m_ for r_ in one.values() for m_ in r_["moves"]]
 check("every change offered is a single one of the four kinds, a valid network of at most 4 reactions, listed best first; "
       "the best three are fitted to convergence; JSON-friendly",
@@ -380,6 +457,14 @@ os.remove(bad)
 check("discover_reactions.py explains an unbalanced candidate in plain words, naming the file, instead of a traceback",
       out.returncode != 0 and "not balanced" in out.stderr and "bad_candidate_test_discovery.txt" in out.stderr
       and "Traceback" not in out.stderr)
+t = time.time()
+out = subprocess.run([sys.executable, os.path.join(HERE, "discover_reactions.py"), os.path.join(EX, "complex_noisy.csv"),
+                      "--candidates", os.path.join(EX, "candidates_truth.txt"), "--quiet",
+                      "--json", os.path.join(HERE, "no_such_folder_test_discovery", "out.json")], capture_output=True, text=True, cwd=HERE)
+check("discover_reactions.py --json into a folder that does not exist says so in plain words before any computing, "
+      "instead of a traceback after it",
+      out.returncode != 0 and "does not exist" in out.stderr and "Traceback" not in out.stderr and time.time() - t < 30
+      and not os.path.exists(os.path.join(HERE, "no_such_folder_test_discovery")))
 
 if QUICK:
     print(f"\nAll quick reaction-discovery checks passed ({time.time() - T0:.0f} s; the searches were skipped).")
@@ -460,6 +545,29 @@ check("a true rate that is zero order in a reactant: the search finds the order 
       "(exactly, or tied with it and said so), with no reaction left over",
       how in ("exact", "tied") and res["best"]["fits_noise"] and res["best"]["n_reactions"] == 3
       and res["best"]["bic"] < true_fit["bic"] + D.INDISTINGUISHABLE)
+
+# a time limit is a limit on the whole search, the final check included (a web page can rely on it)
+noE30 = D.make_data(data["complex_noisy.csv"]["phys"],
+                    np.column_stack([data["complex_noisy.csv"]["gc"][:, :4], np.zeros(30), data["complex_noisy.csv"]["gc"][:, 5]]),
+                    name="E not logged")
+t = time.time()
+res = D.discover(noE30, max_seconds=10)
+took = time.time() - t
+print(f"     discover(max_seconds=10) on a log nothing fits: {took:.1f} s, stopped early: {res['stopped_early']}")
+check("discover(max_seconds=...) bounds the whole search: it stops close to the limit (one batch of fits may run past it), "
+      "says so, and still returns its best network",
+      res["stopped_early"] and took < 25 and any("time limit" in s_ for s_ in res["summary"]) and res["best"]["reactions"])
+
+# far too few runs: the first two rows of complex_noisy.csv.  Many networks fit two readings; the search must
+# still return one, say that the data cannot decide, and warn that this is a first guess (no crash, no claim)
+dn2 = data["complex_noisy.csv"]
+d2 = D.make_data(dn2["phys"][:2], dn2["gc"][:2], dn2["hours"][:2], name="two runs")
+res = D.discover(d2)
+print(f"     two runs only: {'; '.join(res['best']['reactions'])}  ({len(res['undecided'])} undecided, {res['seconds']:.0f} s)")
+check("two runs only: the search returns a network, says what the data cannot decide, and warns that so few runs give a "
+      "first guess only",
+      res["best"]["n_reactions"] >= 1 and not res["decided"] and len(res["undecided"]) >= 1
+      and any("only 2 runs" in s for s in res["summary"]) and len(json.dumps(CLI.strip(res))) > 50)
 
 if "--thorough" in sys.argv:
     # The same zero-order network on ANOTHER run design (design seed 1, noise seed 1; not shipped as a

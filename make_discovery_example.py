@@ -17,9 +17,11 @@ Example 2, the complex network (for ranking typed candidates)
     complex_real.csv        the same runs measured on the virtual "real" reactor (VirtualReactor:
                             adsorbed product and reactant block catalyst sites, plus GC noise),
                             i.e. with physics the plain rate laws do not contain
-    complex_short_campaign.csv   NOT a kinetic study: the first 8 runs of an optimisation campaign on
-                            the virtual "real" reactor (the 5 shared screening runs + 3 allowed
-                            steps), to show what the finder does with few, step-limited runs
+    complex_short_campaign.csv   NOT a kinetic study, and not runs an optimiser chose: the 5 shared
+                            screening runs + 3 allowed steps CHOSEN BY HAND, like the start of an
+                            optimisation campaign on the virtual "real" reactor, to show what the
+                            finder does with few, step-limited runs (the case its ability to start
+                            again was developed on: see SHORT_TRIALS for how it does on others)
     candidates_truth.txt, candidates_close.txt, candidates_similar.txt, candidates_far.txt
 Example 3, a rate law that does not follow the equation (for the automatic search)
     zero_order_noisy.csv    the same 30 runs calculated from the network of candidates_close.txt
@@ -72,6 +74,19 @@ SEEDS = dict(design=7, mystery_noise=5, complex_noise=3, complex_real=11, short_
 SHORT = "complex_short_campaign.csv"
 # ------------------------------------------------------------------ example 3: a rate law that does not follow the equation
 ZERO = "zero_order_noisy.csv"
+# Measured on 25 November 2026 and NOT rerun by this script (it would need the git-ignored benchmark cache and about 6
+# minutes on 10 cores): discover() with its defaults on the first 8 runs of the ten campaigns of the v5 advisor in
+# results/smart_bench/complex (seeds 0 to 9: the 5 shared screening runs, then 3 steps the advisor chose), campaign
+# starts that were not used to develop the search.
+SHORT_TRIALS = dict(n=10, found=6, one_pass=3, after_restart=3, found_s=(61, 250), missed_s=(249, 348),
+                    missed_x_noise=(3.2, 6.6))
+# The same day, the search with the UNPRUNED library (reaction_library(thermo_prune=False): 30 forms instead of 22)
+UNPRUNED = {"mystery_noisy.csv": "the true network (299 s), not deciding whether A + 2 B -> E runs one way or both ways",
+            "complex_noisy.csv": "the true network (61 s), not deciding whether A -> D and B + C -> E run one way or both ways",
+            "complex_real.csv": "the true reactions with A -> D written as two-way, D <=> A (197 s), which inside the box "
+                                "predicts the same as the one-way form",
+            SHORT: "the true reactions with B + C -> E written as two-way (109 s), not deciding whether A -> D and "
+                   "B + C -> E run one way or both ways"}
 ZERO_TEXT = D.CANDIDATES["close"]         # A + B <=> C;  C + B -> E with r = k P_C (zero order in B);  A -> D
 ZERO_K, ZERO_EA = COMPLEX_K, COMPLEX_EA   # the same placeholder numbers as the complex network
 
@@ -134,7 +149,8 @@ def short_campaign(seed=SEEDS["short_campaign"]):
     """Not a kinetic study but the start of an optimisation campaign on the virtual 'real'
     reactor: the five shared screening runs from the project's base case (10 bar, 20 / 20 / 10
     mL/min, 600 K: a temperature ladder, then more pressure, then more B) and three more allowed
-    steps towards hotter and higher pressure.  Every run is within MAX_STEP of the one before."""
+    steps towards hotter and higher pressure, chosen by hand (not by an optimiser).  Every run is
+    within MAX_STEP of the one before."""
     X = screening_runs(base_case(0))
     X = np.vstack([X, X[-1] + [5, 0, 0, 0, 20], X[-1] + [10, 5, 0, 0, 40], X[-1] + [10, 10, -5, 0, 60]])
     assert np.all(np.abs(np.diff(X, axis=0)) <= MAX_STEP + 1e-9)
@@ -389,11 +405,38 @@ def same_network(a, b):
     return D.network_key(D.parse_network(a)) == D.network_key(D.parse_network(b))
 
 
+def solver_gap(found, nr):
+    """How far the fast bed solver (used for every fit) and the accurate one (LSODA) differ at a proposed run, for
+    the two networks the run is meant to separate: the largest difference of a predicted GC reading, in mol-%."""
+    x = np.r_[np.asarray(nr["x"], float), nr["run"]["catalyst_g"]]
+    worst = (0.0, "")
+    for f in [found["best"]] + list(found["runners_up"][:1]):
+        kf = D._model_of(f)
+        out = {}
+        for meth in ("fast", "lsoda"):
+            F, _ = kf.simulate(x[None, :], kf.theta) if meth == "fast" else (None, None)
+            if meth == "lsoda":
+                P, VA, VB, VI, T, W = x
+                parts = kf.split(kf.theta)
+                K = None
+                if "lnK" in parts:
+                    K = np.exp(parts["lnK"] + (parts["e"] if "e" in parts else PRIOR_E) * (T_REF / T - 1.0))
+                F, _ = kf.S.simulate(P, VA, VB, VI, W, T, theta=parts["kin"], method="lsoda", a_spec=kf.a_spec, inhib=K)
+            out[meth] = 100 * F[0] / F[0].sum()
+        d = np.abs(out["fast"] - out["lsoda"])[:-1]
+        i = int(np.argmax(d))
+        if d[i] > worst[0]:
+            worst = (float(d[i]), f"{COMPLEX.species[i]} {out['fast'][i]:.1f} against {out['lsoda'][i]:.1f} mol-% for "
+                                  f"'{'; '.join(f['reactions'])}'")
+    return dict(mol_pct=worst[0], what=worst[1], where=f"{x[0]:g} bar, {x[4] - 273.15:.0f} C")
+
+
 def finder_md(res):
     def block(lines):
         return ["```"] + lines + ["```", ""]
 
     my, mx, cr = res["discover:mystery_noisy.csv"], res["discover:mystery_exact.csv"], res["discover:complex_real.csv"]
+    gap = solver_gap(my, res["next:mystery_free"])
     lib = D.reaction_library()
     n_var = sum(len(e["variants"]) for e in lib)
     L = ["## Part B. What the reaction finder returns", "",
@@ -408,7 +451,13 @@ def finder_md(res):
          f"{n_var} forms in all: one-way in either direction and reversible, except where the placeholder thermodynamics "
          "says a direction runs to completion everywhere in the operating box, and then only that direction is offered), "
          "not written around the answer. Each step of the search tries adding a reaction, removing one, changing one "
-         "reaction order and, if none of these helps, replacing a reaction.", ""]
+         "reaction order and, if none of these helps, replacing a reaction.", "",
+         "One caution about that pruning. The placeholder thermodynamics (the species table in `smart/discovery.py`) "
+         "were chosen to reproduce the complex network, with its two one-way steps (A -> D and C + B -> E) complete "
+         "everywhere in the box; for that chemistry the pruning therefore removes exactly the other forms of those two "
+         "reactions. It encodes the directions of the complex example's answer, and making A -> D complete needs an "
+         "entropy for D that an isomerisation would hardly have. Without pruning (30 forms) the search returns on this "
+         f"file {UNPRUNED['mystery_noisy.csv']}; on the complex files see B8.", ""]
     L += block(report_discovery(my, "mystery_noisy.csv"))
     truth = MYSTERY_TEXT
     hit = same_network(my["best"]["reactions"], truth)
@@ -476,13 +525,23 @@ def finder_md(res):
     sc_hit = same_network(sc["best"]["reactions"], ctruth)
     L += ["### B5. Few, step-limited runs: the start of an optimisation campaign", "",
           f"    python discover_reactions.py examples/discovery/{SHORT}", "",
-          f"`{SHORT}` is not a kinetic study. It holds the first {sc['best']['n_runs']} runs of an optimisation campaign on the "
-          "virtual \"real\" reactor: the 5 shared screening runs from the base case (10 bar, 20 / 20 / 10 mL/min, 600 K: a "
-          "temperature ladder, then more pressure, then more B) and 3 more steps to hotter and higher pressure, each within "
-          "the allowed step (10 bar, 10 mL/min, 30 K) of the run before. This campaign was chosen because the search needs "
-          "more than one pass on it (not every short campaign does): the search changes one reaction at a time, and here "
-          "its first choice leads to a dead end. It notices that its result does not fit within the GC noise and starts "
-          "again from another first reaction.", ""]
+          f"`{SHORT}` is not a kinetic study, and its steps were not chosen by an optimiser. It holds {sc['best']['n_runs']} "
+          "runs on the virtual \"real\" reactor, like the start of an optimisation campaign: the 5 shared screening runs "
+          "from the base case (10 bar, 20 / 20 / 10 mL/min, 600 K: a temperature ladder, then more pressure, then more B) "
+          "and 3 more steps to hotter and higher pressure CHOSEN BY HAND, each within the allowed step (10 bar, 10 mL/min, "
+          "30 K) of the run before. It is the case on which the search's ability to start again was developed: the search "
+          "changes one reaction at a time, and here its first choice leads to a dead end. It notices that its result does "
+          "not fit within the GC noise and starts again from another first reaction. So this is a hand-picked, favourable "
+          "example, not a typical one.", "",
+          f"How the search does on campaign starts it was not developed on was measured separately (not shipped as files): "
+          f"on the first 8 runs of {SHORT_TRIALS['n']} step-limited campaigns of the v5 advisor on the same virtual reactor "
+          "(the shared screening runs, then 3 steps the advisor chose; seeds 0 to 9) it found the true network in "
+          f"{SHORT_TRIALS['found']} of {SHORT_TRIALS['n']} ({SHORT_TRIALS['one_pass']} in one pass, {SHORT_TRIALS['after_restart']} "
+          f"after starting again; {SHORT_TRIALS['found_s'][0]} to {SHORT_TRIALS['found_s'][1]} s). In the other "
+          f"{SHORT_TRIALS['n'] - SHORT_TRIALS['found']} it ended, after three new starts and {SHORT_TRIALS['missed_s'][0]} to "
+          f"{SHORT_TRIALS['missed_s'][1]} s, at a wrong network that it reported as not fitting within the GC noise (typical "
+          f"miss {SHORT_TRIALS['missed_x_noise'][0]:g} to {SHORT_TRIALS['missed_x_noise'][1]:g} times the noise), never as an "
+          "answer. Ten campaign starts are a small sample.", ""]
     L += block(report_discovery(sc, SHORT))
     L += [("The search ends at the true reactions" if sc_hit else "The search does NOT end at the true reactions")
           + f" after starting again {sc['restarts']} time{'s' if sc['restarts'] != 1 else ''}. "
@@ -570,12 +629,20 @@ def finder_md(res):
           "program therefore also gives the difference counted against the GC noise plus that uncertainty, and says so "
           "when one run would not be enough. The uncertainty itself is a rough estimate (a few dozen random draws from each fit).",
           "- All fits use the project's fast bed solver, which agrees with the accurate solver to about 0.1 mol-% of a "
-          "reading. That can shift a BIC by a few units (about 3 for the true complex network on `complex_noisy.csv`), "
-          "one more reason why BIC differences below 6 are not called decisions.",
+          "reading inside the study window. That can shift a BIC by a few units (about 3 for the true complex network on "
+          "`complex_noisy.csv`), one more reason why BIC differences below 6 are not called decisions. Far outside the runs "
+          f"done the two differ more: at the run proposed in B1 ({gap['where']}) the readings the two fitted networks "
+          f"predict differ between the solvers by up to {gap['mol_pct']:.1f} mol-% ({gap['what']}), so the readings printed "
+          "for such a run are approximate (the conclusion that the run separates the networks does not depend on it).",
           "- The 30-run files are designed kinetic studies with a wide range of conditions. The step-limited runs of an "
-          "optimisation campaign cover a much smaller region; B5 shows one such case that works, but fewer or less varied "
-          "runs will leave more undecided.",
-          "- Equilibrium constants come from the placeholder species table in `smart/discovery.py`; all kinetics are placeholders.", ""]
+          f"optimisation campaign cover a much smaller region: on the first 8 runs of {SHORT_TRIALS['n']} such campaigns the "
+          f"search found the true network in {SHORT_TRIALS['found']} (B5); in the others it said that its best network does "
+          "not fit. Fewer or less varied runs will leave more undecided.",
+          "- Equilibrium constants come from the placeholder species table in `smart/discovery.py`; all kinetics are placeholders. "
+          "The table was chosen to reproduce the complex network, so the pruning of the library removes exactly the other "
+          "forms of its two one-way steps (B1). Without pruning the search returns: on `complex_noisy.csv` "
+          f"{UNPRUNED['complex_noisy.csv']}; on `complex_real.csv` {UNPRUNED['complex_real.csv']}; on `{SHORT}` {UNPRUNED[SHORT]}. "
+          "With real species the table must come from tabulated thermodynamics.", ""]
     return L
 
 

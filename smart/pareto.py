@@ -109,10 +109,13 @@ SEL_RES = 0.002                  # a curve spanning less selectivity than this (
 def pareto_front(profit, selectivity, tol=1e-9):
     """Indices of the non-dominated points, ordered by rising selectivity (so by falling
     profit).  A point is dropped when another one has at least its profit and at least its
-    selectivity; what is left is the trade-off curve."""
+    selectivity; what is left is the trade-off curve.  A point whose profit or selectivity is
+    not a finite number (no prediction there) is never on the curve."""
     profit, sel = np.asarray(profit, float), np.asarray(selectivity, float)
     keep, best = [], -np.inf
     for i in np.lexsort((-sel, -profit)):          # most profitable first; ties: most selective first
+        if not (np.isfinite(profit[i]) and np.isfinite(sel[i])):
+            continue
         if sel[i] > best + tol:
             keep.append(int(i))
             best = sel[i]
@@ -347,7 +350,10 @@ def tradeoff(adv, n_points=12, n_candidates=1024, seed=0, rng=None, min_profit=0
       reference   best_run (the run the advisor recommends) and last_run, measured and predicted
       explanation plain-word sentences for someone who has never seen such a curve
       wcat, a_spec  the catalyst load the prediction is for (the advisor's)
-      spec, system, product, n_runs, n_evaluated, seconds, settings, units
+      system      the name of the reaction network the advisor predicts with (adv.S.name: after a
+                  revision, or with a network it was given, this is not the reactor's name)
+      network     that network's reactions, one text line each
+      spec, product, n_runs, n_evaluated, seconds, settings, units
 
     A single point comes back when the allowed settings offer no real choice (all knobs fixed,
     or the whole curve spans less than 0.2 percentage point of selectivity, which one GC reading
@@ -419,9 +425,9 @@ def tradeoff(adv, n_points=12, n_candidates=1024, seed=0, rng=None, min_profit=0
             meets_current_spec=None if cur is None else bool(np.isfinite(s_spec[i]) and s_spec[i] >= cur - 1e-9)))
     markers = _markers(points, knee_pos, sel_pos[keep])
 
-    # ---- the operator's own runs, for reference
+    # ---- the operator's own runs, for reference (measured: read off the GC with the network the advisor was given)
     ph6 = np.column_stack([unscale(adv.X), adv.W])
-    XAm, SCm, _ = kpis_from_gc(adv.S, ph6, adv.gc)
+    XAm, SCm, _ = kpis_from_gc(getattr(adv, "S_start", adv.S), ph6, adv.gc)
 
     def run_row(i):
         return dict(run=int(i) + 1, **_settings(adv.X[i]), x=[float(v) for v in adv.X[i]],
@@ -430,7 +436,8 @@ def tradeoff(adv, n_points=12, n_candidates=1024, seed=0, rng=None, min_profit=0
 
     reference = dict(best_run=run_row(adv.recommend()), last_run=run_row(adv.n - 1))
     return dict(
-        ok=True, system=adv.S.name, product=adv.S.species[adv.S.iC], n_runs=int(adv.n),
+        ok=True, system=adv.S.name, network=_network_lines(adv),
+        product=adv.S.species[adv.S.iC], n_runs=int(adv.n),
         wcat=float(adv.wcat), a_spec=float(adv.a_spec),
         points=points, markers=markers, curve=_curve(F, p, s), reference=reference,
         spec={k: float(v) for k, v in adv.spec.items()},
@@ -442,6 +449,14 @@ def tradeoff(adv, n_points=12, n_candidates=1024, seed=0, rng=None, min_profit=0
         units=dict(P="bar", V_A="mL/min", V_B="mL/min", V_I="mL/min", T="K", T_C="°C",
                    profit="money units per hour (placeholder prices)", selectivity="fraction, 0 to 1",
                    conversion="fraction, 0 to 1"))
+
+
+def _network_lines(adv):
+    """The advisor's reactions as text lines, or None if they cannot be written in the text format."""
+    try:
+        return adv.network()
+    except (AttributeError, ValueError):
+        return None
 
 
 def _explain(points, mk, near_steps, min_profit):
@@ -548,7 +563,17 @@ _TRUE_MEMO = {}
 
 
 def _system(system):
-    return SYSTEMS[system] if isinstance(system, str) else system
+    """A virtual reactor by name ('simple', 'complex') or as a ReactionSystem; a name that is not a
+    virtual reactor (for example the name of the network an advisor was given or revised to) is
+    refused in plain words."""
+    if not isinstance(system, str):
+        return system
+    if system not in SYSTEMS:
+        raise ValueError(f"'{system}' is not one of the virtual reactors ({', '.join(SYSTEMS)}). A trade-off curve records "
+                         "the name of the reaction network the ADVISOR used, which need not be the reactor's (a network "
+                         "it was given, or one it revised): pass system='complex' (or 'simple'), the reactor the runs "
+                         "came from, to compare_with_truth.")
+    return SYSTEMS[system]
 
 
 def true_values(system, X, wcat=WCAT, a_spec=A_SPEC, exact=True):

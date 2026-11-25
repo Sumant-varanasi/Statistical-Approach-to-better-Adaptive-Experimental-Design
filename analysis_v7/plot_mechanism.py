@@ -64,7 +64,15 @@ ax.set_facecolor(SURF)
 ax.axis("off")
 ax.set_title("B. No candidates given: the finder works out the reactions from the data", fontsize=10.5, color=INK, loc="left")
 ext = A.get("complex_noisy.csv", {}).get("extrapolate", {})
-TRUE_COMPLEX = {"A + B <=> C", "B + C -> E", "A -> D"}
+from smart import discovery as D
+
+
+def keys(lines):
+    """Reactions in a form that does not depend on how they are written ('C + B -> E' is 'B + C -> E')."""
+    return {D.parse_reaction(t).key() for t in lines}
+
+
+TRUE_COMPLEX = keys(["A + B <=> C", "B + C -> E", "A -> D"])
 
 
 def eqs(lst):
@@ -93,14 +101,14 @@ for x, t in zip(xs, hdr):
 yy = 0.9
 for data, start, res, truth_txt, note in rows:
     if res is None:
-        found = set(eqs(ext.get("found", []))) if ext else set()
+        found = keys(eqs(ext.get("found", []))) if ext else set()
         ok = found == TRUE_COMPLEX
         secs = ext.get("seconds", np.nan)
         if not ext:
             note = "not run yet"
     else:
-        found = set(eqs(res["best"]["equations"]))
-        truth = TRUE_COMPLEX if "mystery" not in data.lower() else {"A + B <=> C", "C -> B + D", "A + 2 B -> E"}
+        found = keys(res["best"]["reactions"])
+        truth = TRUE_COMPLEX if "mystery" not in data.lower() else keys(["A + B <=> C", "C -> B + D", "A + 2 B -> E"])
         ok = found == truth
         secs = res["seconds"]
     ax.text(xs[0], yy, data, fontsize=8, color=INK, transform=ax.transAxes, va="top")
@@ -144,7 +152,8 @@ ax = fig.add_subplot(gs[1, 1])
 style(ax)
 CASES = [("mystery_noisy.csv", "'Mystery' reactions"), ("complex_noisy.csv", "Complex reactions"),
          ("complex_real.csv", "Complex, 'real' reactor")]
-TESTS = [("interpolate", "runs left out at random"), ("extrapolate", "hottest 6 runs (trained cooler)")]
+TESTS = [("interpolate", "runs left out at random\n(true reactions given)"),
+         ("extrapolate", "hottest 6 runs (trained\ncooler; reactions found)")]
 y, yt = 0, []
 for f, lab in CASES[::-1]:
     if f not in A:
@@ -168,11 +177,14 @@ ax.set_yticklabels([l for _, l in yt], fontsize=7.6, color=INK)
 ax.set_xlabel("typical miss of the predicted GC composition of runs NOT used for training,\n"
               "as a multiple of the GC noise (log scale; 1 = as good as the GC itself)", fontsize=8, color=INK2)
 h = [plt.Rectangle((0, 0), 1, 1, color=c) for c in ("#2a78d6", "#eb6834")]
-ax.legend(h, ["reaction mechanism (rate laws + mole balances)", "neural network alone (knobs → GC)"], fontsize=7.8,
+ax.legend(h, ["reaction mechanism (rate laws + mole balances; see the row labels for where its reactions come from)",
+              "neural network alone (knobs → GC)"], fontsize=7.8,
           frameon=False, loc="lower left", bbox_to_anchor=(0, 1.0), ncol=2)
 ax.set_title("D. Predicting the GC of unseen runs: mechanism vs neural network", fontsize=10.5, color=INK, loc="left", pad=22)
 
-fig.text(0.01, 0.005, "PRELIMINARY: reaction finder before its final review. Simulated data, placeholder kinetics. "
+fig.text(0.01, 0.005, "PRELIMINARY: reaction finder before its final review. Simulated data, placeholder kinetics. In panel D the "
+         "'runs left out at random' rows give the mechanism the reactions the data were made from; only the 'hottest 6 runs' "
+         "rows use reactions the finder found from the training runs.\n"
          "Neural network: ensemble of 5 two-layer networks (32 units), penalty chosen by cross-validation on the training runs.\n"
          "Fairness check (runs left out at random): a Gaussian process on the same data misses by 5.9-8.0 mol-%, about the same as the "
          "network (5.6-7.4); always predicting the average misses by 12.7-13.8 mol-%. 30 runs are too few for any black box.",

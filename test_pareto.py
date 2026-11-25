@@ -73,6 +73,9 @@ p_toy = np.array([10.0, 9.0, 9.5, 5.0, 4.0, 10.0, 1.0])
 s_toy = np.array([0.50, 0.70, 0.60, 0.90, 0.80, 0.40, 0.95])
 check("non-dominated filter: keeps (10, .50) (9.5, .60) (9, .70) (5, .90) (1, .95), sorted by selectivity",
       pareto_front(p_toy, s_toy).tolist() == [0, 2, 1, 3, 6])
+check("non-dominated filter: a point with no prediction (NaN profit or selectivity) is never on the curve",
+      pareto_front([5.0, np.nan, 3.0], [0.5, 0.99, 0.7]).tolist() == [0, 2]
+      and pareto_front([5.0, 4.0, 3.0], [0.5, np.nan, 0.7]).tolist() == [0, 2])
 
 # 2. a short campaign on the complex virtual reactor (5 screening runs + 7 advisor runs, nothing saved)
 t0 = time.time()
@@ -332,6 +335,15 @@ check("the true curve is remembered (second call returns at once)", true_tradeof
 
 # 17. predicted curve against the true curve, after 12 runs
 cmp = compare_with_truth(res, truth=truth)
+try:
+    compare_with_truth(dict(res, system="complex_missing_E"))
+    named = False
+except ValueError as e:
+    named = "system='complex'" in str(e) and "complex_missing_E" in str(e)
+check("a curve predicted with a network that is not a virtual reactor's (one the advisor was given, or revised) cannot "
+      "silently be scored: the caller is told in plain words to name the reactor (system='complex'); the curve records "
+      "the advisor's reactions", named and res["network"] == adv.network()
+      and compare_with_truth(dict(res, system="complex_missing_E"), system="complex", truth=truth)["all"]["n"] == len(pts))
 check("the comparison can be written as JSON", bool(json.dumps(cmp, allow_nan=False)) and plain(cmp))
 tv_2g = true_values("complex", X, wcat=2.0)["profit"]                  # the same settings with 2 g of catalyst
 check("the comparison uses the catalyst mass the curve was predicted for",

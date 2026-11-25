@@ -1,7 +1,10 @@
 """
 How well does each approach predict the GC composition of runs it has NOT seen?
   mechanism  : the reaction network (rate laws + mole balances), rate constants fitted on the
-               training runs only (smart/discovery.py)
+               training runs only (smart/discovery.py).  In the interpolate test it is GIVEN the
+               reactions the data were made from (FILES: the answer file of each data file), so that
+               half compares the rate laws, not the finding of them; label it 'mechanism given the
+               true reactions'.  Only the extrapolate test uses reactions found from the training runs.
   NN alone   : a neural-network ensemble from the five knobs to the GC mole fractions, no physics
                (scikit-learn MLP; size of the penalty chosen by cross-validation on the training runs)
 Two tests per data file (30 runs each):

@@ -46,11 +46,24 @@ one, and trusts whichever has predicted unseen runs better so far.
 What "unseen" means, exactly.  For the stand-alone network a held-out run is truly unseen: the
 networks that predict it were trained without it, their targets were scaled without it and
 their output is clipped to the range of the other runs' profits.  For the physics-based members
-only the CORRECTION is held out: the kinetic fit behind f_phys has used the GC reading of every
-run, the held-out one included, and the correction networks' clip range and input scaling are
-set on all runs.  So the comparison leans a little toward the physics (a handful of rate
-parameters fitted to compositions, not to the profit, so the lean is small next to the
-differences usually seen), and the stand-alone network has to earn its weight the hard way.
+only the CORRECTION is held out, and not all of it:
+  * the kinetic fit behind f_phys has used the GC reading of every run, the held-out one
+    included (refitting the kinetics without the held-out run was measured to change the
+    physics' own held-out error little: 1.10 -> 1.10 per hour with the right network, 26.5 ->
+    26.6 with C + B -> E missing, 12 runs);
+  * the correction networks' clip range and input scaling are set on all runs;
+  * the GP: in the v6 committee its held-out predictions reuse the length-scales, signal and
+    noise variance and the output scale fitted on ALL runs.  That flatters it, and most where
+    the physics is wrong: measured on cached campaigns with C + B -> E missing, its held-out
+    error came out about half of what refitting per fold gives (n = 12: 1.98 against 4.50 per
+    hour; n = 20: 2.08 against 3.84), while with the right network the two agree (1.39 against
+    1.39 at n = 20).  In the v7 committee, which also holds the stand-alone network, the GP is
+    therefore refitted on every fold, hyper-parameters included (_GPMember.heldout(refit=True));
+    the v6 committee keeps the old rule so that v6 results stay exactly reproducible.
+  * the GP's noise bounds come from the spread of all residuals and the GC noise.
+So the comparison still leans toward the physics-based members (the kinetic fit and the
+correction networks' scaling), by a little where the physics is right; the stand-alone network
+has to earn its weight the hard way.
 
 Any subset of the members that contains "none" can be used (ResidualCommittee(members=...)),
 which is how the contribution of each member is measured: run the same campaigns without it.
@@ -110,10 +123,13 @@ def stacking_weights(logp, pseudo=None, iters=500):
 
 
 class _GPMember:
-    """The v5 residual GP (log P input); held-out predictions reuse the full-data
-    hyper-parameters (the usual approximation, and it keeps the cost tiny)."""
+    """The v5 residual GP (log P input).  Held-out predictions (v6) reuse the full-data
+    hyper-parameters (the usual approximation, and it keeps the cost tiny); with refit=True
+    (the v7 committee, which also holds the stand-alone network) the GP is fitted afresh on
+    every fold, hyper-parameters included, so it is held to the same standard as that network."""
 
     def __init__(self, seed, noise_bounds):
+        self.seed, self.noise_bounds = seed, noise_bounds
         self.model = LogInputs(SmoothGP(seed=seed, noise_bounds=noise_bounds), (0,), LOW, HIGH)
 
     def fit(self, X, r):
@@ -123,7 +139,9 @@ class _GPMember:
     def predict(self, X, include_noise=False):
         return self.model.predict(X, include_noise=include_noise)
 
-    def heldout(self, X, r, folds):
+    def heldout(self, X, r, folds, refit=False):
+        if refit:
+            return self._heldout_refit(X, r, folds)
         g = self.model.m
         Z = self.model.g(X)
         mu, var = np.zeros(len(r)), np.zeros(len(r))
@@ -137,6 +155,17 @@ class _GPMember:
             v = solve_triangular(L, k, lower=True)
             mu[te] = m_tr + g.y_std * (k.T @ a)
             var[te] = g.y_std ** 2 * (np.maximum(g.s2 - np.sum(v * v, 0), 1e-12) + g.sn2)
+        return mu, var
+
+    def _heldout_refit(self, X, r, folds):
+        """Every fold predicted by a GP fitted without it: its mean, scale, length-scales, signal and
+        noise variance all come from the other runs only (the noise bounds are the caller's)."""
+        mu, var = np.zeros(len(r)), np.zeros(len(r))
+        for te in folds:
+            tr = np.setdiff1d(np.arange(len(r)), te)
+            m = LogInputs(SmoothGP(seed=self.seed, noise_bounds=self.noise_bounds), (0,), LOW, HIGH).fit(X[tr], r[tr])
+            mu_te, sd_te = m.predict(X[te], include_noise=True)
+            mu[te], var[te] = mu_te, sd_te ** 2
         return mu, var
 
 
@@ -280,6 +309,8 @@ class ProfitEnsemble(_NNMember):
         return y.min() - 0.5 * span, y.max() + 0.5 * span
 
     def fit(self, X, y, noise_var=0.0):
+        """Train the networks on scaled knobs X (n x 5) and measured profits y (n,); noise_var = the
+        variance of one profit measurement (added to the spread when include_noise=True).  Returns self."""
         y = np.asarray(y, float)
         self.r_lo, self.r_hi = self._clip_range(y, noise_var)
         self.noise_var = float(noise_var)
@@ -288,6 +319,8 @@ class ProfitEnsemble(_NNMember):
         return self
 
     def predict(self, X, include_noise=False):
+        """Predicted profit at scaled knobs X (m x 5): (mean over the networks, sd = their spread,
+        plus the measurement noise when include_noise), each (m,)."""
         P = self._scaled(self.net, self.ym, self.ys, self.tf.g(X))
         var = P.var(0) + (self.noise_var if include_noise else 0.0)
         return P.mean(0), np.sqrt(var + 1e-12)
@@ -355,7 +388,8 @@ class ResidualCommittee:
             held.append(np.zeros(n))
         if "gp" in self.members and n >= MIN_GP:
             m = _GPMember(self.seed, gp_noise_bounds).fit(X, r)
-            mu, var = m.heldout(X, r, folds)
+            # next to the stand-alone network (held out strictly) the GP is refitted per fold as well
+            mu, var = m.heldout(X, r, folds, refit="direct" in self.members)
             self.models["gp"] = m
             self.active.append("gp")
             cols.append(_norm_logpdf(r, mu, var))

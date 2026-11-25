@@ -216,13 +216,20 @@ function renderRuns() {
 async function advise(ref) {
   if (S.n < 3) { setMsg("advice-msg", "Add at least 3 runs first (or load the 5 screening runs).", "err"); return; }
   if (setupDirty && !(await applySettings())) { setMsg("advice-msg", "Fix the campaign settings first (see the message under Apply settings).", "err"); return; }
+  const v7 = S.settings.version === "v7";
+  const base = "Fitting the chemistry to your GC readings and simulating candidate runs… (the first time takes 10–20 s, later ones a few seconds)"
+    + (v7 ? " v7 also checks its reactions against the GC readings and may search for better ones (up to a minute)." : "");
+  let poll = null;
   try {
-    busy(true, "Fitting the chemistry to your GC readings and simulating candidate runs… (the first time takes 10–20 s, later ones a few seconds)");
+    busy(true, base);
+    if (v7) poll = setInterval(async () => {
+      try { const p = (await api("/api/progress")).progress; if (p && p.message) $("overlay-text").textContent = `Checking the reactions (${fmt(p.elapsed, 0)} s): ${p.message}`; } catch (e) {}
+    }, 1500);
     const out = await api("/api/analyse", { ref: ref || lsRef });
     A = out.analysis; S = out.state;
     renderAll();
     setMsg("advice-msg", `Advice ready (${A.seconds} s).`, "ok");
-  } catch (e) { setMsg("advice-msg", e.message, "err"); } finally { busy(false); }
+  } catch (e) { setMsg("advice-msg", e.message, "err"); } finally { if (poll) clearInterval(poll); busy(false); }
 }
 $("btn-advise").addEventListener("click", () => advise());
 async function simulateDays(n) {
@@ -301,6 +308,19 @@ function renderLearned() {
       el("span", { class: "ea", html: `activation energy <b>${fmt(r.Ea, 0)}</b> kJ/mol <span class="hint">(likely ${fmt(r.Ea_lo, 0)}–${fmt(r.Ea_hi, 0)}${r.Ea_true !== null ? `; true ${fmt(r.Ea_true, 0)}` : ""})</span>` }),
       el("span", { class: "hint" }, `near ${fmt(ch.at_T, 0)} °C every +10 °C makes it ${fmt(r.factor10, 2)}× faster`)));
   });
+  const nw = ch.network;
+  $("net-box").hidden = !nw;
+  if (nw) {
+    $("net-lines").innerHTML = ""; nw.lines.forEach((l) => $("net-lines").append(el("li", {}, l.replace(/^\d+\.\s+/, ""))));
+    $("net-changed").hidden = !nw.changed;
+    $("net-given").innerHTML = ""; nw.given.forEach((l) => $("net-given").append(el("li", {}, l.replace(/^\d+\.\s+/, ""))));
+    const nn = $("net-notes"); nn.innerHTML = "";
+    if (nw.check) nn.append(el("li", {}, `Last check: ${nw.check}`));
+    nw.revisions.forEach((r) => nn.append(el("li", {}, r.words || `After run ${r.run}: ${r.change}`)));
+    if (!nw.revisions.length) nn.append(el("li", {}, "No change made so far: the reactions you set up explain the GC readings, or the evidence against them is not yet strong enough to change them."));
+    const last = nw.log.length ? nw.log[nw.log.length - 1] : null;
+    if (last && last.outcome !== "revised" && last.words) nn.append(el("li", {}, last.words));
+  }
   const notes = $("rx-notes"); notes.innerHTML = "";
   for (const n of ch.notes) notes.append(el("li", {}, n));
   notes.append(el("li", {}, `How well this chemistry explains your GC readings: typical miss ${fmt(ch.miss_pct, 2)} percentage points of composition. Your runs cover ${fmt(ch.T_range[0], 0)}–${fmt(ch.T_range[1], 0)} °C; activation energies are only pinned down inside that range.`));
@@ -388,8 +408,9 @@ function drawArrhenius() {
   hoverLayer(c, ar.x.map((x) => f.X(x)), (i) => `${ar.T_C[i]} °C<br>` + ar.reactions.map((r) => `${r.eq}: ${fmt(r.learned[i], 2)}${r.truth ? ` (true ${fmt(r.truth[i], 2)})` : ""}`).join("<br>"));
 }
 
-function drawParity() {
-  const pa = A.parity, W = 520, H = 280, m = { l: 46, r: 14, t: 12, b: 38 };
+function drawParity() { parityChart($("chart-parity"), A.parity); }
+function parityChart(c, pa) {
+  const W = 520, H = 280, m = { l: 46, r: 14, t: 12, b: 38 };
   let mx = 0; for (const row of [...pa.meas, ...pa.pred]) for (const v of row) if (v > mx) mx = v;
   mx = Math.max(mx * 1.08, 0.05);
   const T = niceTicks(0, mx, 5);
@@ -397,7 +418,6 @@ function drawParity() {
   let s = f.s + `<line x1="${f.X(0)}" y1="${f.Y(0)}" x2="${f.X(mx)}" y2="${f.Y(mx)}" class="ax" stroke-dasharray="3 3"/>`;
   const pts = [];
   pa.meas.forEach((row, r) => row.forEach((v, k) => { pts.push({ x: f.X(v), y: f.Y(pa.pred[r][k]), r, k, v, p: pa.pred[r][k] }); s += `<circle cx="${f.X(v)}" cy="${f.Y(pa.pred[r][k])}" r="4" style="fill:var(--c${k + 1});stroke:var(--surface)" stroke-width="1.2"/>`; }));
-  const c = $("chart-parity");
   c.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="GC readings against model predictions">${s}</svg>
     <div class="legend">${pa.species.map((sp, k) => `<span class="dot" style="--lc:var(--c${k + 1})">${sp}</span>`).join("")}</div>`;
   const svg = c.querySelector("svg");
@@ -457,6 +477,285 @@ function renderExplore() {
   drawProfit(); drawLandscape();
 }
 
+// ------------------------------------------------------------------ optional: profit vs selectivity trade-off
+let TR = null;           // the curve, for the advice it was drawn from
+function renderTradeoff() {
+  if (TR && TR.forA !== A) TR = null;              // the advice changed: the curve no longer applies
+  $("tradeoff-body").hidden = !TR;
+  $("btn-tradeoff").textContent = TR ? "Draw the curve again" : "Show the trade-off curve";
+  if (!TR) return;
+  const T = TR.res;
+  drawTradeoff(T);
+  const nl = $("tradeoff-notes"); nl.innerHTML = "";
+  for (const n of T.explanation || []) nl.append(el("li", {}, n));
+  const tb = $("tradeoff-table");
+  tb.querySelector("thead").innerHTML = "";
+  tb.querySelector("thead").append(el("tr", {}, ...["", "Selectivity", "Profit / h", "Conversion", "P (bar)", "A", "B", "Inert (mL/min)", "T (°C)", "Runs away", ""].map((h) => el("th", {}, h))));
+  const body = tb.querySelector("tbody"); body.innerHTML = "";
+  T.points.forEach((p, i) => {
+    const tag = p.label ? el("span", { class: "pill" + (p.label === "balanced" ? " yes" : "") }, p.label) : "";
+    body.append(el("tr", {},
+      el("td", { class: "first" }, tag, p.extrapolation ? el("span", { class: "src", title: "far from every run you have made: the model is guessing more here" }, " far from your runs") : ""),
+      el("td", { class: "num" }, `${fmt(100 * p.selectivity, 1)} %`, el("span", { class: "src" }, ` ${fmt(100 * p.selectivity_lo, 0)}–${fmt(100 * p.selectivity_hi, 0)}`)),
+      el("td", { class: "num profit" }, fmt(p.profit, 1), el("span", { class: "src" }, ` ${fmt(p.profit_lo, 0)}–${fmt(p.profit_hi, 0)}`)),
+      el("td", { class: "num" }, `${fmt(100 * p.conversion, 0)} %`),
+      el("td", { class: "num" }, fmt(p.P, 1)), el("td", { class: "num" }, fmt(p.V_A, 1)), el("td", { class: "num" }, fmt(p.V_B, 1)),
+      el("td", { class: "num" }, fmt(p.V_I, 1)), el("td", { class: "num" }, fmt(p.T_C, 0)), el("td", { class: "num" }, String(p.steps_away)),
+      el("td", {}, el("button", { type: "button", class: "btn seg-btn", title: `set the minimum selectivity to ${fmt(100 * (p.min_selectivity_spec ?? p.selectivity), 1)} % and get advice again`, onclick: () => aimAt(i) }, "Aim here"))));
+  });
+}
+function drawTradeoff(T) {
+  const W = 720, H = 300, m = { l: 52, r: 16, t: 14, b: 40 };
+  // the axes follow the curve; a run far off it (e.g. a cold screening run) would squeeze the curve into a corner
+  const xs = [...T.curve.selectivity, ...T.points.map((p) => p.selectivity)].filter((v) => v !== null).map((v) => 100 * v);
+  const ys = [...T.curve.profit, ...T.points.flatMap((p) => [p.profit_lo, p.profit_hi])].filter((v) => v !== null);
+  const xpad = Math.max((Math.max(...xs) - Math.min(...xs)) * 0.08, 0.5);
+  const xT = niceTicks(Math.max(0, Math.min(...xs) - xpad), Math.min(100, Math.max(...xs) + xpad), 6), yT = niceTicks(Math.min(...ys), Math.max(...ys), 5);
+  const inside = (r) => r && r.selectivity !== null && r.profit_measured !== null && 100 * r.selectivity >= xT[0] && 100 * r.selectivity <= xT[xT.length - 1] && r.profit_measured >= yT[0] && r.profit_measured <= yT[yT.length - 1];
+  const ref = [T.reference.best_run, T.reference.last_run].map((r) => (inside(r) ? r : null));
+  const f = frame(W, H, m, [xT[0], xT[xT.length - 1]], [yT[0], yT[yT.length - 1]], `selectivity to ${T.product || "C"} (%)   purer →`, "profit, money / h", xT, yT);
+  let s = f.s;
+  s += `<path d="${path(T.curve.selectivity.map((x, i) => [f.X(100 * x), T.curve.profit[i] === null ? null : f.Y(T.curve.profit[i])]))}" fill="none" style="stroke:var(--c1)" stroke-width="2"/>`;
+  const pts = [];
+  T.points.forEach((p, i) => {
+    const x = f.X(100 * p.selectivity), y = f.Y(p.profit);
+    s += `<line x1="${x}" x2="${x}" y1="${f.Y(p.profit_lo)}" y2="${f.Y(p.profit_hi)}" style="stroke:var(--c1)" stroke-width="1.5" opacity=".45"/>`;
+    const mark = p.label === "balanced" ? "var(--c3)" : p.label ? "var(--c2)" : "var(--c1)";
+    s += `<circle cx="${x}" cy="${y}" r="${p.label ? 6 : 4.5}" style="fill:${mark};stroke:var(--surface)" stroke-width="2"/>`;
+    if (p.label) {
+      const sel = p.label === "most selective";
+      s += `<text x="${x + (sel ? -10 : 10)}" y="${y + (sel ? 18 : -10)}" text-anchor="${sel ? "end" : "start"}" class="t">${p.label}</text>`;
+    }
+    pts.push({ x, y, p, i });
+  });
+  ref.forEach((r, k) => {
+    if (!r) return;
+    const x = f.X(100 * r.selectivity), y = f.Y(r.profit_measured);
+    s += `<rect x="${x - 5}" y="${y - 5}" width="10" height="10" style="fill:${k === 0 ? "var(--c4)" : "var(--surface)"};stroke:var(--c4)" stroke-width="2"/>`;
+  });
+  const out = [T.reference.best_run, T.reference.last_run].map((r, k) => (r && !ref[k] && r.selectivity !== null ? `${k === 0 ? "best" : "last"} run ${r.run}: ${fmt(100 * r.selectivity, 0)} %, ${fmt(r.profit_measured, 1)} / h` : null)).filter(Boolean);
+  const c = $("chart-tradeoff");
+  c.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="predicted profit against selectivity">${s}</svg>
+    <div class="legend"><span style="--lc:var(--c1)">best profit expected at each selectivity</span><span class="dot" style="--lc:var(--c2)">most profitable / most selective</span><span class="dot" style="--lc:var(--c3)">balanced (the knee)</span><span class="dot" style="--lc:var(--c4)">your best run (filled) and last run, measured${out.length ? ` (outside the plotted range: ${out.join("; ")})` : ""}</span></div>`;
+  const svg = c.querySelector("svg");
+  svg.addEventListener("mousemove", (ev) => {
+    const r = svg.getBoundingClientRect(), vb = svg.viewBox.baseVal;
+    const px = (ev.clientX - r.left) * vb.width / r.width, py = (ev.clientY - r.top) * vb.height / r.height;
+    let b = null, bd = 60; for (const q of pts) { const d = Math.hypot(q.x - px, q.y - py); if (d < bd) { bd = d; b = q; } }
+    if (!b) { tip.hidden = true; return; }
+    const p = b.p;
+    tip.innerHTML = `${p.label ? p.label + "<br>" : ""}selectivity ${fmt(100 * p.selectivity, 1)} %<br>profit ${fmt(p.profit, 1)} / h (${fmt(p.profit_lo, 1)}–${fmt(p.profit_hi, 1)})<br>${fmt(p.P, 1)} bar, ${fmt(p.T_C, 0)} °C, A ${fmt(p.V_A, 1)}, B ${fmt(p.V_B, 1)}, inert ${fmt(p.V_I, 1)} mL/min<br>${p.steps_away} run(s) away`;
+    tip.hidden = false;
+    tip.style.left = Math.min(ev.clientX + 14, innerWidth - tip.offsetWidth - 8) + "px"; tip.style.top = Math.max(ev.clientY - tip.offsetHeight - 12, 8) + "px";
+  });
+  svg.addEventListener("mouseleave", () => { tip.hidden = true; });
+}
+$("btn-tradeoff").addEventListener("click", async () => {
+  if (!A) { setMsg("tradeoff-msg", "Get advice first.", "err"); return; }
+  try {
+    busy(true, "Finding the best profit at every selectivity… (a few seconds)");
+    const out = await api("/api/tradeoff", {});
+    TR = { res: out.tradeoff, forA: A };
+    renderTradeoff();
+    setMsg("tradeoff-msg", `Curve ready (${out.tradeoff.seconds} s). It changes nothing unless you press Aim here.`, "ok");
+  } catch (e) { setMsg("tradeoff-msg", e.message, "err"); } finally { busy(false); }
+});
+async function aimAt(i) {
+  const p = TR.res.points[i];
+  try {
+    S = await api("/api/tradeoff/aim", { i }); A = null; TR = null;
+    renderAll();
+    setMsg("tradeoff-msg", "");
+    await advise();
+    setMsg("advice-msg", `Minimum selectivity set to ${fmt(100 * S.settings.spec.S_C, 1)} % (Product spec, on the left; clear it there to go back to the most profitable run). ${$("advice-msg").textContent}`, "ok");
+  } catch (e) { setMsg("tradeoff-msg", e.message, "err"); }
+}
+
+// ------------------------------------------------------------------ the reaction finder
+const F = { ex: null, src: "example", cands: [], upload: null, poll: null, job: null };
+function fCandRow(c, i) {
+  const row = el("div", { class: "f-cand" },
+    el("div", { class: "f-cand-head" },
+      el("input", { type: "text", value: c.name, "aria-label": `name of candidate ${i + 1}`, oninput: (ev) => { F.cands[i].name = ev.target.value; fStartOptions(); } }),
+      el("button", { type: "button", class: "row-btn", title: "remove", "aria-label": `remove candidate ${i + 1}`, onclick: () => { F.cands.splice(i, 1); fRenderCands(); } }, "✕")),
+    el("textarea", { rows: "4", spellcheck: "false", "aria-label": `reactions of candidate ${i + 1}`, oninput: (ev) => { F.cands[i].text = ev.target.value; } }));
+  row.querySelector("textarea").value = c.text;
+  return row;
+}
+function fRenderCands() {
+  const box = $("f-cands"); box.innerHTML = "";
+  F.cands.forEach((c, i) => box.append(fCandRow(c, i)));
+  if (!F.cands.length) box.append(el("p", { class: "hint" }, "No candidates yet: add one, or load the 4 examples."));
+  fStartOptions();
+}
+function fStartOptions() {
+  const sel = $("f-start"), cur = sel.value;
+  sel.innerHTML = "";
+  sel.append(el("option", { value: "" }, "no reactions (search from scratch)"));
+  F.cands.forEach((c, i) => sel.append(el("option", { value: String(i) }, `candidate '${c.name || i + 1}' (repair it)`)));
+  sel.value = [...sel.options].some((o) => o.value === cur) ? cur : "";
+}
+function fLoadExampleCands() { F.cands = F.ex.candidates.map((c) => ({ name: c.name, text: c.text })); fRenderCands(); }
+function fShowExample() {
+  const e = F.ex.examples.find((x) => x.file === $("f-example").value);
+  if (!e) return;
+  $("f-example-text").textContent = e.text + (e.mode === "discover" ? " Suggested: Find the reactions automatically." : " Suggested: Rank candidate networks.");
+  $("f-example-dl").href = "/examples/discovery/" + e.file;
+  $("f-example-dl").setAttribute("download", e.file);
+}
+document.querySelectorAll(".f-src .seg-btn").forEach((b) => b.addEventListener("click", () => {
+  F.src = b.dataset.src;
+  document.querySelectorAll(".f-src .seg-btn").forEach((x) => x.classList.toggle("active", x === b));
+  ["example", "upload", "runs"].forEach((k) => { $("f-src-" + k).hidden = k !== F.src; });
+  if (F.src === "runs" && S) $("f-runs-text").textContent = `Uses the ${S.n} run(s) in the table above, as they are now` + (S.n < 3 ? " (at least 3 are needed)." : ".") + " Few, step-limited runs from an optimisation campaign carry far less information about the reactions than a kinetic study: take the answer as a first guess.";
+}));
+$("f-example").addEventListener("change", fShowExample);
+$("f-file").addEventListener("change", async (ev) => {
+  const f = ev.target.files[0]; if (!f) return;
+  F.upload = { name: f.name, text: await f.text() };
+  $("f-file-name").textContent = `${f.name} (${F.upload.text.split(/\r?\n/).filter((l) => l.trim()).length - 1} rows)`;
+});
+$("f-add").addEventListener("click", () => { F.cands.push({ name: `candidate ${F.cands.length + 1}`, text: "" }); fRenderCands(); });
+$("f-load-ex").addEventListener("click", fLoadExampleCands);
+function fBody(mode) {
+  const b = { mode, source: F.src };
+  if (F.src === "example") b.example = $("f-example").value;
+  if (F.src === "upload") { if (!F.upload) throw new Error("choose a CSV file first"); b.text = F.upload.text; b.name = F.upload.name; }
+  if (mode === "rank") b.candidates = F.cands;
+  if (mode === "discover" && $("f-start").value !== "") b.start = F.cands[+$("f-start").value].text;
+  return b;
+}
+async function fStart(mode) {
+  try {
+    setMsg("f-msg", "");
+    const out = await api("/api/finder/start", fBody(mode));
+    fRender(out.job); fPoll();
+  } catch (e) { setMsg("f-msg", e.message, "err"); }
+}
+$("f-discover").addEventListener("click", () => fStart("discover"));
+$("f-rank").addEventListener("click", () => fStart("rank"));
+$("f-stop").addEventListener("click", async () => { try { fRender((await api("/api/finder/stop", {})).job); } catch (e) { setMsg("f-msg", e.message, "err"); } });
+function fPoll() {
+  if (F.poll) return;
+  F.poll = setInterval(async () => {
+    try {
+      const j = (await api("/api/finder/status")).job;
+      fRender(j);
+      if (!j || j.status !== "running") { clearInterval(F.poll); F.poll = null; }
+    } catch (e) { clearInterval(F.poll); F.poll = null; setMsg("f-msg", e.message, "err"); }
+  }, 1000);
+}
+function fRender(j) {
+  const prevId = F.job && F.job.id, prevStatus = F.job && F.job.status;
+  F.job = j;
+  const running = !!j && j.status === "running";
+  $("f-progress").hidden = !running;
+  ["f-discover", "f-rank"].forEach((id) => { $(id).disabled = running; });
+  if (!j) return;
+  if (running) {
+    $("f-prog-title").textContent = `${j.mode === "rank" ? "Ranking the candidates" : j.repair ? "Repairing the network" : "Searching for the reactions"} · ${j.label} (${j.n_runs} runs) · ${fmt(j.elapsed, 0)} s` + (j.stopping ? " · stopping…" : "");
+    const lg = $("f-log"); lg.innerHTML = "";
+    j.log.forEach((l) => lg.append(el("li", {}, el("span", { class: "src" }, `${fmt(l.t, 0)} s `), l.msg)));
+    return;
+  }
+  if (j.status === "done") {
+    if (prevId !== j.id || prevStatus !== "done") fResult(j);
+    setMsg("f-msg", `Done in ${fmt(j.elapsed, 0)} s (${j.label}, ${j.n_runs} runs).`, "ok");
+  } else if (j.status === "error" || j.status === "stopped") {
+    setMsg("f-msg", j.error || "stopped", j.status === "error" ? "err" : "");
+  }
+}
+function fResult(j) {
+  const R = j.result, best = R.networks[0];
+  $("f-result").hidden = false;
+  $("f-next-body").hidden = true; setMsg("f-next-msg", "");
+  const v = $("f-verdict"); v.innerHTML = "";
+  v.append(el("div", { class: "f-verdict-head" },
+    el("span", { class: "label" }, R.mode === "rank" ? "Best supported by the data" : "Reactions found"),
+    el("span", { class: "pill " + (best.fits_noise ? "yes" : "no") }, best.fits_noise ? "fits within the GC noise" : "does not fit within the GC noise"),
+    el("span", { class: "pill " + (R.decided ? "yes" : "no") }, R.decided ? "no other network comes close" : "the data cannot decide everything")));
+  if (R.mode === "rank") v.append(el("p", { class: "f-best-name" }, `'${best.name}'`));
+  const ol = el("ol", { class: "mono f-eqs" }); best.equations.forEach((l) => ol.append(el("li", {}, l.replace(/^\d+\.\s+/, "")))); v.append(ol);
+  const verdict = (best.verdict || "").replace(/\.?\s*$/, ".");
+  v.append(el("p", {}, verdict.charAt(0).toUpperCase() + verdict.slice(1) + (best.model === "inhib" ? ` ${best.model_words.charAt(0).toUpperCase()}${best.model_words.slice(1)}.` : "")));
+  R.undecided.forEach((u) => v.append(el("p", { class: "hint" }, u)));
+  const an = $("f-answer");
+  an.hidden = !R.answer; an.innerHTML = "";
+  if (R.answer) {
+    an.className = "f-answer " + (R.answer.match ? "ok" : "warn");
+    an.append(el("span", { class: "label" }, "The answer: the reactions this example file was calculated from"));
+    const ao = el("ol", { class: "mono f-eqs" }); R.answer.equations.forEach((l) => ao.append(el("li", {}, l.replace(/^\d+\.\s+/, "")))); an.append(ao);
+    an.append(el("p", {}, R.answer.match ? "✓ The finder's best network is exactly these reactions with these rate laws."
+      : "✗ The finder's best network differs from these reactions or rate laws (see the table: the data may not be able to tell them apart, or the search missed it)."));
+  }
+  const T = $("f-table");
+  T.querySelector("thead").innerHTML = "";
+  T.querySelector("thead").append(el("tr", {}, ...["#", "Network", "Reactions and rate laws", "Typical miss (× GC noise)", "BIC difference", "Evidence weight", "Verdict"].map((h, k) => el("th", { class: k < 3 || k === 6 ? "first" : "" }, h))));
+  const tb = T.querySelector("tbody"); tb.innerHTML = "";
+  R.networks.forEach((n, k) => {
+    const eqs = el("td", { class: "first mono f-eq-cell" }); n.equations.forEach((l) => eqs.append(el("div", {}, l.replace(/^\d+\.\s+/, ""))));
+    if (n.model === "inhib") eqs.append(el("div", { class: "src" }, "+ product C blocks catalyst sites"));
+    tb.append(el("tr", { class: k === 0 ? "best" : "" },
+      el("td", { class: "first num" }, String(n.rank ?? k + 1)), el("td", { class: "first" }, n.name || (k === 0 ? "best" : `runner-up ${k}`)), eqs,
+      el("td", { class: "num" }, fmt(n.x_noise, 2)), el("td", { class: "num" }, k === 0 ? "0 (best)" : (n.delta_bic > 1e4 ? n.delta_bic.toExponential(1) : fmt(n.delta_bic, 1))),
+      el("td", { class: "num" }, n.weight === undefined || n.weight === null ? "–" : `${fmt(100 * n.weight, n.weight > 0.01 ? 0 : 2)} %`),
+      el("td", { class: "first f-verdict-cell" }, (n.tied_with_best && k > 0 ? "cannot be told apart from the best. " : "") + (n.differs_by && k > 0 ? `Differs by: ${n.differs_by}. ` : "") + (n.verdict || ""))));
+  });
+  const K = $("f-k");
+  K.querySelector("thead").innerHTML = "";
+  K.querySelector("thead").append(el("tr", {}, ...["Reaction", "Rate law", "k at 300 °C", "Ea (kJ/mol)"].map((h, k) => el("th", { class: k < 2 ? "first" : "" }, h))));
+  const kb = K.querySelector("tbody"); kb.innerHTML = "";
+  best.rate_constants.forEach((r) => kb.append(el("tr", {},
+    el("td", { class: "first mono" }, r.reaction), el("td", { class: "first mono" }, r.rate_law),
+    el("td", { class: "num", title: `likely ${Number(r.k_lo).toExponential(2)} – ${Number(r.k_hi).toExponential(2)}` }, `${Number(r.k).toExponential(2)}`, el("span", { class: "src" }, ` ${r.units}`)),
+    el("td", { class: "num" }, `${fmt(r.Ea, 0)} ± ${fmt(r.Ea_sd, 0)}`))));
+  $("f-k-note").textContent = "k per gram of catalyst at the BET area of the data, at 300 °C; ± = one standard deviation of the fit; hover a k for its likely range."
+    + (best.inhibition ? ` Site blocking by C: K_C = ${Number(best.inhibition.K_C).toPrecision(3)} per bar (likely ${Number(best.inhibition.K_C_low).toPrecision(2)}–${Number(best.inhibition.K_C_high).toPrecision(2)}).` : "");
+  parityChart($("chart-f-parity"), R.parity);
+  const su = $("f-summary"); su.innerHTML = "";
+  [...R.summary].forEach((n) => su.append(el("li", {}, n)));
+  su.append(el("li", {}, `${R.n_runs} runs (${R.n_settings} different settings)` + (R.n_fits ? `; ${R.n_fits} networks fitted` : "") + (R.restarts ? `; the search started again ${R.restarts} time(s)` : "") + `; ${fmt(R.seconds, 0)} s.`));
+  $("f-path-fold").hidden = !R.path.length;
+  const pa = $("f-path"); pa.innerHTML = "";
+  R.path.forEach((p) => pa.append(el("li", {}, typeof p === "string" ? p : (p.words || p.message || JSON.stringify(p)))));
+  $("f-next").disabled = R.networks.length < 2;
+  if (R.networks.length < 2) setMsg("f-next-msg", "Needs at least two networks.");
+}
+$("f-next").addEventListener("click", async () => {
+  try {
+    setMsg("f-next-msg", "Searching the operating box… (10–30 s)");
+    $("f-next").disabled = true;
+    const nr = (await api("/api/finder/next_run", { from_last: $("f-step").checked })).next_run;
+    const b = $("f-next-body"); b.innerHTML = ""; b.hidden = false;
+    const r = nr.run;
+    const ul = el("ul", { class: "kv mono" });
+    [["Pressure", `${fmt(r.pressure_bar, 1)} bar`], ["Flow of A", `${fmt(r.flow_A_mL_min, 1)} mL/min`], ["Flow of B", `${fmt(r.flow_B_mL_min, 1)} mL/min`],
+      ["Inert flow", `${fmt(r.flow_I_mL_min, 1)} mL/min`], ["Temperature", `${fmt(r.temperature_C, 0)} °C`], ["Catalyst", `${fmt(r.catalyst_g, 2)} g`]]
+      .forEach(([k, v]) => ul.append(el("li", {}, el("span", {}, k), el("span", {}, v))));
+    b.append(ul);
+    const names = nr.networks || Object.keys(nr.predicted || {});
+    const t = el("table", { class: "runs-table f-table" });
+    const sp = Object.keys(nr.predicted[names[0]] || {});
+    t.append(el("thead", {}, el("tr", {}, el("th", { class: "first" }, "Predicted GC (mol-%)"), ...sp.map((s) => el("th", {}, s)))));
+    const tb = el("tbody");
+    names.forEach((nm) => tb.append(el("tr", {}, el("td", { class: "first" }, nm), ...sp.map((s) => el("td", { class: "num" }, fmt(nr.predicted[nm][s], 2))))));
+    tb.append(el("tr", {}, el("td", { class: "first" }, "difference (× GC noise)"), ...sp.map((s) => el("td", { class: "num" }, fmt((nr.difference_x_noise || {})[s], 1)))));
+    t.append(tb);
+    b.append(el("div", { class: "table-wrap" }, t), el("p", {}, nr.message));
+    setMsg("f-next-msg", "");
+  } catch (e) { setMsg("f-next-msg", e.message, "err"); } finally { $("f-next").disabled = false; }
+});
+async function finderInit() {
+  try {
+    F.ex = await api("/api/finder/examples");
+    const sel = $("f-example"); sel.innerHTML = "";
+    F.ex.examples.forEach((e) => sel.append(el("option", { value: e.file }, `${e.title} (${e.file})`)));
+    fShowExample(); fLoadExampleCands();
+    const j = (await api("/api/finder/status")).job;
+    if (j) { fRender(j); if (j.status === "running") fPoll(); }
+  } catch (e) { setMsg("f-msg", "The reaction finder is not available: " + e.message, "err"); }
+}
+
 // ------------------------------------------------------------------ everything
 function renderAll() {
   const sj = JSON.stringify([S.settings, S.meta.names]);
@@ -464,7 +763,7 @@ function renderAll() {
   const pj = JSON.stringify(S.meta.species);
   if (pj !== renderedSpecies) { runInputs(); closeForm(); renderedSpecies = pj; }
   $("chem-badge").textContent = S.settings.system;
-  renderRuns(); renderAdvice(); renderLearned(); renderExplore();
+  renderRuns(); renderAdvice(); renderTradeoff(); renderLearned(); renderExplore();
   const best = S.best_idx === null ? null : S.runs[S.best_idx].profit;
   $("status").textContent = S.n === 0 ? "no runs yet" : `${S.n} run${S.n > 1 ? "s" : ""} · best ${fmt(best, 1)} / h` + (A ? " · advice ready" : "");
 }
@@ -474,4 +773,5 @@ function renderAll() {
     if (S.analysis_ready) { try { A = (await api("/api/analysis")).analysis; } catch (e) { A = null; } }
     renderAll();
   } catch (e) { $("status").textContent = "cannot reach the server: " + e.message; }
+  finderInit();
 })();

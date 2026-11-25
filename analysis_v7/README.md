@@ -7,6 +7,12 @@ Scripts behind the two preliminary figures (`figures/smart_7_prelim_campaigns.pn
     python analysis_v7/plot_campaigns.py   # needs the campaign files in results/hpc_early/bench and results/smart_bench
     python analysis_v7/plot_mechanism.py   # needs examples/discovery/finder_results.json and gc_accuracy.json
 
-The campaign numbers come from an HPC run of 23 November 2026 on the v7 code before its final
-review. They will be regenerated from the final code; until then treat them as preliminary.
-Simulated reactor, placeholder kinetics and prices.
+plot_campaigns.py shows only campaign files made by the PRESENT definition of each method
+(smart.benchmark.is_stale). The HPC run of 23 November 2026 made its smart_v7* files when v7 meant
+the hybrid committee without network revision, and its nn_only files under an earlier
+recommendation rule: they are skipped (the footer counts them), so v7 and the neural network alone
+are missing from the figure until benchmark.run_all(methods=benchmark.V7_STUDY) has been run with
+the final code. The v6 ablations of that run are still valid and are shown. In the mechanism figure,
+the 'runs left out at random' rows give the mechanism the reactions the data were made from; only
+the 'hottest 6 runs' rows use reactions found from the training runs. Treat everything here as
+preliminary. Simulated reactor, placeholder kinetics and prices.

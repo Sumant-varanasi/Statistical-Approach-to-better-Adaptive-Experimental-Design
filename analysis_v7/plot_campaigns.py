@@ -1,4 +1,9 @@
-"""Preliminary v7 comparison figure from the HPC run (results/hpc_early) + the laptop cache (results/smart_bench)."""
+"""Preliminary v7 comparison figure from the laptop cache (results/smart_bench) and the HPC run (results/hpc_early).
+
+Campaign files are read only if they were made by the PRESENT definition of their method (smart.benchmark.is_stale):
+the results/hpc_early smart_v7* files were made when v7 meant the hybrid committee without network revision, and its
+nn_only files under an earlier recommendation rule, so they are skipped and counted in the footer.  A method with no
+valid file is left out of the figure.  results/smart_bench is searched first."""
 import os, sys
 sys.path.insert(0, os.getcwd())
 import numpy as np
@@ -8,14 +13,15 @@ import matplotlib.pyplot as plt
 from smart.advisor import true_optimum
 from smart import benchmark as B
 
-ROOTS = ["results/hpc_early/bench", "results/smart_bench"]
+ROOTS = ["results/smart_bench", "results/hpc_early/bench"]
+SKIPPED = set()                 # stale files met while loading
 SEEDS, BUDGET = 10, 25
 INK, INK2, MUTED, GRID, SURF = "#0b0b0b", "#52514e", "#8a8986", "#e6e5e1", "#fcfcfb"
 COL = {"nn_only": "#eb6834", "plain_bo": "#e87ba4", "chemist": "#eda100", "smart": "#2a78d6",
        "smart_v6": "#1baf7a", "smart_v7": "#008300"}
-NAME = {"nn_only": "Neural network alone", "plain_bo": "Plain BO (GP, profit only)", "chemist": "Rules of thumb (script)",
+NAME = {"nn_only": "NN alone (best run measured)", "plain_bo": "Plain BO (GP, profit only)", "chemist": "Rules of thumb (script)",
         "smart": "v5 advisor (physics + GP)", "smart_v6": "v6 advisor (physics + GP + NNs)",
-        "smart_v7": "v7 hybrid (v6 + NN alone)"}
+        "smart_v7": "v7 advisor (hybrid + revision)"}
 ORDER = ["nn_only", "plain_bo", "chemist", "smart", "smart_v6", "smart_v7"]
 SCEN = [("simple", "", "Simple reaction"), ("complex", "", "Complex reaction, model correct"),
         ("complex", "_missing_E", "Complex, C+B→E missing from the model"),
@@ -24,9 +30,13 @@ MODEL_FREE = {"nn_only", "plain_bo", "chemist"}
 
 
 def load(st, m, k):
+    """The campaign file of method m, setting st, seed k: the first one found that the present definition of m made."""
     for r in ROOTS:
         p = os.path.join(r, st, f"{m}_s{k}_b{BUDGET}.npz")
         if os.path.exists(p):
+            if B.is_stale(p, m):
+                SKIPPED.add(p)
+                continue
             return np.load(p, allow_pickle=True)
     return None
 
@@ -101,6 +111,10 @@ for i, m in enumerate(ORDER):
     ax.text(0.02, yy + rh / 2, NAME[m], fontsize=8.5, color=INK, va="center", transform=ax.transAxes)
     for j, (st, suf, _) in enumerate(SCEN):
         f, C = campaigns(st, method_name(m, suf))
+        if not C:
+            ax.text(x0 + (j + 0.5) * cw, yy + rh / 2, "no data", ha="center", va="center", fontsize=8, color=MUTED,
+                    transform=ax.transAxes)
+            continue
         t = []
         for d in C:
             r = 100 * d["rec"] / f
@@ -131,9 +145,13 @@ PARTS = [("smart_missing_E", "v5: physics + GP", "#2a78d6"),
          ("smart_v7_missing_E", "v7: v6 + neural network alone", "#008300")]
 for i, (m, lab, c) in enumerate(PARTS):
     _, C = campaigns("complex", m)
+    y = len(PARTS) - 1 - i
+    if not C:
+        ax.text(-115, y + 0.36, lab, fontsize=7.8, color=MUTED, va="center")
+        ax.text(5, y, "no data of the present definition yet", fontsize=7.5, color=MUTED, va="center")
+        continue
     E = np.array([d["cum_true"][-1] for d in C])
     q1, med, q3 = np.percentile(E, [25, 50, 75])
-    y = len(PARTS) - 1 - i
     ax.barh(y, med, height=0.42, color=c)
     ax.plot([q1, q3], [y, y], color=INK, lw=1.1)
     ax.text(-115, y + 0.36, lab, fontsize=7.8, color=INK, va="center")
@@ -156,6 +174,11 @@ y = 0
 ticks = []
 for m, title in [("smart_v7_missing_E", "C+B→E missing from the model"), ("smart_v7", "Model correct")]:
     _, C = campaigns("complex", m)
+    if not C:
+        ax.text(2.6, y + 1.5, f"{title}: no v7 campaigns of the present definition yet\n(run benchmark.run_all(methods=benchmark.V7_STUDY))",
+                fontsize=7.5, color=MUTED)
+        y += 4.2
+        continue
     E = np.array([d["committee_heldout_rmse"] for d in C])          # campaigns x updates x 4
     cols4 = list(C[0]["weight_columns"])
     for key, lab, c in MEM[::-1]:
@@ -175,9 +198,12 @@ ax.set_xlim(0, 33)
 ax.set_title("Error predicting runs it has not seen", fontsize=10, color=INK, loc="left")
 ax.set_xlabel("typical error of the predicted profit (money/h)\nheld-out runs after 20–24 runs, median of 10", fontsize=8, color=INK2)
 
-fig.text(0.01, 0.005, "PRELIMINARY: HPC run of 23 Nov on the v7 code before its final review; v5/v6 from the committed benchmark. "
-         "Simulated reactor, placeholder kinetics and prices. Curves clipped at -60 %. NN = neural network, GP = Gaussian process.",
-         fontsize=7.5, color=INK2)
+fig.text(0.01, 0.005, "PRELIMINARY. Only campaign files made by the present definition of each method are shown "
+         f"({len(SKIPPED)} older files skipped, e.g. the HPC run of 23 Nov for v7 and the neural network alone); v5/v6 from the "
+         "committed benchmark. Simulated reactor, placeholder kinetics and prices. Curves clipped at -60 %. "
+         "NN = neural network, GP = Gaussian process.", fontsize=7.5, color=INK2)
 out = "figures/smart_7_prelim_campaigns.png"
 fig.savefig(out, dpi=130, facecolor=SURF, bbox_inches="tight")
 print("->", out)
+if SKIPPED:
+    print(f"skipped {len(SKIPPED)} file(s) made by an earlier definition of their method, e.g. {sorted(SKIPPED)[0]}")

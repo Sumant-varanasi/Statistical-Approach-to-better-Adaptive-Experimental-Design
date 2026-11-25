@@ -1,4 +1,5 @@
-"""Checks for the smart advisor (smart/ and reactor_advisor.py).  Run:  python test_smart.py  (~7 min)"""
+"""Checks for the smart advisor (smart/ and reactor_advisor.py).  Run:  python test_smart.py  (~10 min; at the end it
+runs one short campaign of every method of the v7 study side by side, one process each)"""
 import os
 import copy
 import tempfile
@@ -349,6 +350,16 @@ cm2h = ResidualCommittee(seed=0, members=HYBRID_MEMBERS).fit(Xc, r_smooth, phys_
 m6, m7 = cm2.predict(Xc[:3], phys_c[:3])[2]["member_mu"], cm2h.predict(Xc[:3], phys_c[:3])[2]["member_mu"]
 check("adding the direct member leaves what the GP and the correction networks compute unchanged",
       all(np.array_equal(m6[k], m7[k]) for k in ("gp", "nn")))
+from smart.committee import _GPMember
+f22 = ResidualCommittee.folds(len(r_smooth), np.random.default_rng(0 + len(r_smooth)))
+mu_ref = np.zeros(len(r_smooth))
+for te in f22:
+    tr = np.setdiff1d(np.arange(len(r_smooth)), te)
+    mu_ref[te] = _GPMember(0, (1e-3, 1.0)).fit(Xc[tr], r_smooth[tr]).predict(Xc[te])[0]
+check(f"next to the stand-alone network the GP is held out as strictly (refitted on every fold, hyper-parameters included: "
+      f"held-out error {cm2h.heldout_rmse['gp']:.2f}); the v6 committee keeps its rule (all-run hyper-parameters: "
+      f"{cm2.heldout_rmse['gp']:.2f})",
+      abs(cm2h.heldout_rmse["gp"] - rmse(r_smooth - mu_ref)) < 1e-9 and cm2.heldout_rmse["gp"] != cm2h.heldout_rmse["gp"])
 
 # 23. the v7 advisor (hybrid committee + network revision): a short campaign, its suggestion, and the logged weights
 h7 = run_smart("complex", budget=10, seed=2, correction="hybrid", revise=True)
@@ -402,12 +413,13 @@ check("nn_only: every run within one step of the previous one, in the box, feasi
       bool(np.all(np.abs(np.diff(ph, axis=0)) <= MAX_STEP + 1e-6)) and feasible(ph).all() and len(h["rec"]) == 14
       and bool(np.all(ph >= LOW - 1e-9)) and bool(np.all(ph <= HIGH + 1e-9)) and h["strategy"] == "nn_only")
 pol = NNOnlyPolicy(step, np.zeros(DIM), np.ones(DIM), seed=1)
-check("nn_only: recommends one of the tested runs", pol.recommend(h0) in range(len(h0["X"])))
+check("nn_only: recommends the tested run with the best MEASURED profit (not its ensemble's best mean), and its campaign "
+      "file says so", pol.recommend(h0) == int(np.argmax(h0["y_obs"])) and str(h["recommend_rule"]) == "best measured run")
 new_all = ("smart_v7", "smart_v7_fixednet", "nn_only", "smart_v6_nonn", "smart_v6_nogp")
 new_stress = ("smart_v7_missing_E", "smart_v7_norevise_missing_E", "smart_v6_nonn_missing_E", "smart_v6_nogp_missing_E")
-new_cand = tuple(f"smart{v}_cand_{c}" for v in ("", "_v7") for c in ("close", "similar", "far"))
-check("benchmark: the v7 study is listed and labelled (5 methods for every setting, 4 stress tests, 6 candidate-network "
-      "campaigns), and every listed method can be run",
+new_cand = tuple(f"smart{v}_cand_{c}" for v in ("", "_v7", "_v7_fixednet") for c in ("close", "similar", "far"))
+check("benchmark: the v7 study is listed and labelled (5 methods for every setting, 4 stress tests, 9 candidate-network "
+      "campaigns: v5 and v7 with the network fixed, v7 with revision), and every listed method can be run",
       tuple(B.V7_METHODS) == new_all and tuple(B.V7_STRESS) == new_stress and tuple(B.CANDIDATE_STUDY) == new_cand
       and B.V7_STUDY == new_all + new_stress + new_cand and set(B.LABELS) == set(B.CLASSIC) | set(B.V7_STUDY)
       and all(m in B.SMART_KWARGS or m in POLICIES for m in B.LABELS) and all(isinstance(v, str) and v for v in B.LABELS.values()))
@@ -431,7 +443,24 @@ check("benchmark: v7 = hybrid committee + network revision; the two switches are
       and B.SMART_KWARGS["smart_v7_missing_E"] == dict(correction="hybrid", revise=True, model="complex_missing_E")
       and B.SMART_KWARGS["smart_v7_norevise_missing_E"] == dict(correction="hybrid", model="complex_missing_E")
       and B.SMART_KWARGS["smart_cand_far"] == dict(model="cand_far")
-      and B.SMART_KWARGS["smart_v7_cand_far"] == dict(correction="hybrid", revise=True, model="cand_far"))
+      and B.SMART_KWARGS["smart_v7_cand_far"] == dict(correction="hybrid", revise=True, model="cand_far")
+      and B.SMART_KWARGS["smart_v7_fixednet_cand_far"] == dict(correction="hybrid", model="cand_far"))
+from smart.advisor import V7_VERSION
+with tempfile.TemporaryDirectory() as tmp_b:                     # a cached file from an earlier definition of a method
+    old_v7, new_v7, mid_v7 = (os.path.join(tmp_b, f + ".npz") for f in ("old", "new", "mid"))
+    cols_ = np.array(["none", "gp", "nn", "direct"])
+    np.savez(old_v7, rec=np.zeros(3), weight_columns=cols_)                              # v7 before revision was part of it
+    np.savez(mid_v7, rec=np.zeros(3), weight_columns=cols_, network=np.array(["A -> D"] * 3))   # v7 of an earlier version
+    np.savez(new_v7, rec=np.zeros(3), weight_columns=cols_, network=np.array(["A -> D"] * 3), v7_version=V7_VERSION)
+    old_nn, new_nn = os.path.join(tmp_b, "old_nn.npz"), os.path.join(tmp_b, "new_nn.npz")
+    np.savez(old_nn, rec=np.zeros(3))
+    np.savez(new_nn, rec=np.zeros(3), recommend_rule="best measured run")
+    check("benchmark: cached files made by an earlier definition are recognised as stale (never rerun or overwritten, "
+          "skipped when loading): 'smart_v7' before network revision was part of it or of another v7 version, 'nn_only' "
+          "before its recommendation rule changed; v6-benchmark methods are never flagged",
+          B.is_stale(old_v7, "smart_v7") and B.is_stale(mid_v7, "smart_v7") and not B.is_stale(new_v7, "smart_v7")
+          and not B.is_stale(old_v7, "smart_v6") and not B.is_stale(old_v7, "smart") and B.is_stale(old_nn, "nn_only")
+          and not B.is_stale(new_nn, "nn_only") and B.required_keys("smart_v6") == set() and B.required_keys("chemist") == set())
 
 # ================================================================= v7: the advisor checks and revises its reaction network
 import io
@@ -464,7 +493,8 @@ check("revise=False (the default) never changes the network, however badly it fi
 # 26. revise=True: the same advisor repairs its network on the same 5 runs, and says what it did
 t0 = time.time()
 adv_rev = SmartAdvisor(MODELS["complex_missing_E"], seed=2, correction="hybrid", remaining=6, revise=True)
-adv_rev.update(Xs, gs, ys, hours=hs)
+msgs_rev = []
+adv_rev.update(Xs, gs, ys, hours=hs, progress=msgs_rev.append)
 rv = adv_rev.revisions
 print(f"     ({time.time() - t0:.0f} s) " + (rv[0]["words"] if rv else "no revision"))
 check("revise=True: given the network without C + B -> E, the advisor adopts a network that makes E after the screening runs",
@@ -490,6 +520,45 @@ check("the profit and the KPIs of a run come from the measured GC reading and do
 adv_rev.update(Xs, gs, ys, hours=hs)
 check("a second look at the same runs changes nothing more (the repaired network explains them)",
       len(adv_rev.revisions) == 1 and adv_rev.n_searches == 1)
+check("during the search the caller's progress callback is told what is being done (stage, message, seconds so far)",
+      len(msgs_rev) >= 3 and all(m_["stage"] == "network" and isinstance(m_["message"], str) and m_["elapsed_s"] >= 0
+                                 for m_ in msgs_rev) and any("like for like" in m_["message"] for m_ in msgs_rev))
+# an edited log: the change rested on run 3, which is now removed; the advisor goes back to the network it was given
+net_rev = adv_rev.network()
+adv_rev.update(Xs[[0, 1, 3, 4]], gs[[0, 1, 3, 4]], ys[[0, 1, 3, 4]], hours=hs[[0, 1, 3, 4]])
+check("when a run that a change of the network rested on is edited or removed, the change is taken back (the network "
+      "follows from the runs as they are now) and the record says so",
+      adv_rev.S is adv_rev.S_start and adv_rev.revisions == [] and len(adv_rev.revisions_undone) == 1
+      and adv_rev.revision_log[-1]["outcome"] == "taken back" and "was edited" in adv_rev.revision_log[-1]["words"]
+      and adv_rev.network() == ["A + B <=> C", "A -> D"] and len(net_rev) == 3)
+# one wrong GC entry (E of run 3 typed as 0) must not make the advisor rewrite a right network
+gz = gs.copy()
+gz[2, 4] = 0.0
+gz[2] /= gz[2].sum()
+adv_bad = SmartAdvisor(COMPLEX, seed=2, residual_gp=False, revise=True)
+adv_bad.update(Xs, gz, ys, hours=hs)
+bad_ = adv_bad.misfit["bad_run"]
+print("     one wrong reading: " + adv_bad.misfit["words"])
+check("one wrong GC reading: the advisor does not search or change its reactions; it names the run and the reading to "
+      "check (the network fitted without that run explains the others)",
+      adv_bad.n_searches == 0 and adv_bad.revisions == [] and adv_bad.S is COMPLEX and bad_ is not None
+      and bad_["run"] == 3 and bad_["species"] == "E" and "check run 3's GC printout" in adv_bad.misfit["words"]
+      and adv_bad.revision_log[-1]["outcome"] == "held")
+adv_bad.update(Xs, gs, ys, hours=hs)
+check("... and once the reading is corrected the same advisor finds the network explains every run",
+      adv_bad.misfit["within_allowance"] and adv_bad.misfit["bad_run"] is None and adv_bad.n_searches == 0)
+# a time limit for a web page that waits: here none at all is left, so no search is made and the record says so
+adv_t = SmartAdvisor(MODELS["complex_missing_E"], seed=2, residual_gp=False, revise=True, revise_seconds=0.0)
+adv_t.update(Xs, gs, ys, hours=hs)
+check("revise_seconds: when the time is up the advisor keeps the network it has, says so, and searches at the next update",
+      adv_t.n_searches == 0 and adv_t.S is adv_t.S_start and adv_t.revision_log[-1]["outcome"] == "time limit"
+      and "time limit" in adv_t.revision_log[-1]["words"] and adv_t._searched_on is None)
+try:
+    SmartAdvisor(COMPLEX, revise=True, library=["A + B -> C", "C + B -> X"])
+    refused = False
+except D.ReactionError as e:
+    refused = "Unknown species 'X'" in str(e)
+check("a typing error in the library is reported when the advisor is built, not at its first search", refused)
 # hysteresis and the cap on searches, with the thresholds made impossible to reach
 adv_cap = SmartAdvisor(MODELS["complex_missing_E"], seed=2, residual_gp=False, revise=True)
 adv_cap.REVISE_GAIN = 1e12                                    # no evidence is ever enough: every search ends without a change
@@ -499,6 +568,34 @@ adv_cap.update(Xs, gs, ys, hours=hs)
 check("after a search that changed nothing the advisor waits 3 runs before it searches again (a campaign stays fast)",
       first == (1, True, 5 + adv_cap.REVISE_WAIT, "kept") and adv_cap.n_searches == 1 and adv_cap.S is adv_cap.S_start
       and "no single change of the network is clearly better" in adv_cap.revision_log[-1]["words"])
+# the simple reaction (its GC has 5 columns, no E): the benchmark runs v7 on it too
+_, _, hs5, _ = start_campaign("simple", 1)
+Xq, gq, yq, hq = (np.array(hs5[k]) for k in ("X", "gc", "y_obs", "hours"))
+adv_s1 = SmartAdvisor(SIMPLE, seed=1, revise=True, remaining=6)
+adv_s1.update(Xq, gq, yq, hours=hq)
+adv_s2 = SmartAdvisor(D.build_system("A -> D", base=SIMPLE, name="only D"), seed=1, revise=True, remaining=6)
+adv_s2.update(Xq, gq, yq, hours=hq)
+xs2, info_s2 = adv_s2.suggest(Xq[-1])
+print("     simple reaction, given only A -> D: " + (adv_s2.revisions[0]["words"] if adv_s2.revisions else "no revision"))
+check("simple reaction (5 GC columns): the right network is kept; a network that makes no C gets A + B -> C (or its "
+      "two-way form) after the screening runs, and the advisor then plans within one step",
+      adv_s1.revisions == [] and adv_s1.n_searches == 0 and adv_s1.misfit["within_allowance"]
+      and len(adv_s2.revisions) == 1 and "could not explain C" in adv_s2.revisions[0]["words"]
+      and {r.entry_key() for r in D.parse_network(adv_s2.S)} == {r.entry_key() for r in D.parse_network(SIMPLE)}
+      and adv_s2.S.species == SIMPLE.species and bool(np.all(np.abs(unscale(xs2) - unscale(Xq[-1])) <= MAX_STEP + 1e-6))
+      and feasible(unscale(xs2))[0])
+ms1 = adv_s1.misfit
+# (the kinetic fit integrates each run together with its perturbed copies, the check integrates it alone, so the two
+# chi-squares agree to about 1e-6, not exactly; counting the empty E column would put them 25 % apart at 5 runs)
+c_chk = ms1["chi2_allow"] / (ms1["n_data"] - len(adv_s1.kin.theta))
+check(f"simple reaction: the network check leaves out the E column the simple system cannot have (4 GC species per run; "
+      f"chi-square per degree of freedom with the fit's weights {c_chk:.5f}, the kinetic fit's own {adv_s1.kin.chi2_dof:.5f})",
+      set(ms1["miss"]) == {"A", "B", "C", "D"} and ms1["n_data"] == 4 * len(Xq)
+      and abs(c_chk - adv_s1.kin.chi2_dof) < 1e-3 * adv_s1.kin.chi2_dof)
+Sb_ = adv_s1._build(["A + B -> C", "D -> A"])
+check("a revised network keeps the heats of reaction of the network the advisor was given for the reactions it shares "
+      "with it (a reaction written the other way round changes sign), so the adiabatic rise does not jump with a revision",
+      np.array_equal(adv_s1._build(["A + B -> C", "A -> D"]).dH, SIMPLE.dH) and Sb_.dH[0] == SIMPLE.dH[0] and Sb_.dH[1] == -SIMPLE.dH[1])
 
 # 27. the advisor can be given any network: a ReactionSystem object, or one of the candidate networks by name
 t0 = time.time()
@@ -582,7 +679,9 @@ while todo or running:                                           # at most (core
     while todo and len(running) < max(2, (os.cpu_count() or 4) - 2):
         m = todo.pop(0)
         running.append((m, subprocess.Popen([sys.executable, "-c", CHILD, m], cwd=HERE, stdout=subprocess.PIPE,
-                                            stderr=subprocess.PIPE, text=True)))
+                                            stderr=subprocess.PIPE, text=True,
+                                            env=dict(os.environ, OMP_NUM_THREADS="1", OPENBLAS_NUM_THREADS="1",
+                                                     MKL_NUM_THREADS="1"))))
     m, proc = running.pop(0)
     so, se = proc.communicate()
     line = [ln for ln in so.splitlines() if ln.startswith("RESULT ")]
@@ -599,6 +698,7 @@ check("the campaigns are labelled by what was switched on (" + ", ".join(f"{m}: 
       named["smart_v7"] == "smart_v7" and named["smart_v7_fixednet"] == "smart_v7_fixednet"
       and named["smart_v7_missing_E"] == "smart_v7_complex_missing_E" and named["smart_v7_norevise_missing_E"] == "smart_v7_fixednet_complex_missing_E"
       and named["smart_cand_far"] == "smart_cand_far" and named["smart_v7_cand_far"] == "smart_v7_cand_far"
+      and named["smart_v7_fixednet_cand_far"] == "smart_v7_fixednet_cand_far"
       and named["smart_v6_nonn"] == "smart_v6" and named["nn_only"] == "nn_only")
 net_keys = {"network", "network_start", "network_final", "network_fit", "n_revisions", "n_searches", "revision_runs", "revision_words", "revisions_json"}
 w_keys = {"committee_weights", "weight_columns", "committee_members", "committee_weights_final", "committee_heldout_rmse"}
@@ -625,7 +725,8 @@ check("campaign: v7 given the right network does not change it",
 check("campaign: with the revision switched off the network never changes (v7 without revision, v5 with a candidate network)",
       all(short[m]["n_revisions"] == 0 and short[m]["n_searches"] == 0 and len(set(short[m]["network"])) == 1
           and short[m]["network_final"] == short[m]["network_start"]
-          for m in ("smart_v7_fixednet", "smart_v7_norevise_missing_E", "smart_cand_close", "smart_cand_similar", "smart_cand_far"))
+          for m in ("smart_v7_fixednet", "smart_v7_norevise_missing_E", "smart_cand_close", "smart_cand_similar", "smart_cand_far",
+                    "smart_v7_fixednet_cand_close", "smart_v7_fixednet_cand_similar", "smart_v7_fixednet_cand_far"))
       and short["smart_v7_norevise_missing_E"]["network_start"] == "A + B <=> C\nA -> D")
 for c in ("close", "similar", "far"):
     r = short[f"smart_v7_cand_{c}"]

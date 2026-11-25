@@ -52,6 +52,7 @@ v7 adds two things, both off by default (so v5 and v6 are reproduced unchanged):
     change one reaction order) and adopts it only on strong evidence.  Every change is written
     down in plain words (SmartAdvisor.revisions).  See SmartAdvisor._revise.
 """
+import hashlib
 import json
 import os
 import time
@@ -60,7 +61,7 @@ from scipy.stats import qmc
 from scipy.optimize import differential_evolution, minimize
 from .systems import (SYSTEMS, MODELS, LOW, HIGH, MAX_STEP, MIN_TOTAL_FLOW, WCAT, A_SPEC, DIM, R, T_REF,
                       unscale, scale, physical, feasible, step_scaled, base_case, screening_runs)
-from .kinetics import KineticFit, GC_NOISE_REL, GC_NOISE_ABS, HOURS_PER_RUN
+from .kinetics import KineticFit, GC_NOISE_REL, GC_NOISE_ABS, HOURS_PER_RUN, PRIOR_E, GC_REL, GC_ABS
 from .committee import ResidualCommittee, ProfitEnsemble, MEMBERS, HYBRID_MEMBERS, ALL_MEMBERS
 from . import discovery as D
 from bo.gp import GP
@@ -207,6 +208,10 @@ def keep_feasible(C):
 
 # =================================================================================== the advisor
 COMMITTEES = {"committee": MEMBERS, "hybrid": HYBRID_MEMBERS}     # correction -> its default committee members
+# saved with every campaign of the hybrid committee or of network revision (run_smart); benchmark.is_stale
+# treats a cached file with another value as made by an earlier definition.  Change it whenever v7 changes.
+V7_VERSION = "v7 of 2026-11-25 (GP refitted per fold next to the stand-alone network; revision screened with site " \
+             "blocking, held on one bad run, never repeated on the same runs)"
 SPEC_KEYS = {"S_C": ("min", "selectivity"), "X_A": ("min", "conversion"), "dT_ad": ("max", "adiabatic temperature rise")}
 
 
@@ -219,8 +224,11 @@ def _what_was_wrong(m):
     if m["beyond"]:
         return ("the model missed " + ", ".join(f"{x} by {m['miss'][x]['x_noise']:.1f}" for x in m["beyond"])
                 + " times the GC noise, more than the allowance for model error")
-    return ("the model's misses were larger than the GC noise plus the allowance for model error "
-            f"({m['x_noise']:.1f} times the GC noise overall)")
+    if not m["within_allowance"]:
+        return ("the model's misses were larger than the GC noise plus the allowance for model error "
+                f"({m['x_noise']:.1f} times the GC noise overall)")
+    return ("the model missed " + ", ".join(f"{x} by {m['miss'][x]['x_noise']:.1f}" for x in m["unexplained"])
+            + " times the GC noise, within the allowance for model error but more than twice the GC noise")
 
 
 class SmartAdvisor:
@@ -256,9 +264,19 @@ class SmartAdvisor:
                   True (v7): after every update the advisor checks whether its network explains
                   the GC readings and, when it does not, may change it one step at a time (see
                   _revise).  adv.S is then the network in use, adv.S_start the one it was given,
-                  adv.revisions the changes made (plain words), adv.misfit the last check.
+                  adv.revisions the changes made (plain words), adv.misfit the last check (with
+                  'bad_run' when the misfit is down to one reading to be checked), adv.revision_log
+                  every search or decision (outcome 'revised', 'kept', 'held' for a reading to check,
+                  'time limit', 'taken back' after an edited log), adv.revisions_undone the changes
+                  taken back because the runs they rested on were edited.
     library       reactions the revision may use: None = discovery.reaction_library() (every
-                  atom-balanced reaction among the species), or a list of reaction texts
+                  atom-balanced reaction among the species), or a list of reaction texts (read
+                  when the advisor is built, so a typing error shows at once)
+    revise_seconds  with revise=True: about how long the check-and-repair of the network may take
+                  in one update (None = no limit, as in the benchmark).  It is checked between the
+                  steps of a search and also limits the fresh search; one screening batch (5 to 30 s)
+                  can run past it.  When it is hit the advisor keeps the network it has, says so, and
+                  searches again at the next update.  For a web page that waits for the answer.
     """
     # ---- network revision (only used with revise=True)
     REVISE_MIN_RUNS = 5        # no revision before the 5 screening runs are in
@@ -276,13 +294,13 @@ class SmartAdvisor:
     def __init__(self, system, wcat=WCAT, a_spec=A_SPEC, seed=0, n_theta=6, lo=None, hi=None,
                  fixed=None, max_step=None, residual_gp=True, spec=None, planner="horizon", horizon=4,
                  remaining=10, calibrate=True, models=None, correction="gp", members=None, revise=False,
-                 library=None):
+                 library=None, revise_seconds=None):
         if correction not in (None, "gp") + tuple(COMMITTEES):
             raise ValueError(f"correction must be 'gp', 'committee' or 'hybrid', got {correction!r}")
         if members is not None and correction not in COMMITTEES:
             raise ValueError(f"members only applies to correction='committee' or 'hybrid' (got correction={correction!r}); "
                              "it would be ignored")
-        self.S =SYSTEMS[system] if isinstance(system, str) else system
+        self.S = SYSTEMS[system] if isinstance(system, str) else system
         self.wcat, self.a_spec = float(wcat), float(a_spec)
         self.kin = KineticFit(self.S, a_spec=self.a_spec, seed=seed, **({} if models is None else dict(models=models)))
         self.n_theta = n_theta
@@ -316,13 +334,21 @@ class SmartAdvisor:
         self.revision_log = []                  # every search, also those that changed nothing
         self.misfit = None                      # the last check: how well the network explains the GC (discovery.misfit)
         self.n_searches, self.n_fresh, self._next_search, self._left, self._lib = 0, 0, 0, {}, None
+        self.revise_seconds = None if revise_seconds is None else float(revise_seconds)
+        self.revisions_undone = []              # changes taken back because the runs they were based on were edited
+        self.progress = None                    # optional callback during a search (update(progress=...))
+        self._searched_on, self._basis, self._t_rev, self._timed_out = None, None, None, False
+        if self.revise:
+            self._library()                     # read the library now: a typing error in it shows when the advisor is built
 
     # ------------------------------------------------------------------ learning
-    def update(self, X, gc, profit, wcat_rows=None, hours=None):
+    def update(self, X, gc, profit, wcat_rows=None, hours=None, progress=None):
         """wcat_rows: catalyst mass of each logged run (defaults to the campaign's wcat);
         hours: duration of each run (time-on-stream clock; default 24 h each).
         With revise=True the reaction network may change here (see _revise); the kinetics, the
-        plausible chemistries and the correction below are then those of the new network."""
+        plausible chemistries and the correction below are then those of the new network.
+        progress: optional callback, called during a search for another network with a dict
+        {stage, message, elapsed_s} (revise=True only; a search can take a minute)."""
         self.X = np.atleast_2d(np.asarray(X, float))
         self.gc = np.atleast_2d(gc)
         self.y = np.asarray(profit, float)
@@ -331,6 +357,9 @@ class SmartAdvisor:
         self.W = np.broadcast_to(np.asarray(self.wcat if wcat_rows is None else wcat_rows, float), (n,)).copy()
         self.hours = np.full(n, HOURS_PER_RUN) if hours is None else np.asarray(hours, float)
         ph6 = physical(self.X, self.W)
+        if self.revise:
+            self.progress = progress
+            self._replay_if_edited()
         n_starts = None if self.kin.n_fits == 0 else (3 if n % 5 == 0 else 1)
         self.kin.fit(ph6, self.gc, hours=self.hours, n_starts=n_starts)
         if self.revise:
@@ -380,6 +409,7 @@ class SmartAdvisor:
         ph6 = physical(self.X, self.W) if ph6 is None else ph6
         yp = self.kin.predict_gc(ph6, t=self.kin.t_rows)
         m = D.misfit(self.S, D.make_data(ph6, self.gc, self.hours, self.a_spec), yp, len(self.kin.theta))
+        m["bad_run"] = None                     # filled in by _revise when the misfit is down to one run (_bad_run)
         m["words"] = ("the reaction network explains the GC readings within the GC noise "
                       f"(typical miss {m['x_noise']:.1f} times the noise)" if m["fits"] else
                       "the reaction network explains the GC readings within the GC noise plus the allowance for what "
@@ -389,11 +419,19 @@ class SmartAdvisor:
 
     def _ladder(self, S, ph6, warm):
         """The kinetic fit of network S to the runs so far, with the same model classes the
-        advisor itself uses, started from fitted plain kinetics `warm`.  None if it failed."""
-        kf = KineticFit(S, a_spec=self.a_spec, seed=self.seed, models=self.kin.models)
-        kf._warm = {"plain": np.asarray(warm, float)[:2 * S.nr]}
-        kf.fit(ph6, self.gc, hours=self.hours, n_starts=2)
-        return kf if kf.n_fits else None
+        advisor itself uses.  Two fits: one started from fitted plain kinetics `warm` (+ one
+        random start), one from the chemist's starting guess of S; the one with the better
+        evidence (_evidence) is kept.  The second guards against constants that were fitted to a
+        wrong network and are bent to make up for what it lacks.  None if both failed."""
+        best = None
+        for w in (warm, None):
+            kf = KineticFit(S, a_spec=self.a_spec, seed=self.seed, models=self.kin.models)
+            if w is not None:
+                kf._warm = {"plain": np.asarray(w, float)[:2 * S.nr]}
+            kf.fit(ph6, self.gc, hours=self.hours, n_starts=2 if w is not None else 1)
+            if kf.n_fits and (best is None or self._evidence(kf) < self._evidence(best)):
+                best = kf
+        return best
 
     def _evidence(self, kf):
         """BIC of a kinetic fit of the runs so far, counted with the fit's own weights (GC noise
@@ -409,17 +447,30 @@ class SmartAdvisor:
 
         The check (after every update, cheap): the misses of the advisor's own kinetic fit
         (explains).  The network is left alone while every product the GC sees is made by some
-        reaction and the misses stay within the GC noise plus the allowance for model error that
-        the kinetic fit itself uses (2 % of the reading + 0.2 mol-%).  A right network on an
-        imperfect model (an adsorption term it lacks, a catalyst that ages) stays within that
-        allowance; a missing or wrong reaction does not.
-        When the network fails that check, and a search is due, discovery.one_step_revision
+        reaction, the misses stay within the GC noise plus the allowance for model error that
+        the kinetic fit itself uses (2 % of the reading + 0.2 mol-%), and no species is missed by
+        more than twice the GC noise (what discovery calls 'cannot explain').  A right network on
+        an imperfect model (an adsorption term it lacks, a catalyst that ages) normally passes.
+        A reaction the network lacks, or a misfit larger than the allowance, does not; but a
+        superfluous or slightly wrong reaction can pass (there is no step that removes a reaction
+        while the network passes the check: see the open issues).
+        One bad reading is not a reason to change the chemistry: when the misfit sits in ONE run
+        and the other runs are explained within the allowance (a typing error, a bad GC injection
+        look like that), the advisor asks for that reading to be checked and does not search
+        (explains() says which run and which reading).
+        When the network fails the check, and a search is due, discovery.one_step_revision
         tries every single change of it (add / remove / replace a reaction from the enumerated
-        library, or change one reaction order) on the campaign's own runs.  The best few are
+        library, or change one reaction order) on the campaign's own runs, with plain rate laws
+        and, when the advisor's own fit found product C blocking catalyst sites, also with site
+        blocking at that strength (so that a change that only imitates the site blocking cannot
+        push the right one out).  The best few are
         then compared with the network as it stands LIKE FOR LIKE: the same runs, the same
         kinetic model classes (kinetics.KineticFit), the same measure (_evidence: BIC counted
-        with the weights of the kinetic fit).  A change is adopted only when it lowers that BIC
-        by REVISE_GAIN (10: very strong evidence) or more.  Then the kinetics of the new network
+        with the weights of the kinetic fit), each fitted both from the constants fitted so far and
+        from the starting guess (constants fitted to a wrong network are bent to make up for what
+        it lacks, and from them the right network can stop at a poor fit: seen in a replay of a
+        logged campaign, 8 times the GC noise against 0.6).  A change is adopted only when it
+        lowers that BIC by REVISE_GAIN (10: very strong evidence) or more.  Then the kinetics of the new network
         replace the old ones, and update() goes on to refit the plausible chemistries and the
         correction with them.  Up to REVISE_STEPS changes are made in one update, each on the
         same evidence rule, so a badly wrong network is repaired in a few steps.
@@ -431,22 +482,165 @@ class SmartAdvisor:
         So that the advisor does not flip back and forth: going back to a network it has already
         left needs twice the evidence (REVISE_RETURN).  So that a campaign stays fast: after a
         search that changed nothing the advisor waits REVISE_WAIT runs before it searches again,
-        and it never searches more than REVISE_MAX_SEARCHES times.
+        and it never searches more than REVISE_MAX_SEARCHES times.  The same runs are never
+        searched twice: asking again (update with the same log) gives the same network.  When
+        rows of the log that a change was based on are edited or removed, the changes are taken
+        back and the check starts again from the network the advisor was given
+        (_replay_if_edited), so the network follows from the runs as they are now.
+        revise_seconds (optional) limits the time spent here in one update.
         The profit and the KPIs of the runs are computed from the measured GC readings and do not
-        depend on the network; only the advisor's predictions do."""
+        depend on the network (the adiabatic rise read off the GC uses the network the advisor
+        was given); only the advisor's predictions do."""
         if not self.kin.scores or self.n < self.REVISE_MIN_RUNS:
             return
+        self._t_rev, self._timed_out = time.time(), False
         self.misfit = m = self.explains(ph6)
-        steps = 0
-        while (not m["within_allowance"] and self.n >= self._next_search and steps < self.REVISE_STEPS
-               and self.n_searches < self.REVISE_MAX_SEARCHES):
+        fp = self._fingerprint()
+        if fp == self._searched_on:                 # these very runs have been searched already: same answer
+            return
+        bad = self._bad_run(ph6, m) if self._needs_search(m) else None
+        if bad is not None:
+            m["bad_run"] = bad
+            m["words"] = (f"the reaction network explains every run except run {bad['run']} within the GC noise plus the "
+                          f"allowance for what any textbook model leaves out; in run {bad['run']} the {bad['species']} reading "
+                          f"({bad['measured_mol_pct']:.2f} mol-%) is far from what the reactions fitted to the other runs predict "
+                          f"({bad['predicted_mol_pct']:.2f} mol-%): check run {bad['run']}'s GC printout (a typing error, a bad "
+                          "injection) before trusting it")
+            self.revision_log.append(dict(run=int(self.n), network=self.network(), miss_x_noise=m["x_noise"],
+                                          verdict=m["verdict"], outcome="held", seconds=time.time() - self._t_rev, words=(
+                f"After run {self.n}: {m['words']}. The advisor does not change its reactions because of one reading; if the "
+                "reading is right, the next runs near those settings will show the same and it will search then.")))
+            return
+        steps, searched = 0, False
+        while (self._needs_search(m) and self.n >= self._next_search and steps < self.REVISE_STEPS
+               and self.n_searches < self.REVISE_MAX_SEARCHES and not self._out_of_time()):
+            searched = True
             if not self._revise_once(ph6, m):
+                if self._timed_out:
+                    break
                 # no single change helps: a dead end, or simply not enough evidence yet (see _start_again)
                 if self.misfit["within_allowance"] or not self._start_again(ph6, self.misfit):
-                    self._next_search = self.n + self.REVISE_WAIT
+                    if not self._timed_out:
+                        self._next_search = self.n + self.REVISE_WAIT
                     break
             steps += 1
             self.misfit = m = self.explains(ph6)
+        if self._timed_out or (self._out_of_time() and self._needs_search(m) and self.n >= self._next_search
+                               and steps < self.REVISE_STEPS and self.n_searches < self.REVISE_MAX_SEARCHES):
+            self._timed_out = True
+            self.revision_log.append(dict(run=int(self.n), network=self.network(), miss_x_noise=m["x_noise"],
+                                          verdict=m["verdict"], outcome="time limit", seconds=time.time() - self._t_rev, words=(
+                f"After run {self.n}: the search for a better reaction network was stopped by the time limit "
+                f"({self.revise_seconds:g} s); the advice uses the network as it stands and the search goes on at the "
+                "next update.")))
+        elif searched:
+            self._searched_on = fp
+
+    REVISE_ON_UNEXPLAINED = True   # also search when a species is missed by more than twice the GC noise (within the allowance)
+
+    def _needs_search(self, m):
+        """Does the network fail the check (see _revise)?"""
+        return bool(not m["within_allowance"] or (self.REVISE_ON_UNEXPLAINED and m["unexplained"]))
+
+    def _bad_run(self, ph6, m):
+        """Is a failed check down to ONE run, as a typing error or a bad GC injection would be?
+        Asked only when every product the GC sees is made and one run carries most of the misfit
+        (discovery.misfit: one_run).  The network is then fitted again WITHOUT that run (one kinetic
+        fit; the run's hours stay on the clock so the later runs keep their time on stream).  It is
+        a bad run when the other runs are then explained within the allowance and that run is not.
+        A wrong or missing reaction does not pass this: the other runs still show it (checked on the
+        screening runs of three campaigns: the two wrong candidate networks tried never passed, a
+        reading set to zero always did).  Returns {run (from 1), species, measured_mol_pct,
+        predicted_mol_pct, x_allow} for the reading missed most, or None."""
+        if m["not_made"] or not m.get("one_run"):
+            return None
+        k = int(m["worst_run"]) - 1
+        keep = np.arange(self.n) != k
+        hk = self.hours.copy()
+        if k > 0:
+            hk[k - 1] += hk[k]
+        kf = KineticFit(self.S, a_spec=self.a_spec, seed=self.seed, models=self.kin.models)
+        kf.fit(ph6[keep], self.gc[keep], hours=hk[keep])
+        if not kf.n_fits:
+            return None
+        rest = D.misfit(self.S, D.make_data(ph6[keep], self.gc[keep], hk[keep], self.a_spec),
+                        kf.predict_gc(ph6[keep], t=kf.t_rows), len(kf.theta))
+        g = np.asarray(self.gc[k], float)
+        yk = kf.predict_gc(ph6[k:k + 1], t=KineticFit.time_on_stream(self.hours)[k:k + 1])[0]
+        za = ((yk - g) / (GC_REL * g + GC_ABS))[:-1]
+        x_allow = float(np.sqrt(np.mean(za ** 2)))
+        if not rest["within_allowance"] or x_allow <= 1.0:
+            return None
+        i = int(np.argmax(np.abs(za)))
+        return dict(run=k + 1, species=self.S.species[i], measured_mol_pct=float(100 * g[i]),
+                    predicted_mol_pct=float(100 * yk[i]), x_allow=x_allow)
+
+    def _out_of_time(self):
+        return self.revise_seconds is not None and self._t_rev is not None and time.time() - self._t_rev > self.revise_seconds
+
+    def _say(self, message):
+        """Tell the caller's progress callback (update(progress=...)) what the search is doing."""
+        if self.progress:
+            self.progress(dict(stage="network", message=message,
+                               elapsed_s=0.0 if self._t_rev is None else time.time() - self._t_rev))
+
+    def _fingerprint(self):
+        """A short digest of the log (settings, GC readings, hours, catalyst mass)."""
+        h = hashlib.sha1()
+        for a in (self.X, self.gc, self.hours, self.W):
+            h.update(np.ascontiguousarray(np.asarray(a, float)).tobytes())
+        return (int(self.n), h.hexdigest())
+
+    def _replay_if_edited(self):
+        """The network must follow from the runs as they are NOW.  If a row of the log that a change
+        of the network was based on has been edited or removed since (a corrected GC reading, a
+        deleted run), every change is taken back: the advisor returns to the network it was given,
+        with a fresh kinetic fit, and the check (and, if needed, the search) starts again from
+        there.  The changes taken back are kept in revisions_undone."""
+        if self._basis is None:
+            return
+        Xb, gb, hb = self._basis
+        m = len(Xb)
+        if (len(self.X) >= m and np.array_equal(self.X[:m], Xb) and np.array_equal(np.asarray(self.gc[:m], float), gb)
+                and np.array_equal(self.hours[:m], hb)):
+            return
+        many = len(self.revisions) > 1
+        self.revision_log.append(dict(run=int(self.n), network=self.network(), outcome="taken back", seconds=0.0, words=(
+            f"The log was edited: a run that the change{'s' if many else ''} of the reaction network "
+            f"({'; '.join(r['change'] for r in self.revisions)}) {'were' if many else 'was'} based on has been changed or "
+            f"removed. The advisor goes back to the network it was given ({'; '.join(D.network_text(self.S_start))}) and "
+            "checks it against the runs as they are now.")))
+        self.revisions_undone += self.revisions
+        self.revisions = []
+        self.S = self.S_start
+        self.kin = KineticFit(self.S_start, a_spec=self.a_spec, seed=self.seed, models=self.kin.models)
+        self._basis, self._left, self._next_search, self._searched_on, self.misfit = None, {}, 0, None, None
+
+    def _site_blocking(self, ph6):
+        """K_C (1/bar) at the temperature of every run from the advisor's own kinetic fit, or None
+        when the data did not support product C blocking catalyst sites."""
+        parts = self.kin.split(self.kin.theta)
+        if "lnK" not in parts:
+            return None
+        e = parts["e"][0] if "e" in parts else PRIOR_E
+        return np.exp(parts["lnK"][0] + e * (T_REF / ph6[:, 4] - 1.0))
+
+    def _build(self, reactions):
+        """A revised network as a reactor model.  Species, prices and product come from the network
+        the advisor was given; so do the heats of reaction (and, for a two-way reaction, its
+        equilibrium) of every reaction it shares with it, so that a change does not alter what is
+        known about the reactions that stay.  New reactions take theirs from discovery.SPECIES_TABLE."""
+        S_new = D.build_system(reactions, base=self.S_start, name=f"{self.S_start.name} (revised)")
+        old = {r.entry_key(): (j, r) for j, r in enumerate(D.parse_network(self.S_start))}
+        for j, r in enumerate(S_new.reactions):
+            if r.entry_key() not in old:
+                continue
+            k, q = old[r.entry_key()]
+            sign = 1.0 if r.direction_key() == q.direction_key() else -1.0    # the same reaction written the other way round
+            S_new.dH[j] = sign * self.S_start.dH[k]
+            if r.reversible and self.S_start.thermo[k] is not None:
+                S_new.thermo[j] = tuple(sign * v for v in self.S_start.thermo[k])
+        return S_new
 
     def _library(self):
         """The reactions the revision may use: the library, limited to this system's species."""
@@ -460,28 +654,34 @@ class SmartAdvisor:
         t0 = time.time()
         data = D.make_data(ph6, self.gc, self.hours, self.a_spec)
         net = D.parse_network(self.S)
+        self._say(f"after run {self.n}: trying every single change of the reaction network")
         res = D.one_step_revision(net, data, library=self._library(), theta=self.kin.theta_kin,
-                                  max_reactions=self.MAX_REACTIONS)
+                                  max_reactions=self.MAX_REACTIONS, inhib=self._site_blocking(ph6))
         self.n_searches += 1
         log = dict(run=int(self.n), network=D.network_text(net), miss_x_noise=m["x_noise"], verdict=m["verdict"],
                    n_tried=res["n_tried"])
         # ---- the network as it stands, fitted once more from the search's own optimum: a change must
         # beat the BEST fit of the present network, not a fit that happens to be stuck
         bic0 = self._evidence(self.kin)
-        kf0 = self._ladder(self.S, ph6, res["current"]["theta"]) if net else None
+        self._say(f"after run {self.n}: {res['n_tried']} single changes screened; fitting the present network once more")
+        kf0 = self._ladder(self.S, ph6, res["current"]["theta"]) if net and not self._out_of_time() else None
         if kf0 is not None and self._evidence(kf0) < bic0 - 1.0:
             self.kin, bic0 = kf0, self._evidence(kf0)               # a better fit of the SAME network: use it
             self.misfit = m = self.explains(ph6)
             log.update(refit=True, miss_x_noise=m["x_noise"], verdict=m["verdict"])
-            if m["within_allowance"]:
+            if not self._needs_search(m):
                 self.revision_log.append(dict(log, outcome="kept", seconds=time.time() - t0, words=(
                     f"After run {self.n}: a better fit of the same reactions was found; with it, {m['words']}. "
                     "The reaction network is unchanged.")))
                 return False
         # ---- the best single changes, each fitted with the advisor's own kinetic model classes
-        cands = []
-        for mv in res["moves"][:self.REVISE_TOP]:
-            S_new = D.build_system(mv["reactions"], base=self.S_start, name=f"{self.S_start.name} (revised)")
+        cands, top = [], res["moves"][:self.REVISE_TOP]
+        for i, mv in enumerate(top):
+            if self._out_of_time():
+                self._timed_out = i < len(top)
+                break
+            self._say(f"after run {self.n}: comparing the best changes like for like ({i + 1} of {len(top)}: {mv['what']})")
+            S_new = self._build(mv["reactions"])
             kf = self._ladder(S_new, ph6, mv["fit"]["theta"])
             if kf is not None:
                 cands.append((self._evidence(kf), mv, S_new, kf))
@@ -491,10 +691,13 @@ class SmartAdvisor:
             key1 = D.network_key(D.parse_network(S_new))
             need = self.REVISE_RETURN if key1 in self._left else self.REVISE_GAIN
             log.update(best_change=mv["what"], gain=float(bic0 - bic1), needed=need)
+        if (not cands or bic0 - bic1 < need) and self._timed_out:
+            return False                                            # not every change was compared: _revise says so
         if not cands or bic0 - bic1 < need:
             self.revision_log.append(dict(log, outcome="kept", seconds=time.time() - t0, words=(
                 f"After run {self.n}: {m['words']}, but no single change of the network is clearly better"
-                + (f" (the best, to {mv['what']}, lowers BIC by {bic0 - bic1:.1f}; {need:g} is needed)" if cands else "")
+                + (f" (the best, to {mv['what']}, lowers the evidence score BIC by {bic0 - bic1:.1f}; {need:g} is needed)"
+                   if cands else "")
                 + f". The network is unchanged; the advisor checks again after run {self.n + self.REVISE_WAIT}.")))
             return False
         verb = {"add": "Adding", "remove": "Removing", "change": "Changing", "replace": "Replacing"}
@@ -511,11 +714,13 @@ class SmartAdvisor:
         """Take network S_new (kinetic fit kf) in place of the present one and write the change down."""
         self._left[D.network_key(net)] = int(self.n)
         self.S, self.kin = S_new, kf
+        self._basis = (self.X.copy(), np.asarray(self.gc, float).copy(), self.hours.copy())    # the runs this change rests on
         m1 = self.explains(ph6)
         after = D.network_text(S_new)
         words = (f"After run {self.n}: {_what_was_wrong(m)}. {lead} the typical miss from {m['x_noise']:.1f} to "
-                 f"{m1['x_noise']:.1f} times the GC noise (BIC {bic0:.0f} -> {bic1:.0f}; a drop of {need:g} or more is taken "
-                 f"as strong evidence). The advisor now works with: {'; '.join(after)}.")
+                 f"{m1['x_noise']:.1f} times the GC noise (evidence score BIC, the misfit plus a penalty for every fitted "
+                 f"constant, lower is better: {bic0:.0f} -> {bic1:.0f}; a drop of {need:g} or more is taken as strong "
+                 f"evidence). The advisor now works with: {'; '.join(after)}.")
         if not m1["within_allowance"]:
             words += (" This network still does not explain every reading (typical miss "
                       f"{m1['x_noise']:.1f} times the GC noise), so the advisor keeps checking.")
@@ -537,17 +742,25 @@ class SmartAdvisor:
         REVISE_FRESH_MAX times.  True if the network was changed."""
         if self.n < self.REVISE_FRESH_RUNS or self.n_fresh >= self.REVISE_FRESH_MAX:
             return False
+        limit = self.REVISE_FRESH_SECONDS
+        if self.revise_seconds is not None:
+            limit = min(limit, self.revise_seconds - (time.time() - self._t_rev))
+            if limit < 5.0:                                 # not enough time left for a search worth the name
+                self._timed_out = True
+                return False
         t0 = time.time()
         self.n_fresh += 1
         net = D.parse_network(self.S)
+        self._say(f"after run {self.n}: no single change helps; searching the reactions afresh from none at all")
         res = D.discover(D.make_data(ph6, self.gc, self.hours, self.a_spec), library=self._library(),
-                         max_reactions=self.MAX_REACTIONS, n_restarts=1, max_seconds=self.REVISE_FRESH_SECONDS, seed=self.seed)
+                         max_reactions=self.MAX_REACTIONS, n_restarts=1, max_seconds=limit, seed=self.seed,
+                         progress=(lambda info: self._say("fresh search: " + info["message"])) if self.progress else None)
         best = res["best"]
         log = dict(run=int(self.n), network=D.network_text(net), miss_x_noise=m["x_noise"], verdict=m["verdict"],
                    n_tried=res["n_fits"], fresh=True, best_change="start again from no reactions: " + "; ".join(best["reactions"]))
         kf = None
         if best["reactions"] and D.network_key(D.parse_network(best["reactions"])) != D.network_key(net):
-            S_new = D.build_system(best["reactions"], base=self.S_start, name=f"{self.S_start.name} (revised)")
+            S_new = self._build(best["reactions"])
             kf = self._ladder(S_new, ph6, best["theta"])
         if kf is not None:
             bic0, bic1 = self._evidence(self.kin), self._evidence(kf)
@@ -629,9 +842,11 @@ class SmartAdvisor:
         cannot fool it) among the runs that met the spec, measured; falls back to all runs."""
         mu = self.mu_data
         if self.spec:
+            # measured KPIs: from the GC reading, with the network the advisor was given (S_start is S
+            # unless revise=True changed the network), so a revision never changes what was measured
             ph6 = physical(self.X, self.W)
-            XA, SC, _ = kpis_from_gc(self.S, ph6, self.gc)
-            dT = dT_ad_from_gc(self.S, ph6, self.gc)
+            XA, SC, _ = kpis_from_gc(self.S_start, ph6, self.gc)
+            dT = dT_ad_from_gc(self.S_start, ph6, self.gc)
             ok = np.ones(self.n, bool)
             for key, lim in self.spec.items():
                 val = {"S_C": SC, "X_A": XA, "dT_ad": dT}[key]
@@ -953,6 +1168,8 @@ def run_smart(system, budget=25, seed=0, wcat=WCAT, a_spec=A_SPEC, verbose=False
     (number of runs done when each change was made), revision_words (each change in plain words),
     revisions_json (the full records as JSON text) and network_fit (updates,): the typical miss
     of the advisor's kinetic fit at each update, as a multiple of the GC noise.
+    Every campaign of the hybrid committee or of revise=True also logs v7_version (V7_VERSION), so
+    that benchmark.is_stale can tell files made by an earlier v7 from the present one.
     callback(run_number, x, result, info) is called after every advisor-chosen run."""
     S, vr, h, base = start_campaign(system, seed, wcat, a_spec, deactivation)
     x_base = scale(base)[0]
@@ -1016,6 +1233,8 @@ def run_smart(system, budget=25, seed=0, wcat=WCAT, a_spec=A_SPEC, verbose=False
                      revision_words=np.array([r["words"] for r in adv.revisions], str),
                      revisions_json=json.dumps(adv.revisions), revisions=list(adv.revisions),
                      n_searches=int(adv.n_searches))
+    if correction == "hybrid" or revise:
+        extra["v7_version"] = V7_VERSION
     return _pack(h, strategy=name, system=system, seed=seed, base=base, theta=adv.kin.theta,
                  kin_model=adv.kin.model, info=info_log, advisor=adv, **extra)
 
@@ -1143,7 +1362,17 @@ class NNOnlyPolicy:
     rule of PlainBOPolicy, but the model is a deep ensemble of small networks (knobs -> profit,
     committee.ProfitEnsemble) and Expected Improvement uses the ensemble's mean and the spread
     between its networks.  No physics and no GC composition: like plain BO it sees one profit
-    number per run.  It is the baseline that shows what the neural network can do on its own."""
+    number per run.  It shows how a neural network on its own chooses runs.
+    The recommendation is the tested run with the best MEASURED profit, the rule of the
+    rules-of-thumb policy and of the random walk.  An earlier version recommended the run with
+    the highest ensemble mean, as plain BO does with its GP; but the ensemble does not reproduce
+    its own training runs (bootstrap and weight penalty: a run measured at +0.9 per hour was
+    rated below one measured at -11.7), so it recommended runs that had measured far worse than
+    its best one, and its score showed that rule more than the network's choice of runs.  Plain
+    BO's GP reproduces the measured ranking, so for it the two rules hardly differ.
+    Campaign files carry recommend_rule = 'best measured run' (benchmark.is_stale flags files
+    made under the old rule)."""
+    RECOMMEND_RULE = "best measured run"
 
     def __init__(self, step, lo, hi, seed=0, fixed=None):
         self.step, self.lo, self.hi, self.fixed = step, lo, hi, dict(fixed or {})
@@ -1158,6 +1387,9 @@ class NNOnlyPolicy:
         self.mu_X = self.nn.predict(X)[0]
 
     def next(self, h):
+        """The next run (scaled knobs), within one allowed step of the last run in the history h:
+        the candidate with the highest Expected Improvement under the ensemble (mean and spread),
+        measured against the ensemble's own best mean at the runs done."""
         self._fit(h)
         X = self.X
         x_last = X[-1]
@@ -1174,9 +1406,8 @@ class NNOnlyPolicy:
         return C[int(np.argmax(expected_improvement(mu, sd, float(np.max(self.mu_X)))))]
 
     def recommend(self, h):
-        if self.nn is None or len(self.X) != len(h["X"]):
-            self._fit(h)
-        return int(np.argmax(self.mu_X))
+        """Index of the tested run with the best measured profit (see the class note)."""
+        return int(np.argmax(h["y_obs"]))
 
 
 class RandomWalkPolicy:
@@ -1218,7 +1449,8 @@ def run_baseline(system, method, budget=25, seed=0, wcat=WCAT, a_spec=A_SPEC, ma
             x, chk = pol.next(h), False
         _evaluate(vr, h, x, check=chk)
         _score_rec(vr, h, pol.recommend(h))
-    return _pack(h, strategy=method, system=system, seed=seed, base=base)
+    extra = dict(recommend_rule=pol.RECOMMEND_RULE) if hasattr(pol, "RECOMMEND_RULE") else {}
+    return _pack(h, strategy=method, system=system, seed=seed, base=base, **extra)
 
 
 # =================================================================================== true optimum (for scoring only)

@@ -230,3 +230,52 @@ input[type="number"]:focus { border-color: var(--focus); }
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 2s; } .btn, .fold summary::before { transition: none; } }
 .foot { color: var(--ink-3); font-size: .8rem; padding: 4px 6px 20px; }
+
+/* ---------------------------------------------------------------- v7: trade-off, network box, reaction finder */
+textarea { font: 500 .88rem/1.45 var(--mono); padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); width: 100%; min-width: 0; resize: vertical; }
+textarea:focus, input[type="text"]:focus { border-color: var(--focus); }
+label.inline { flex-direction: row; align-items: center; gap: 6px; }
+.fold.opt { border: 1px dashed var(--line); border-radius: 12px; padding: 12px 14px; }
+.fold.opt summary .hint { font-weight: 400; }
+.fold.opt[open] { display: flex; flex-direction: column; gap: 10px; }
+.net-box .net-lines { margin: 0; padding-left: 22px; font-size: .9rem; display: flex; flex-direction: column; gap: 2px; }
+.net-box .net-lines.given { color: var(--ink-3); }
+.net-box h3 { display: flex; align-items: center; gap: 8px; }
+.finder-steps { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
+
+.fstep { border: 1px solid var(--line); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.fstep h3 { display: flex; align-items: center; gap: 8px; }
+.fstep .num { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--accent); color: var(--accent-ink); font: 600 .78rem var(--mono); }
+.f-src { display: flex; gap: 6px; flex-wrap: wrap; }
+.fmodes { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.7fr); gap: 12px; }
+@media (max-width: 760px) { .fmodes { grid-template-columns: minmax(0, 1fr); } }
+.fmode { background: var(--surface-2); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; min-width: 0; }
+.fmode h4 { margin: 0; font-size: .9rem; }
+.fmode label { align-self: stretch; }
+.f-cands { display: flex; flex-direction: column; gap: 8px; align-self: stretch; }
+.f-cand { display: flex; flex-direction: column; gap: 4px; }
+.f-cand-head { display: flex; gap: 6px; align-items: center; }
+.f-cand-head input { font-family: var(--font); font-weight: 600; font-size: .85rem; padding: 4px 8px; }
+.f-cand .row-btn { border: 0; background: transparent; color: var(--ink-2); cursor: pointer; padding: 2px 6px; border-radius: 5px; }
+.f-cand .row-btn:hover { background: var(--surface); color: var(--bad); }
+.f-progress { border: 1px solid var(--accent); background: var(--accent-soft); border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+.f-prog-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: .88rem; }
+.f-prog-head .btn { margin-left: auto; }
+.spinner.small { width: 18px; height: 18px; border-width: 2px; }
+.f-log { margin: 0; padding-left: 0; list-style: none; font-size: .78rem; color: var(--ink-2); max-height: 180px; overflow: auto; display: flex; flex-direction: column; gap: 2px; }
+#f-result { display: flex; flex-direction: column; gap: 14px; }
+.f-verdict { border: 1px solid var(--line); border-left: 4px solid var(--good); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 8px; }
+.f-verdict-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.f-best-name { font-weight: 600; }
+.f-eqs { margin: 0; padding-left: 24px; font-size: 1rem; font-weight: 600; display: flex; flex-direction: column; gap: 3px; }
+.f-answer { border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; }
+.f-answer.ok { background: var(--good-soft); }
+.f-answer.warn { background: var(--warn-soft); }
+.f-answer .f-eqs { font-weight: 500; font-size: .92rem; }
+.f-table td.first, .f-table th.first { text-align: left; }
+.f-table td.f-eq-cell { font-size: .8rem; line-height: 1.45; }
+.f-table td.f-verdict-cell { white-space: normal; min-width: 260px; font-size: .8rem; color: var(--ink-2); }
+.f-path { margin: 0; padding-left: 22px; display: flex; flex-direction: column; gap: 4px; font-size: .85rem; color: var(--ink-2); }
+#f-next-body { display: flex; flex-direction: column; gap: 10px; }
+.overlay p { max-width: 640px; text-align: center; padding: 0 16px; }
+#f-next-body .kv { max-width: 420px; }
