@@ -167,7 +167,7 @@ try:
     bad = False
 except ValueError:
     bad = True
-check("advisor version is validated (v5, v6 or v7 only)", bad and C.state()["settings"]["version"] == "v6")
+check("advisor version is validated (v5, v6 or v7 only); v7 is the default", bad and C.state()["settings"]["version"] == "v7")
 st = C.settings(dict(version="v6"))
 A = C.analyse()["analysis"]
 check("v6 advisor: advice produced and the committee weights are explained",

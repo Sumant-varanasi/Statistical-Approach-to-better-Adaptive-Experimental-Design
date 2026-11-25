@@ -289,7 +289,7 @@ The best candidate, 'truth':
 
 On the realistic file the best candidate is 'truth', fitted with rate laws with product C blocking catalyst sites, K_C = 0.0328 per bar at 300 C. The program is allowed one extra number for product C blocking catalyst sites and keeps it only when the data ask for it (they do here, and not on the two files made with plain rate laws). The reactant term K_A of the virtual reactor is not in the model at all; its effect is absorbed by the fitted constants. One thing makes this file a favourable case: how K_C falls with temperature is not fitted but assumed (a typical heat of adsorption, -48 kJ/mol), and the virtual reactor happens to use the same value.
 
-The run that would best tell the first two candidates apart, anywhere in the operating box and within one allowed step of the last run of the log:
+Back to the noisy file (complex_noisy.csv): the run that would best tell its first two candidates apart, anywhere in the operating box and within one allowed step of the last run of the log:
 
 ```
 The run that would best tell the top two networks apart:

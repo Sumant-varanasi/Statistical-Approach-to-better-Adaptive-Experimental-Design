@@ -12,7 +12,10 @@ readings and tells an operator what to run next, in plain English, through a web
 a learning upgrade (v5) that adds product inhibition and catalyst ageing only when the data
 support them, plans several runs ahead, and respects product specs, and a committee correction
 (v6) in which a Gaussian process and an ensemble of small neural networks both correct the
-physics, each trusted by how well it predicts runs it has not seen.
+physics, each trusted by how well it predicts runs it has not seen. v7 adds a neural network that
+predicts profit from the knobs alone as a fourth member of that committee, a reaction finder that
+works out from a GC log which reactions happen, and an advisor that uses it to check its own
+reaction network after every run and repair it when the GC readings disagree.
 
 **Headline result** (simulated reactor, placeholder kinetics and prices, 10 campaigns of 25 runs):
 the advisor reaches 90 % of the best possible profit in a median of **9–10 runs**, against **21 or
@@ -24,11 +27,13 @@ section 3.6) reaches the best point in 10 of 10 campaigns on the complex reactor
 along the way than v4 in 8 of 10. v6 (section 3.7) matches v5 when the chemistry is right and,
 with a reaction missing from its model, is at 65 % of the best profit after 10 runs instead of
 34 % and earns more in 8 of 10 campaigns (p = 0.014).
+v7 (section 3.8) matches v6 when its reaction network is right; when a reaction is missing from its model it puts it back by run 6 (median) in 10 of 10 campaigns and earns about twice as much as v6 over 25 runs (200 against 102, more in 10 of 10, p = 0.002). A neural network on its own never reaches 90 % of the best profit on the complex reaction.
 
-> **Status (23 November 2026).** v6 is committed and is the default on the web page and the
-> command line; v5 is tagged `v5` and one setting away. The mid-term presentation (17 October) is in
-> `presentation/`. The figures and `results/smart_demo_summary.md` still show the v4 benchmark;
-> `python khare_demo.py` rebuilds them from the finished v5 benchmark cache.
+> **Status (25 November 2026).** v7 is built, reviewed and benchmarked (320 campaigns, section 3.8)
+> and is now the default on the web page and the command line; v6 is one setting away (*Advisor
+> version* on the page, `--advisor v6`) and is tagged `v6`, v5 is tagged `v5`. The mid-term presentation (17 October) is in `presentation/`. The figures and
+> `results/smart_demo_summary.md` still show the v4 benchmark; `python khare_demo.py` rebuilds them
+> from the finished v5 benchmark cache.
 
 > Every kinetic parameter, price and noise level in this repository is a **placeholder**. The
 > numbers and figures will change once the real kinetics and prices are agreed with Prof. Khare
@@ -52,8 +57,10 @@ To check the installation:
 
 ```bash
 python test_reactor_twin.py            # 11 checks, 1 s
-python test_reactor_ui.py              # 36 checks, ~2 min
-python test_smart.py                   # 53 checks, ~5 min
+python test_reactor_ui.py              # 56 checks, ~5 min
+python test_smart.py                   # 132 checks, ~8 min
+python test_discovery.py               # 81 checks, ~8 min
+python test_pareto.py                  # 58 checks, ~1 min
 python test_bo.py                      # 29 checks, ~5 min
 ```
 
@@ -65,11 +72,12 @@ python test_bo.py                      # 29 checks, ~5 min
 |---|---|---|---|
 | **v1 — twin + basic BO** | Packed-bed mole balances for A + B → C, A → D; a hand-written Gaussian-process optimiser with Expected Improvement over 5 knobs; brute-force comparison. | BO reached yield ≥ 0.99 in 17 experiments where random search needed 285 (one seed; over 10 seeds the gap is 22 vs ~104). Yield turned out to be too easy an objective: a broad plateau. | `reactor_twin.py`, `sweeps.py`, `bo_basic.py`, `bo_5knobs.py`, `simulation_campaign.py`, `compare.py` |
 | **v2 — BO package and benchmark** | `bo/`: fitted Matérn GP, four acquisition functions, batch mode, a neural-network surrogate, constrained BO, a harder profit objective, 20-seed benchmark with significance tests. | BO beats random, Latin-hypercube and Nelder–Mead (p < 0.001); constrained BO is essential when there is a product spec; ~25 % of plain-BO runs get stuck in a second optimum on the profit objective. | `bo/`, `run_benchmark.py`, `analyse_benchmark.py`, `surrogate_study.py`, `suggest_next.py`, `make_report.py` |
-| **v3/v4 — smart advisor + web UI** | `smart/`: the advisor knows the reactor physics, learns the kinetics from every GC reading, plans where the best profit is and walks there within the step limits a real reactor allows. A chemist's-rules baseline. A web page and a command-line tool for the operator. | Under the real protocol the advisor is 2–3× faster than a good chemist to 90 % of the best profit, and black-box BO cannot plan beyond one step. It still works with one reaction missing from its model. | `smart/`, `reactor_ui.py` + `ui/`, `reactor_advisor.py`, `khare_demo.py` |
+| **v3/v4 — smart advisor + web UI** | `smart/`: the advisor knows the reactor physics, learns the kinetics from every GC reading, plans where the best profit is and walks there within the step limits a real reactor allows. A scripted rules-of-thumb baseline. A web page and a command-line tool for the operator. | Under the real protocol the advisor is 2–3× faster than the scripted rules-of-thumb policy to 90 % of the best profit, and black-box BO cannot plan beyond one step. It still works with one reaction missing from its model. | `smart/`, `reactor_ui.py` + `ui/`, `reactor_advisor.py`, `khare_demo.py` |
 | **v5 — learning upgrade** | A ladder of kinetic models (plain → product inhibition → its adsorption heat → catalyst ageing) chosen by BIC; a receding-horizon planner that values the runs left; product and safety specs; a catalyst-ageing scenario with check runs; trust-region and GP-ensemble strategies in `bo/`. | Learned activation energies within 1 kJ/mol of the truth (the plain model missed one by 15). On the complex reactor v5 reaches the best point in 10/10 campaigns and earns more on the way than v4 in 8/10. Ageing is detected and reported, not solved. The new `bo/` strategies give no significant gain over GP + EI. | `smart/kinetics.py`, `smart/advisor.py`, `smart/benchmark.py`, `bo/` |
 | **v6 — committee correction** | The correction of the physics is a committee: no correction, the v5 Gaussian process, and an ensemble of 8 small neural networks that also see the physics prediction, weighted after every run by how well each predicts held-out runs (stacking); their disagreement adds to the uncertainty. | Same as v5 when the chemistry is right. With C + B → E missing: 65 % vs 34 % of the best profit after 10 runs, 90 % reached 4 runs sooner, more profit earned in 8/10 campaigns (p = 0.014). The GP carries most of the weight; the networks 5–10 %. | `smart/committee.py`, `compare_v6.py` |
+| **v7 — a neural network alone in the committee, network repair, reaction finder** | A fourth committee member: an ensemble of small neural networks that predicts profit from the knobs alone (no physics), weighted by held-out prediction like the others. After every run the advisor checks whether its reaction network explains the GC readings and, if not, changes it one step at a time, only on strong evidence. A reaction finder that works out which reactions happen from a GC log (automatic search, or ranking of typed candidate networks) and proposes the run that would tell two networks apart. An optional profit vs selectivity trade-off curve. | Reaction finder (simulated data, placeholder kinetics): recovers a network that is not one of the built-in ones (A + B ⇌ C, C → D + B, A + 2 B → E) from 30 noisy runs; ranks four typed candidates with the true network first on every complex example file (typical miss 0.75, 7, 25 and 69 times the GC noise on `complex_noisy.csv`); finds the site blocking on the "real"-reactor file and a zero-order rate law; on the first 8 runs of 10 step-limited campaigns it found the true network in 6 and reported the other 4 as not fitting. Advisor (10 seeds × 25 runs): the same as v6 when the network is right; with C + B → E missing it repairs the network by run 6 and earns 200 against v6's 102 (10/10, p = 0.002); from a wrong starting network the repair earns more than the same advisor with its network fixed in 30 of 30 campaigns. The stand-alone network does not help (with a reaction missing and no repair it costs a little), and on its own it never reaches 90 % on the complex reaction. | `smart/discovery.py`, `smart/committee.py`, `smart/advisor.py`, `smart/pareto.py`, `discover_reactions.py`, `analysis_v7/` |
 
-Sections 3–5 describe the advisor (the current work, v3–v6); sections 6–7 keep the v2 and v1
+Sections 3–5 describe the advisor (the current work, v3–v7); sections 6–7 keep the v2 and v1
 material, which still runs unchanged.
 
 ---
@@ -110,9 +118,9 @@ reasons with a reactor model:
 
 | Built in (physics) | Learned from the runs |
 |---|---|
-| reaction network and stoichiometry, mole balances over the catalyst surface | rate constant of every reaction |
+| reaction network and stoichiometry, mole balances over the catalyst surface | rate constant of every reaction (v7: also a change of the reaction network, when the GC readings demand one) |
 | Arrhenius temperature dependence, ideal-gas partial pressures (inert dilution included) | activation energy of every reaction |
-| equilibrium limit from thermodynamics (ΔH, ΔS) | a correction for whatever the physics misses (v5: a Gaussian process; v6: a committee of a GP and neural networks) |
+| equilibrium limit from thermodynamics (ΔH, ΔS) | a correction for whatever the physics misses (v5: a Gaussian process; v6: a committee of a GP and neural networks; v7: the same plus a neural network alone) |
 | economics (prices) | |
 
 Each round (v5; details in `smart-advisor-model.md` section 8):
@@ -129,7 +137,8 @@ Each round (v5; details in `smart-advisor-model.md` section 8):
    how many allowed steps away it is.
 4. **Correct**: a GP on the residual (measured − physics) with a noise floor from the GC error,
    so noise is never mistaken for chemistry; the spread is calibrated against the advisor's own
-   past misses. In v6 this step is a weighted committee (section 3.7).
+   past misses. In v6 this step is a weighted committee (section 3.7); v7 adds a fourth member
+   to it and, between steps 1 and 2, checks and if needed repairs the reaction network (section 3.8).
 5. **Decide** with a receding-horizon planner: from a shortlist of allowed first steps, roll
    forward up to four runs and score each path under every plausible chemistry by the profit
    earned on the way plus what the best point found is worth for the runs left. With a product
@@ -183,16 +192,16 @@ would recommend, as % of the best possible profit at that catalyst loading.
 | complex | Smart advisor, **C + B → E missing from its model** | 62 % | 95 % | 99 % | 12 (10/10) |
 
 - **The rules of thumb get there too, given enough runs**: after 25 runs the rules of thumb reach
-  96 % (simple) and 87 % (complex). After 25 runs smart and chemist are tied on the simple
+  96 % (simple) and 87 % (complex). After 25 runs smart and the rules of thumb are tied on the simple
   reaction (5/10 paired campaigns, p = 0.92); on the complex one smart is still ahead (9/10,
   p = 0.004).
 - **The advisor's value is speed.** It reaches 90 % of the best profit in a median of 9.5 runs
-  (simple) and 9 runs (complex), against 21 and "not within 25" for the chemist. After 10 and 15
-  runs it beats the chemist in **10/10 paired campaigns** on both chemistries (Wilcoxon
+  (simple) and 9 runs (complex), against 21 and "not within 25" for the rules of thumb. After 10 and 15
+  runs it beats the rules of thumb in **10/10 paired campaigns** on both chemistries (Wilcoxon
   p = 0.002). Each run saved is a day of reactor time, feed gas and operator time.
 - **Why it is faster**: it learns each reaction's temperature response from the screening ladder
   alone (full GC composition, not one profit number), predicts where the best profit is over the
-  whole box, and walks there one allowed step at a time; the chemist probes a knob or two per run;
+  whole box, and walks there one allowed step at a time; the rules of thumb probe a knob or two per run;
   plain BO, which sees only profit, cannot plan beyond one step.
 - **Wrong network.** With the over-reaction removed from its model the advisor is slower (62 %
   after 10, 95 % after 15) but still ends at 99 %: the GP correction learns the missing product loss.
@@ -272,7 +281,8 @@ screening runs; `results/v6_summary.md`, `figures/smart_6_v6_vs_v5.png`):
   85–90 % of the weight and the networks 5–10 %: the networks are a small voice, not the main
   driver. The gain comes from the committee as a whole: it weighs the GP's correction by how
   well it predicts unseen runs, and adds the members' disagreement to the uncertainty. An
-  ablation without the networks is the next check, to separate the two.
+  ablation without the networks is the next check, to separate the two (it is part of the v7
+  study, section 3.8).
 - **Ageing plus a wrong network** stays hard for both (no significant difference; v6 earns more
   in 7 of 10 but ends lower in the median).
 - Cost: about 1–2 s per run for the committee fit, next to 5–20 s for the planner.
@@ -281,9 +291,284 @@ Because v6 never does worse and helps exactly where a real reactor is likely to 
 textbook model, **the web page and `reactor_advisor.py` now use v6 by default**; v5 stays one
 setting away (*Advisor version* on the page, `--advisor v5` on the command line) and is tagged
 `v5` on GitHub. In the library `SmartAdvisor` keeps `correction="gp"` as its default, so every v5
-result above is reproduced unchanged.
+result above is reproduced unchanged. (Since v7, section 3.8, the page and the command line use v7
+by default; v6 is tagged `v6`.)
 
-### 3.8 Baselines (all under the same step limits)
+### 3.8 v7: a neural network alone in the committee, and an advisor that repairs its own reactions
+
+v7 (`SmartAdvisor(..., correction="hybrid", revise=True)`; *Advisor version* v7 on the page,
+`--advisor v7` on the command line; the maths in `smart-advisor-model.md` section 8.5) keeps the
+v5 physics and planner and the v6 committee, and adds two things. Both are off by default in the
+library, so v5 and v6 are reproduced unchanged.
+
+**A neural network alone in the committee** (`smart/committee.py`). A fourth member, *direct*, is
+an ensemble of 8 small neural networks of the same kind as v6's that predicts the measured profit
+from the five knobs alone: no physics, no GC composition, one number per run. In the committee it
+is written as a correction, r = y_NN(x) − f_phys(x), so a weight of 1 makes the advisor's
+prediction the neural network's (the physics cancels) and a weight of 0 leaves v6. It joins from
+run 8 and is weighted like the other members, by how well it predicts runs it was not trained on.
+It is there for a physics model so wrong that correcting it is harder than starting from the data.
+Its held-out runs are truly unseen (the networks that predict a run are trained, scaled and clipped
+without it); next to it the GP is refitted on every held-out fold, hyper-parameters included, so
+that the two are judged by the same standard. (v6 keeps its old, more lenient rule so that its
+results stay exactly reproducible.) The physics-based members still have a small advantage: the
+kinetic fit behind f_phys has seen every GC reading.
+
+**Checking and repairing the reaction network** (`SmartAdvisor._revise`, using the reaction
+finder of section 3.9). v5 and v6 take the reaction network they are given for granted. From run 5
+on, v7 checks after every run whether the network, as fitted, explains the GC readings. It passes
+while every product the GC sees is made by some reaction, the misses stay within the GC noise plus
+the allowance for model error that the kinetic fit already uses (2 % of the reading + 0.2 mol-%),
+and no species is missed by more than twice the GC noise. A right network on an imperfect model (an
+adsorption term it lacks, a little catalyst ageing) normally passes. When the network fails, every
+single change of it is tried on the campaign's own runs (add, remove or replace a reaction from the
+library, or change one reaction order); the best three are fitted with the advisor's own kinetic
+models and compared with the network as it stands, by BIC (misfit plus a penalty for every fitted
+number). Safeguards:
+
+- A change is adopted only if it lowers BIC by **10 or more** (very strong evidence); going back to
+  a network the advisor has already left needs **20**, so it does not flip back and forth.
+- **One bad reading is not a reason to change the chemistry.** When the misfit sits in one run and
+  the network, fitted without that run, explains all the others, the advisor names the run and the
+  reading to check (a typing error, a bad GC injection) and changes nothing.
+- **Edits of the log take changes back.** When a run that a change rested on is edited or deleted,
+  every change is undone and the check starts again from the network the advisor was given.
+- **A campaign stays fast**: at most 3 changes in one update, a wait of 3 runs after a search that
+  changed nothing, at most **12 searches** per advisor, networks of at most 4 reactions.
+- **A way out of dead ends.** When no single change helps but the network still fails the check,
+  the advisor (from run 8 on, at most twice, about 60 s each) searches afresh from no reactions at
+  all and takes the result only under the same evidence rule.
+
+Every change is written down in plain words (the run, what was wrong, what changed, BIC before and
+after) and shown on the web page in the *Reaction network in use* box. A search costs 10–60 s; on
+the page one check-and-repair is limited to about 60 s per *Get advice*. The profit and KPIs of a
+run come from its GC reading and do not depend on the network; only the predictions do.
+
+**The v7 benchmark.** `smart/benchmark.py` (`run_all(methods=V7_STUDY)`): 18 methods, 10 seeds ×
+25 runs, the same protocol as before (catalyst loaded once, step limits, the same 5 screening runs,
+the same virtual reactor and GC noise for a given seed), so every v7 campaign is paired with the v5,
+v6 and baseline campaigns of the same seed in the committed benchmark cache. Seeds 0–6 were run on
+the college HPC and seeds 7–9 on the laptop, with identical code. Each comparison changes one thing
+where possible:
+
+| Methods compared | Scenarios | What it isolates |
+|---|---|---|
+| `smart_v7` against `smart_v7_fixednet` (v7 with the repair switched off) | simple, complex, complex with ageing | what the repair costs or adds when the given network is right |
+| `smart_v7_missing_E` against `smart_v7_norevise_missing_E` | complex, C + B → E missing from the given network | what the repair adds when a reaction is missing |
+| `smart_v7_fixednet` against `smart_v6` | all | what the stand-alone network adds to the committee (with the stricter held-out rule for the GP that comes with it) |
+| `smart_v6_nonn`, `smart_v6_nogp` (and their `_missing_E` forms) against `smart_v6` | all | what v6's neural networks and v6's GP each add (the ablation section 3.7 left open) |
+| `nn_only` | all | a neural network on its own (deep ensemble + Expected Improvement on profit) choosing runs under the same step limits (section 3.11) |
+| `smart_cand_*` (v5, network kept fixed), `smart_v7_fixednet_cand_*` (v7, network kept fixed), `smart_v7_cand_*` (v7, may repair) | complex | the advisor given a wrong network: `close` (one reaction order wrong), `similar` (another pathway, no equilibrium) or `far` (two reactions, other orders, nothing makes E). v7 repair against v7 fixed is one switch apart; against v5 two things change at once |
+
+`python analysis_v7/compare_v7.py` reads the campaign files (skipping any made by an earlier
+definition of a method), runs paired Wilcoxon tests (same seed = same screening runs and reactor
+noise) and writes `figures/smart_7_campaigns.png`, `figures/smart_7_candidates.png` and
+`analysis_v7/v7_summary.md`. Simulated reactor, placeholder kinetics and prices.
+
+**Results** (`analysis_v7/v7_summary.md` has every number; `figures/smart_7_campaigns.png`,
+`figures/smart_7_candidates.png`). Profit earned over the 25-run campaign, median of 10, and the
+paired comparison (same seed = same screening runs and reactor noise; Wilcoxon signed-rank test):
+
+| Scenario | v5 | v6 | v7 | v7 against v6 | runs to 90 %, v6 / v7 |
+|---|---|---|---|---|---|
+| Simple reaction | 441 | 442 | 442 | no difference (p = 0.49) | 10 / 9.5 |
+| Complex, network right | 201 | 203 | 200 | no difference (p = 0.28) | 9 / 9.5 |
+| Complex, ageing catalyst | −27 | −26 | −15 | no difference (p = 1.0) | never / never |
+| **Complex, C + B → E missing** | 20 | 102 | **200** | **+88, better in 10 of 10 (p = 0.002)** | 14.5 / **9.5** |
+
+![v7 against v5, v6, the neural network alone and the baselines](figures/smart_7_campaigns.png)
+
+- **When the network is right, v7 = v6.** The check passes, nothing is searched, and v7 with the
+  repair switched off (`smart_v7_fixednet`) gives exactly the same campaigns. Nothing is lost.
+- **When a reaction is missing, the repair is what helps.** In all 10 campaigns v7 found that
+  its network could not make the E the GC sees, added C + B → E (median: after run 6) and ended
+  with exactly the true network. It then plans like an advisor that was given the right chemistry:
+  90 % of the best profit after 9.5 runs, the same as with the right network from the start, and
+  200 earned against v6's 102. Against the same advisor with the repair switched off the gain is
+  +136 (better in 10 of 10, p = 0.002).
+- **The neural network alone in the committee does not help.** Without the repair, v6 plus the
+  stand-alone network earns *less* than v6 when a reaction is missing (−35, worse in 10 of 10,
+  p = 0.002) and the same otherwise. Its error on runs it has not seen stays at 8–11 money/h, against
+  1.7–1.8 for the physics-based members when the network is right and 4.7 for physics + GP when a
+  reaction is missing (right-hand panel). So it rarely gets more than a few per cent of the weight. Two
+  things change at once in this comparison (the extra member and the stricter per-fold rule for the
+  GP that comes with it), so this run cannot say which of the two costs the profit.
+- **What v6's parts add** (the ablation section 3.7 left open). With C + B → E missing, v6 without
+  its Gaussian process earns 84 less (worse in 9 of 10, p = 0.004); v6 without its neural networks
+  earns the same (+1, p = 0.49). The GP carries v6's gain; the networks add nothing measurable here.
+  The weighting itself matters: v6 without its networks (physics + GP, weighted by held-out
+  prediction) earns 69, v5's single GP 20.
+- **A neural network on its own** (`nn_only`: deep ensemble + Expected Improvement on the profit,
+  same step limits, recommends its best measured run) earns less than v6 in all 40 paired
+  campaigns (p = 0.002 in every scenario), never reaches 90 % of the best profit on the complex
+  reaction and is below the rules-of-thumb script in every scenario (on the simple reaction it
+  ends at 81 % of the best, the script at 87 %). Twenty-five runs are far too few for a model that has to learn
+  the chemistry from profit numbers alone.
+- **Catalyst ageing** stays unsolved by every version (about 61 % of the best at the end).
+
+**Starting from a wrong network** (complex reaction, 10 campaigns each; `figures/smart_7_candidates.png`):
+
+| Network given at the start | v5, fixed | v7, fixed | v7, may repair | repair vs fixed | v7 ended with |
+|---|---|---|---|---|---|
+| the true network | 201 | 200 | 200 | no change (nothing to repair) | the true network 10/10 |
+| quite close (one reaction order wrong) | 185 | 177 | **200** | +17, better in 10/10 (p = 0.002) | the true network 10/10 |
+| relatively the same (another pathway) | 102 | 87 | **179** | +75, better in 10/10 (p = 0.002) | true 5, true + an extra reaction 5 |
+| very different (2 reactions, no E) | −217 | −203 | **110** | +290, better in 10/10 (p = 0.002) | true 3, true + an extra reaction 6, wrong 1 |
+
+![Starting from a wrong network](figures/smart_7_candidates.png)
+
+With the network fixed, the correction cannot make up for a very different network (both v5 and
+v7 end at 70 % of the best and lose money over the campaign). With the repair, v7 reaches 100 % of
+the best by the end from every starting network, but it pays for the detour on the way (110 earned
+from the very different network against 200 from the right one). It keeps a reaction that does no
+harm: 5 of the 'relatively the same' campaigns ended with the true reactions plus one more (3
+times a form of the given A + 2 B → E), and from 'very different' it ended with an extra reaction 6
+times (3 times the given C → D + B) and once with a wrong network (section 3.12).
+
+**Cost.** One v7 campaign of 25 runs took a median of 2.5–7 min on 16 cores of the HPC (about 4
+on the complex reaction, 7 when repairing the very different network); the network searches add
+10–60 s each and run only when the check fails. **Reproducibility.** A campaign is reproducible on
+one machine. Nineteen campaigns were run on both the HPC and the laptop: 10 agree throughout; in 9
+the two machines' rounding tipped a close decision and the campaigns went different ways (median
+difference 7 in profit earned, largest 172; all but two with a wrong model). Each campaign is used
+once in the tables, and the pairing by seed (same screening runs, same reactor noise) holds.
+
+### 3.9 The reaction finder (`smart/discovery.py`)
+
+The advisor up to v6 is told which reactions happen and learns only their rate constants. The
+reaction finder removes that assumption. It answers the questions a chemist asks before any
+optimisation:
+
+1. "I have two or three ideas of what is going on. Which one do my data support?" (ranking typed
+   candidate networks)
+2. "I do not know the reactions. What do the data say?" (automatic search)
+3. "Two networks fit about equally well. Which run would tell them apart?" (the discriminating run)
+
+**How it works, in plain words.**
+
+- A network is typed as text, one reaction per line: `A + B <=> C` runs both ways and stops at the
+  equilibrium, `C + B -> E` runs one way, `A -> D ; orders A=2` changes a rate law. By default the
+  rate follows the equation (mass action). Species: A and B are fed, C = AB, D = A rearranged
+  (one A unit), E = AB2, I is the inert. Every reaction must keep the A and B units (atom balance).
+- Each network becomes a fixed-bed reactor model (the same mole balances over the catalyst surface
+  as the advisor), and its rate constants and activation energies are fitted to every GC mole
+  fraction of every run.
+- The misfit is counted in units of the GC's own noise (1 % of the reading + 0.05 mol-%); a right
+  network misses by about 0.5–0.8 times that noise. Networks are compared by BIC: misfit plus a
+  penalty for every fitted number, so an extra reaction must clearly improve the fit to be kept. A
+  BIC difference below 6 is reported as "the data cannot tell these apart", never as a decision;
+  above 10, "no other network comes close".
+- One extra fitted number is allowed for product C blocking catalyst sites, and kept only when the
+  data ask for it.
+- The automatic search starts from no reactions and changes one thing at a time (add, remove or
+  replace a reaction, or change one reaction order), keeping a change only if it lowers BIC. The
+  reactions come from a library **enumerated from the atom balance** (12 reactions among A–E with
+  at most 3 molecules reacting and 2 formed; 22 forms after thermodynamics rules out directions
+  that cannot run anywhere in the operating box), not written around a known answer. When its
+  result does not fit within the GC noise it starts again from another first reaction; a network
+  that still does not fit is reported as such, never as the answer.
+- The discriminating run is the set point where the two best networks' predicted GC readings
+  differ most, counted against the GC noise plus each fit's own uncertainty; it can be held within
+  one allowed step of the last run.
+
+**Worked example.** `examples/discovery/WORKED_EXAMPLE.md` (written by `python
+make_discovery_example.py`; every number in it is computed) shows how each example file was
+calculated from its reactions, with run 1 of `mystery_exact.csv` worked through by hand (inlet
+flows, rate constants, rates at the inlet, integration along the bed, the GC reading: it matches
+the file to the 6 decimals it is written with), and what the finder returns on every file. The
+"mystery" network (A + B ⇌ C, C → D + B, A + 2 B → E) is not one of the built-in systems. The
+30-run files are a designed kinetic study (2–40 bar, 5–50 mL/min of each gas, 230–410 °C, 1 g of
+catalyst), not a step-limited campaign.
+
+What it found (from `examples/discovery/finder_results.json`; simulated data, placeholder kinetics):
+
+| File | What the data are | Task | Result | Time |
+|---|---|---|---|---|
+| `mystery_noisy.csv` | 30 runs of the mystery network, GC noise | automatic search | the true reactions and rate laws (typical miss 0.74 times the GC noise); it says the data cannot decide whether A + 2 B → E runs one way or both ways (BIC difference 0.0) | 26 s |
+| `mystery_exact.csv` | the same, no noise | automatic search | the same | 34 s |
+| `complex_noisy.csv` | 30 runs of the complex network, GC noise | rank 4 typed candidates | true network first; typical miss 0.75 / 7.0 / 25 / 69 times the GC noise for the true network / `close` (one order wrong) / `similar` (another pathway) / `far` (two reactions, no E) | 12 s |
+| `complex_exact.csv`, `complex_real.csv` | the same runs without noise, and on the virtual "real" reactor (site blocking the plain rate laws lack, plus GC noise) | rank 4 typed candidates | true network first, same order | 13 s, 10 s |
+| `complex_real.csv` | as above | automatic search | the true reactions with product C blocking catalyst sites, K_C = 0.0328 /bar at 300 °C (the virtual reactor uses 0.03); next best network 14 BIC worse | 39 s |
+| `complex_noisy.csv` | as above | repair the `far`, `similar` and `close` candidates | the true network from each | 34 s, 32 s, 11 s |
+| `complex_short_campaign.csv` | 8 step-limited runs (the 5 screening runs + 3 steps chosen by hand) on the virtual "real" reactor | automatic search; ranking | the true network after one new start (next best 9.2 BIC worse); ranking puts it first | 29 s; 8 s |
+| `zero_order_noisy.csv` | 30 runs where C + B → E is zero order in B | automatic search | the true reactions, including the zero order | 25 s |
+
+Times are for one laptop core and vary by a factor of about two. On the mystery data the fitted
+rate constants are within 1 % of the true ones and the activation energies within 0.3 kJ/mol. Two
+of these are favourable cases, and the worked example says so: the short-campaign file is the case
+the search's ability to start again was developed on, and on `complex_real.csv` the temperature
+dependence of the site blocking is assumed with the same adsorption heat the virtual reactor uses.
+Measured separately on the first 8 runs of 10 step-limited v5 campaigns (seeds 0–9, not shipped as
+files), the search found the true network in 6; in the other 4 it ended at a network it reported as
+not fitting within the GC noise (typical miss 3.2–6.6 times the noise), never as an answer.
+
+**Mechanism or neural network: which predicts the GC of unseen runs?** `python
+analysis_v7/gc_accuracy.py` (about 10 min, `analysis_v7/gc_accuracy.json`) predicts the GC
+composition of runs a model was not trained on, two ways: the reaction mechanism (rate laws + mole
+balances, constants fitted on the training runs) and a neural-network ensemble trained on the same
+runs (5 scikit-learn networks, two hidden layers of 32, from the five knobs to the mole fractions,
+penalty chosen by cross-validation; no physics). Two tests per file: *interpolation*, 5-fold
+cross-validation, where the mechanism is **given** the reactions the file was made from (so this
+half compares rate laws, not the finding of them); and *extrapolation*, training on the 24 coolest
+runs (232–368 °C) and predicting the 6 hottest (372–406 °C), where the reactions are **found** by
+the finder from the 24 training runs alone (it found the true reactions in all three files).
+Typical miss of the mole fractions of A–E, in units of the GC noise:
+
+| File | Interpolation: mechanism / neural network | Extrapolation to the 6 hottest runs: mechanism / neural network |
+|---|---|---|
+| `mystery_noisy.csv` | 0.77 / 46 | 0.71 / 58 |
+| `complex_noisy.csv` | 0.78 / 70 | 0.87 / 82 |
+| `complex_real.csv` | 0.88 / 69 | 0.79 / 84 |
+
+The mechanism misses by about the GC noise (0.14–0.18 mol-%), the neural network by 46–84 times it
+(5.5–8.4 mol-%). With 24 to 30 runs the network has to learn five mole fractions over five knobs
+from the data alone; the mechanism brings the mole balances and the Arrhenius law with it.
+Figure: `figures/smart_7_mechanism.png` (`python analysis_v7/plot_mechanism.py`): typed candidates
+ranked, the automatic search on each file, learned against true kinetics on the mystery data, and
+this comparison.
+
+**How to use it.** On the web page, the *Reaction finder* section (section 4.1): choose the data
+(one of the 7 example files, each downloadable; an uploaded CSV; or the runs in the table), then
+*Find the reactions* (automatic, optionally starting from a network to repair; 1–3 minutes, with
+progress shown and a Stop button) or *Rank candidate networks* (type them in text boxes; *Load the 4
+example candidates* fills them in). Nothing in the finder changes the campaign. On the command line:
+
+```bash
+python discover_reactions.py examples/discovery/mystery_noisy.csv                      # automatic search
+python discover_reactions.py examples/discovery/complex_noisy.csv --candidates examples/discovery/candidates_truth.txt examples/discovery/candidates_close.txt examples/discovery/candidates_similar.txt examples/discovery/candidates_far.txt
+python discover_reactions.py examples/discovery/complex_noisy.csv --start examples/discovery/candidates_far.txt   # repair a network
+python discover_reactions.py my_reactor_log.csv --next-run --from-last-run              # also the run that tells the top two apart, one step from the last run
+python make_discovery_example.py                                                        # rebuilds the example files and WORKED_EXAMPLE.md (~10 min)
+```
+
+The log is the same CSV the web page and `reactor_advisor.py` use; a candidate file holds one
+reaction per line. Other options: `--max-reactions`, `--surface-area`, `--no-site-blocking`,
+`--json FILE`, `--quiet`.
+
+### 3.10 Optional: the profit vs selectivity trade-off (`smart/pareto.py`)
+
+The advisor aims for the most profit (within any minimum selectivity set). Sometimes a purer
+product is worth a little profit: less by-product to separate, or a customer's specification.
+`tradeoff(adv)` predicts the curve of settings that no other setting beats on both counts at once
+(a Pareto front), from the advisor's own model: profit as the advisor predicts it (physics plus
+correction, with a 90 % range), selectivity from the fitted chemistry. It marks the most profitable
+point, the most selective point that still makes a profit and, when the curve has a clear knee, a
+*balanced* point (up to it, a point of selectivity costs less profit than beyond it). *Aim here*
+turns a point into a minimum-selectivity spec (`spec_for_point`) and asks for advice again. Nothing
+changes unless the operator aims: the curve uses its own random numbers, so the advisor's next
+suggestion is the same with or without it. It takes about 2 s on a fitted advisor.
+
+Measured on one campaign (complex reactor, 12 runs, v5 advisor; `test_pareto.py`): over the points
+predicted to earn at least 80 % of the top profit, the settings on the predicted curve truly lie
+within 0.33 % (of the best possible profit) of the true curve, but the predicted profit is 0.4–0.65
+per hour too high along it; the selective end is the weakest part (its last point 4.6 % below the
+true curve). Under an aimed minimum selectivity the planner searches coarsely and may head for
+settings that earn less than the point itself (for the balanced point, 14.4 /h on the curve, it
+found 10.5–13.9 /h over five seeds). The page does not yet hand the chosen point to the planner
+(the library's `plan` and `suggest` accept it as `seeds=`), so read the point's own settings as the
+target. One campaign is an example, not a guarantee; placeholder kinetics and prices.
+
+### 3.11 Baselines (all under the same step limits)
 
 - **Rules of thumb** (`ChemistPolicy`, a scripted policy we wrote from the standard heuristics,
   not a human): read conversion and selectivity off the GC.
@@ -296,13 +581,22 @@ result above is reproduced unchanged.
 - **Random walk**: a random allowed step each run.
 - **Smart v4**: the previous advisor (plain kinetics, one-step EI + purposeful step), to measure
   what the v5 ladder and planner add.
+- **Neural network alone** (`nn_only`, v7 study; `NNOnlyPolicy`): a deep ensemble of 8 small
+  neural networks (the v7 *direct* member on its own) predicts profit from the knobs; Expected
+  Improvement on its mean and the spread between its networks picks the next run from plain BO's
+  candidates within the step box. Like plain BO it sees one profit number per run, no physics and
+  no GC composition. It recommends its best **measured** run, as the rules of thumb and the random
+  walk do. (An earlier rule, the run with the highest ensemble mean, recommended runs that had
+  measured far worse than its best, because the ensemble does not reproduce its own training runs;
+  campaign files made under that rule are recognised as stale and not used.)
 - On the ageing scenario every method repeats the base case every 5th run (check runs).
 
-### 3.9 Limits (honest list)
+### 3.12 Limits (honest list)
 
 - The advisor needs the **reaction network** (which reactions happen). With one reaction missing
   it still works, but more slowly; with a badly wrong network the correction has to do the
-  work and the advantage shrinks (less so with v6).
+  work and the advantage shrinks (less so with v6). v7 can repair the network from the GC
+  readings (section 3.8), with the limits listed at the end of this section.
 - It wins partly because it **uses more information** (the whole GC composition, not one profit
   number) and because it can **plan beyond one step**. Both are the point, but neither is a
   like-for-like test of surrogates.
@@ -316,10 +610,43 @@ result above is reproduced unchanged.
   ends well below the fresh-catalyst best.
 - The adiabatic temperature rise is reported as a heat-load indicator. For this chemistry it is
   hundreds of kelvin at any useful conversion, so it is not a usable limit until there is a heat model.
-- Only the two built-in reaction schemes can be used from the web page; another chemistry needs
-  a new entry in `smart/systems.py`.
+- A campaign on the web page starts from one of the two built-in reaction schemes (v7 may then
+  change it, within the species A–E). The reaction finder accepts any typed network among A, B, C,
+  D and E; other species need entries in the species table of `smart/discovery.py` and in
+  `smart/systems.py`.
 - Suggestions only: every run still needs a safety check (safety ranges and fixed knobs keep
   suggestions inside what is allowed; step limits set what the hardware allows).
+
+v7 and the reaction finder:
+
+- **No step removes a reaction that does no harm.** The repair only searches when the network
+  fails the check, so a superfluous reaction, given or added, that leaves the fit within the
+  allowance is kept.
+- **Path dependence.** Starting from a very different network, repairing one change at a time
+  can end at a wrong network (two wrong reactions can prop each other up). The fresh search from no
+  reactions is the way out, but it is made at most twice per campaign and screens its changes with
+  plain rate laws only.
+- The time limit on a repair (`revise_seconds`, 60 s on the page) is checked between steps; one
+  batch of fits that is already running can overrun it (5–30 s).
+- **Placeholder thermodynamics.** Equilibrium constants of new reactions come from a placeholder
+  species table in `smart/discovery.py`, chosen to reproduce the complex network. Pruning the
+  library with it therefore encodes the directions of that example's two one-way steps (it removes
+  exactly D → A, D ⇌ A, E → B + C and B + C ⇌ E), and making A → D complete needs an entropy for D
+  that a rearrangement would hardly have. Without the pruning the finder still returns the same
+  reactions on the example files, but cannot tell those two steps from their two-way forms. Real
+  species need tabulated thermodynamics.
+- A log without a `gc_D` or `gc_E` column is read with zeros for that species (right for the simple
+  reaction), with a note in every summary; an empty cell in a column that is there is refused.
+- **Cost.** Each search of the repair costs 10–60 s; an automatic search from scratch 1–3 minutes,
+  and several minutes when nothing in the library fits (it starts again up to three times).
+- **What the finder can return.** Reactions from its library (at most 3 molecules reacting and 2
+  formed, at most 4 reactions per network), power-law orders 0, 1 or 2, and one adsorption term
+  (product C). Anything else (another species adsorbing, diffusion limits, a species the GC does
+  not see) shows as "does not fit within the GC noise", not as a wrong answer presented as right.
+  Unusual orders were tested in few trials, all with one reactant of order zero.
+- **Few, step-limited runs** cover a small region: on the first 8 runs of 10 such campaigns the
+  search found the true network in 6. All finder results are on simulated data with placeholder
+  kinetics.
 
 ---
 
@@ -342,10 +669,14 @@ own machine (Python's own `http.server`; nothing is installed, nothing leaves th
 | **Your runs** | type a run (set points in °C, bar, mL/min; GC as % or fractions; catalyst mass per run; hours on stream), edit or delete rows, import / export the CSV log, load the 5 screening runs on the virtual reactor. Conversion, selectivity, profit and the adiabatic temperature rise are worked out from the GC with the inert as internal standard. A set point repeated later in the log is what lets the model see catalyst drift. |
 | **What the model learned** | a card per reaction (activation energy with its likely range, how much faster per +10 °C), the plain-English notes (including product inhibition and catalyst ageing when the data show them), the Arrhenius plot with the uncertainty band, every GC number against the model. On the virtual reactor the true chemistry is drawn too; on a real one it is not known and not shown. |
 | **Explore** | profit of every run with the model's estimate; *what-if* charts: expected profit as each knob moves while the others stay at the next run, your best run or the predicted best, with the one-step reachable band shaded. |
+| **Advisor version** (in *Campaign*) | v7 (the default): v6 plus a neural network alone in the committee, and the reaction network checked after every run and repaired when the GC readings disagree (section 3.8; when a search runs, *Get advice* can take up to a minute longer); v6 (network taken as given) or v5. With v7, *What the model learned* shows a **Reaction network in use** box: the reactions, what was changed from the network you set up and why, in plain words, and the last check. |
+| **Optional: profit vs purity trade-off** (folded away under *What to run next*) | the curve of the best profit the model expects at each selectivity to C, with 90 % ranges, your best and last runs, and a table of points (most profitable, balanced, most selective). It changes nothing unless you press *Aim here* on a row, which sets that point's selectivity as the minimum in the product spec and asks for advice again (section 3.10). |
+| **Reaction finder** | which reactions do the GC readings support (section 3.9)? Data: one of 7 example files (each downloadable, with a line on what it is), an uploaded CSV, or the runs in the table. *Find the reactions* (automatic search, optionally starting from a network to repair; 1–3 minutes, progress shown, Stop button) or *Rank candidate networks* (text boxes; *Load the 4 example candidates* fills them in). Result: the best network and, for an example file, whether it matches the reactions the file was calculated from; every network compared (typical miss in units of the GC noise, BIC difference, evidence weight, verdict); fitted rate constants and activation energies with ranges; a parity chart; the search path; and *the next run that would tell the top two apart*, optionally within one step of the last run. Nothing here changes the campaign. |
 
 Light and dark themes, keyboard-navigable, works on a phone. The server keeps the fitted model
 between calls (a refit after one more run takes a few seconds), restores the advice when the page
 is reloaded, runs one fit at a time, and discards a fit if the runs change while it is computing.
+The reaction finder runs in a separate Python process, so a search can be stopped at once.
 The campaign lives in memory: **export the CSV before stopping the server** and import it next
 time. The server does not reload its own code; restart it after editing `reactor_ui.py`.
 
@@ -361,13 +692,16 @@ python reactor_advisor.py my_reactor_log.csv --max-step temperature=20 --max-ste
 python reactor_advisor.py my_reactor_log.csv --trial-cost 500 --hours 6000
 python reactor_advisor.py my_reactor_log.csv --min-selectivity 0.9 --remaining 8   # product spec, runs left
 python reactor_advisor.py --demo --simulate-days 15 --deactivation 2 --check-every 5    # ageing catalyst, check runs
-python reactor_advisor.py my_reactor_log.csv --advisor v5             # the v5 correction (one GP) instead of the v6 committee
+python reactor_advisor.py my_reactor_log.csv --advisor v6             # the v6 committee, reaction network taken as given (v7, the default, checks and repairs it)
+python reactor_advisor.py my_reactor_log.csv --advisor v5             # the v5 correction (one GP)
 ```
 
 It prints how each run went, what it learned about the chemistry in plain words, the next run
 (one allowed step from the last), where this is heading, whether another run is worth it, and the
-best proven settings, and writes `next_run.csv`. `--demo` writes its example runs to `demo_log.csv`
-(or to the log named on the command line, overwriting it), never to `my_reactor_log.csv`.
+best proven settings, and writes `next_run.csv`. With `--advisor v7` it also lists the reaction
+network in use, any changes made to it (in plain words) and the last check. `--demo` writes its
+example runs to `demo_log.csv` (or to the log named on the command line, overwriting it), never to
+`my_reactor_log.csv`.
 
 **Log format** (`my_reactor_log.csv`, one row per run in the order they were run; GC as mole
 fractions or %):
@@ -378,7 +712,14 @@ pressure_bar, flow_A_mL_min, flow_B_mL_min, flow_I_mL_min, temperature_C, cataly
 
 `hours_h` (hours on stream for that run, default 24) is optional; it is what the ageing model uses.
 
-The same file is what the web page imports and exports.
+The same file is what the web page imports and exports, and what the reaction finder reads
+(section 3.9):
+
+```bash
+python discover_reactions.py my_reactor_log.csv                                       # which reactions? automatic search
+python discover_reactions.py my_reactor_log.csv --candidates mine.txt yours.txt       # rank typed networks, one file each
+python discover_reactions.py my_reactor_log.csv --candidates mine.txt yours.txt --next-run --from-last-run   # + the run that tells them apart
+```
 
 ### 4.3 The demo for the supervisors (`khare_demo.py`)
 
@@ -399,11 +740,15 @@ Options: `--seeds 5` (quicker), `--workers N` (benchmark processes, default
 |---|---|
 | `smart/systems.py` | both reaction networks (true kinetics with Langmuir–Hinshelwood site blocking for the virtual reactor, and a chemist's guess for the advisor), heats of reaction and the adiabatic temperature rise; the batch reactor simulator: a vectorised adaptive Rosenbrock solver (ROS2, L-stable, each experiment with its own step size; ~10× faster than LSODA for thousands of experiments, within 2·10⁻³ of it) plus the exact LSODA solver for the virtual reactor; surface-area coordinate; knobs, box, step limits, screening runs; economics |
 | `smart/kinetics.py` | kinetic parameter estimation from GC readings: Bayesian least squares (wide prior around the guess), Laplace uncertainty inflated when the physics fits worse than the GC noise explains; the v5 ladder of model classes (plain, inhibition, adsorption heat, ageing) chosen by BIC, with ageing only when a set point was repeated |
-| `smart/advisor.py` | the advisor (`SmartAdvisor`: fit, plan, receding-horizon planner with specs and recover mode, the v4 greedy rule), the virtual reactor with inhibition, GC noise and catalyst ageing, profit and KPIs from a GC reading, the chemist / plain-BO / random-walk policies, campaigns, true optima for scoring (`smart/optima.json`) |
-| `smart/committee.py` | v6: the committee correction (no correction / GP / neural-network ensemble), stacking weights from held-out prediction, mixture mean and spread including the members' disagreement; all networks of all folds trained in one vectorised L-BFGS (`BatchMLP`) |
-| `smart/benchmark.py` | resumable multi-seed benchmark over the scenarios `simple`, `complex`, `complex_deact`, one `.npz` per campaign in `results/smart_bench/<scenario>/`; methods include `smart_v6` and `smart_v6_missing_E` |
+| `smart/advisor.py` | the advisor (`SmartAdvisor`: fit, plan, receding-horizon planner with specs and recover mode, the v4 greedy rule; v7: `revise=True`, the check and repair of the reaction network after every run, `_revise`, with its plain-word log `revisions`), the virtual reactor with inhibition, GC noise and catalyst ageing, profit and KPIs from a GC reading, the rules-of-thumb / plain-BO / random-walk / neural-network-alone (`NNOnlyPolicy`) policies, campaigns, true optima for scoring (`smart/optima.json`) |
+| `smart/committee.py` | v6: the committee correction (no correction / GP / neural-network ensemble), stacking weights from held-out prediction, mixture mean and spread including the members' disagreement; all networks of all folds trained in one vectorised L-BFGS (`BatchMLP`). v7: the fourth member `direct` (`ProfitEnsemble`, a neural-network ensemble on the knobs alone), `correction="hybrid"`, any subset of members (`members=`) for the ablations |
+| `smart/discovery.py` | v7: the reaction finder. Reactions as text (with plain-word errors), any network as a fixed-bed reactor model, fit and BIC ranking (`fit_network`, `rank_candidates`), the reaction library enumerated from the atom balance with a placeholder species table (`reaction_library`), the automatic search (`discover`), one step of it for the advisor's repair (`one_step_revision`), the misfit check (`misfit`), the run that tells two networks apart (`discriminating_run`), reading and writing run logs |
+| `smart/pareto.py` | v7: the optional profit vs selectivity trade-off curve (`tradeoff`), "aim here" as a spec (`spec_for_point`), and the true curve of the virtual reactor for scoring (`true_tradeoff`, cached in `smart/pareto_true.json`) |
+| `smart/benchmark.py` | resumable multi-seed benchmark over the scenarios `simple`, `complex`, `complex_deact`, one `.npz` per campaign in `results/smart_bench/<scenario>/`; methods include `smart_v6` and `smart_v6_missing_E`, and the v7 study (`V7_STUDY`, 18 methods, section 3.8); files made by an earlier definition of a method are recognised as stale and never reused |
 | `compare_v6.py` | paired v6-vs-v5 comparison on the benchmark cache: table, Wilcoxon test, committee weights, `figures/smart_6_v6_vs_v5.png` |
-| `smart-advisor-model.md` | the model and protocol in equations: surface-area coordinate, inert knob, constraints, economics, the advisor's loop, the baselines |
+| `analysis_v7/` | `compare_v7.py` (the v7 study against v5, v6 and the baselines: `figures/smart_7_campaigns.png`, `figures/smart_7_candidates.png`, `analysis_v7/v7_summary.md`), `gc_accuracy.py` (mechanism vs neural network at predicting the GC of unseen runs), `plot_mechanism.py` (`figures/smart_7_mechanism.png`); `plot_campaigns.py` is the earlier preliminary figure |
+| `discover_reactions.py`, `make_discovery_example.py` | the reaction finder on the command line; the builder of `examples/discovery/` (data files, candidate files, `WORKED_EXAMPLE.md`, `finder_results.json`) |
+| `smart-advisor-model.md` | the model and protocol in equations: surface-area coordinate, inert knob, constraints, economics, the advisor's loop, the v6 and v7 committees, the network repair, reaction discovery, the trade-off curve, the baselines |
 
 The advisor reuses `bo/gp.py` (the fitted Matérn GP) for its correction term and `bo/loop.py`'s
 log-input wrapper and rank transform for the plain-BO baseline.
@@ -767,12 +1112,17 @@ profit objective and 20 seeds.
 | `bo_basic.py`, `bo_5knobs.py`, `simulation_campaign.py`, `compare.py` | v1 | first BO, brute force, overlay |
 | `bo/` (`gp.py`, `acquisition.py`, `nn.py`, `loop.py`, `problem.py`, `optima.json`) | v2 | the BO package |
 | `test_bo.py`, `run_benchmark.py`, `analyse_benchmark.py`, `surrogate_study.py`, `demo_bo_1d.py`, `suggest_next.py`, `make_report.py`, `report/` | v2 | checks, benchmark, studies, black-box next-experiment tool, results page |
-| `smart/` (`systems.py`, `kinetics.py`, `advisor.py`, `committee.py`, `benchmark.py`, `optima.json`) | v3–v6 | the smart advisor |
+| `smart/` (`systems.py`, `kinetics.py`, `advisor.py`, `committee.py`, `benchmark.py`, `optima.json`) | v3–v7 | the smart advisor |
+| `smart/discovery.py`, `smart/pareto.py`, `smart/pareto_true.json` | v7 | the reaction finder; the profit vs selectivity trade-off curve and its cached true curve |
 | `compare_v6.py` | v6 | paired v6-vs-v5 comparison |
-| `reactor_ui.py`, `ui/` (`index.html`, `app.css`, `app.js`) | v4 | the web interface |
-| `reactor_advisor.py` | v3/v4 | the command-line advisor |
+| `analysis_v7/` (`compare_v7.py`, `gc_accuracy.py`, `gc_accuracy.json`, `plot_mechanism.py`, `plot_campaigns.py`, `README.md`) | v7 | the v7 comparison and its figures; mechanism vs neural network at predicting the GC |
+| `discover_reactions.py` | v7 | the reaction finder on the command line |
+| `make_discovery_example.py`, `examples/discovery/` | v7 | builds the 7 example data files, the 4 candidate networks, `WORKED_EXAMPLE.md` and `finder_results.json` |
+| `reactor_ui.py`, `ui/` (`index.html`, `app.css`, `app.js`) | v4, v7 | the web interface (v7: reaction finder, v7 advisor, trade-off panel) |
+| `reactor_advisor.py` | v3/v4, v7 | the command-line advisor (`--advisor v7`) |
 | `khare_demo.py` | v3/v4 | the 4-part demo for the supervisors |
-| `test_smart.py`, `test_reactor_ui.py` | v3–v6 | 63 + 38 checks |
+| `test_smart.py`, `test_reactor_ui.py` | v3–v7 | 132 + 56 checks |
+| `test_discovery.py`, `test_pareto.py` | v7 | 81 + 58 checks |
 | `presentation/` | | mid-term deck (17 October 2026, speaker script in the notes) and `midterm_script.md` with timings and prepared answers |
 | `digital-twin-fixed-bed-reactor.md`, `smart-advisor-model.md` | docs | the reactor model and what the advisor adds |
 | `figures/` | all | every figure referenced above (committed) |
@@ -786,9 +1136,14 @@ profit objective and 20 seeds.
 | Command | Checks | Time | What is checked |
 |---|---|---|---|
 | `python test_reactor_twin.py` | 11 | 1 s | atom balances, inert, mole fractions, yield identity, analytical solution, input guard |
-| `python test_smart.py` | 63 | ~5 min | `smart/systems.py` matches `reactor_twin.py`; surface-area invariance; fast solver vs LSODA; atom balances on both networks; dilution; equilibrium from thermodynamics; GC → flows → profit; kinetics recovered from clean data; screening runs and every policy within the step limits; safety box, fixed knobs, custom step limits; log round trip; v5: the model ladder picks plain / inhibition / ageing on data made that way, decay only with replicates, time on stream, adiabatic rise, virtual-reactor ageing, planner within step limits and spec (or recovering), calibration, check runs, cumulative profit; v6: stacking weights, noise-only data give a small correction, a knob-smooth error goes to the GP and a physics-shaped one to the networks, spread includes disagreement, networks only after 8 runs, v6 suggestions within the step limits |
-| `python test_reactor_ui.py` | 38 | ~1 min | the web server's campaign logic: validation messages, °C/K, GC in %, cold runs, export/import round trip, settings all-or-nothing, fixed knobs and step limits honoured, virtual reactor uses the table's catalyst mass, one fit at a time, a change during a fit discards it, the advisor version is validated and v6 explains its committee weights |
+| `python test_smart.py` | 132 | ~8 min | `smart/systems.py` matches `reactor_twin.py`; surface-area invariance; fast solver vs LSODA; atom balances on both networks; dilution; equilibrium from thermodynamics; GC → flows → profit; kinetics recovered from clean data; screening runs and every policy within the step limits; safety box, fixed knobs, custom step limits; log round trip; v5: the model ladder picks plain / inhibition / ageing on data made that way, decay only with replicates, time on stream, adiabatic rise, virtual-reactor ageing, planner within step limits and spec (or recovering), calibration, check runs, cumulative profit; v6: stacking weights, noise-only data give a small correction, a knob-smooth error goes to the GP and a physics-shaped one to the networks, spread includes disagreement, networks only after 8 runs, v6 suggestions within the step limits; v7: the stand-alone network takes the weight when the physics is useless and little when it is right, its predictions stay within the profits seen plus half their range, a held-out run cannot widen the range it is judged against, the GP is refitted on every fold next to it, adding it changes nothing the other members compute, the v6 default is unchanged; `nn_only` stays within the step limits and recommends its best measured run; the network check (the right network passes, one without C + B → E fails and says why); the repair (adds the missing reaction and plans with it, leaves a right network alone, names one wrong reading instead of searching, takes a change back when its runs are edited, keeps to the time limit, waits after a search that changed nothing, works on the simple reaction); the v7 study's method definitions and stale-file detection; every v7-study method runs a short campaign within the step limits |
+| `python test_reactor_ui.py` | 56 | ~5 min | the web server's campaign logic: validation messages, °C/K, GC in %, cold runs, export/import round trip, settings all-or-nothing, fixed knobs and step limits honoured, virtual reactor uses the table's catalyst mass, one fit at a time, a change during a fit discards it, the advisor version is validated and v6 explains its committee weights; v7: the network box (shown only for v7; the given network kept when it explains the data); the trade-off curve (changes nothing by itself; *Aim here* sets the minimum selectivity and asks for advice again); the reaction finder (7 example files and 4 candidates, downloads, ranks the true network first on the 8-run campaign and says it matches the answer file, rate constants and parity chart, the next run within one step, a running search stopped at once) |
+| `python test_discovery.py` | 81 | ~8 min | reactions as text and plain-word errors; atom balance and the species table; the library (12 balanced reactions, no duplicates); the fast integrator within 2·10⁻³ of LSODA; zero-order rates; the example files re-calculated from their reactions, from rate laws written out by hand, and the hand calculation of `WORKED_EXAMPLE.md`; reading run logs; ranking truth > close > similar > far on the complex files and fitted constants close to the truth; ties reported as undecided; the discriminating run (inside the box, within one step); the misfit check and its one-bad-run test; one-step repair; the automatic search on the mystery file, from each wrong candidate, on the short campaign and on the zero-order file; the time limit; the command line. `--quick` skips the searches; `--thorough` adds one hard search |
+| `python test_pareto.py` | 58 | ~1 min | the non-dominated filter; on a fitted advisor: the curve takes under 10 s and leaves the advisor unchanged, is sorted and non-dominated, stays inside the box with enough flow, has its markers (no balanced point on a straight curve), agrees with the advisor's own plan, and no other setting beats it by more than 5 % of its top profit; safety ranges and fixed knobs; the no-profit and no-trade-off cases; `spec_for_point`; the true curve and the comparison with it; v6 and the simple reactor |
 | `python test_bo.py` | 29 | ~5 min | likelihood gradients, match with scikit-learn, ARD, posterior sampling, every v2 strategy runs, GP + EI converges on a toy problem |
+
+v5, v6 and the old baselines are bit-identical to the committed v6 code (377 of 377 saved arrays
+compared), so every earlier result stands.
 
 ---
 
@@ -796,23 +1151,30 @@ profit objective and 20 seeds.
 
 Placeholder: the kinetics of both networks (`smart/systems.py`, `reactor_twin.py`), the prices
 (`smart/systems.py`, `bo/problem.py`), the GC noise, the product inhibition of the virtual reactor,
-the step limits and the flow minimum. They are plausible numbers, not measured ones.
+the step limits and the flow minimum; since v7 also the formation enthalpies and entropies of the
+species table in `smart/discovery.py`, and with them the equilibrium constants of every reaction
+the finder proposes. They are plausible numbers, not measured ones.
 
-Next, in order (as presented at the mid-term on 17 October 2026):
+Where the plan presented at the mid-term (17 October 2026) stands, and what comes next:
 
-1. **Make the numbers real.** No real data has been used yet. Collect real kinetics and prices
-   and a real GC log from the Micromeritics reactor with Prof. Khare (`reactor_ui.py` imports a
-   log as is); rerun `khare_demo.py` and the v2 benchmark; measure how far the textbook model is
-   from the real reactor and how much the GP correction must carry. Hardware limits (furnace and
-   pressure ramp rates, MFC reference conditions, the GC's minimum flow) become the step limits.
-2. **Your own chemistry.** Let the user type in their own reactions on the page, and let the
-   advisor propose runs that tell competing reaction networks apart (model discrimination).
-3. **Blind test against a chemist.** Same reactor, same run budget, judged blind on profit and
-   runs used: the fair version of the rules-of-thumb comparison.
-4. **Profit vs selectivity.** Show the trade-off curve (Pareto front) between profit and product
-   purity, so the operator picks the point that fits the contract.
+1. **Make the numbers real** (open). No real data has been used yet. Collect real kinetics and
+   prices and a real GC log from the Micromeritics reactor with Prof. Khare (`reactor_ui.py` imports
+   a log as is); rerun `khare_demo.py`, the v2 benchmark and the reaction finder on it; measure how
+   far the textbook model is from the real reactor and how much the correction must carry. Hardware
+   limits (furnace and pressure ramp rates, MFC reference conditions, the GC's minimum flow) become
+   the step limits. With real species, the species table of `smart/discovery.py` needs tabulated
+   thermodynamics in place of the placeholders.
+2. **Your own chemistry** (largely done in v7). The reaction finder ranks networks typed on the
+   page and proposes the run that tells the top two apart (section 3.9), and the v7 advisor repairs
+   its network during a campaign (section 3.8). Still open: starting a campaign on the page from a
+   typed network rather than a built-in one, and a step that removes a reaction that does no harm
+   (pruning), which the repair lacks.
+3. **Blind test against a chemist** (open). Same reactor, same run budget, judged blind on profit
+   and runs used: the fair version of the rules-of-thumb comparison.
+4. **Profit vs selectivity** (done in v7 as an optional panel, section 3.10). Still open: handing
+   the chosen point to the planner on the page, so that it heads for that point's settings.
 
-Also open: an ablation of v6 without the neural networks (to separate the networks' share of
-the gain from the committee's weighting and disagreement term); rerun `khare_demo.py` on the finished v5 benchmark to refresh the figures; a heat
+Also open: write up the v7 benchmark (section 3.8) and decide on that evidence whether v7 becomes
+the default; rerun `khare_demo.py` on the finished v5 benchmark to refresh the figures; a heat
 model so hot spots are predicted, not only flagged; deciding when to regenerate an ageing
 catalyst; more seeds for the comparisons that are not significant at 20.

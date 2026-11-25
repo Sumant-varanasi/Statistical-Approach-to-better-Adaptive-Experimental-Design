@@ -111,8 +111,8 @@ class Campaign:
         self.spec = {}                         # product / safety spec, e.g. {"S_C": 0.9, "dT_ad": 60}
         self.remaining = 10                    # runs the operator can still afford
         self.deactivation = 0.0                # virtual reactor only: activity lost per day, %
-        self.version = "v6"                     # advisor: "v6" (committee correction, default), "v5" (GP correction) or
-                                               # "v7" (v6 + the neural network alone, and the reaction network is checked and repaired)
+        self.version = "v7"                     # advisor: "v7" (default: v6 + the neural network alone, and the reaction
+                                               # network is checked and repaired), "v6" (committee correction) or "v5" (GP)
         self.progress = None                   # what a long fit is doing right now (v7 network search), for the page
         self.tradeoff_res = None               # the optional profit vs selectivity curve, while the advice it came from holds
         self.seed = 0

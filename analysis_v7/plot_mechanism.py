@@ -1,4 +1,4 @@
-"""Preliminary figure: finding the reaction mechanism, and physics vs a neural network at predicting the GC."""
+"""Finding the reaction mechanism, and physics vs a neural network at predicting the GC (figures/smart_7_mechanism.png)."""
 import os, sys, json
 sys.path.insert(0, os.getcwd())
 import numpy as np
@@ -182,13 +182,13 @@ ax.legend(h, ["reaction mechanism (rate laws + mole balances; see the row labels
           frameon=False, loc="lower left", bbox_to_anchor=(0, 1.0), ncol=2)
 ax.set_title("D. Predicting the GC of unseen runs: mechanism vs neural network", fontsize=10.5, color=INK, loc="left", pad=22)
 
-fig.text(0.01, 0.005, "PRELIMINARY: reaction finder before its final review. Simulated data, placeholder kinetics. In panel D the "
+fig.text(0.01, 0.005, "Simulated data, placeholder kinetics. In panel D the "
          "'runs left out at random' rows give the mechanism the reactions the data were made from; only the 'hottest 6 runs' "
          "rows use reactions the finder found from the training runs.\n"
          "Neural network: ensemble of 5 two-layer networks (32 units), penalty chosen by cross-validation on the training runs.\n"
          "Fairness check (runs left out at random): a Gaussian process on the same data misses by 5.9-8.0 mol-%, about the same as the "
          "network (5.6-7.4); always predicting the average misses by 12.7-13.8 mol-%. 30 runs are too few for any black box.",
          fontsize=7.5, color=INK2)
-out = "figures/smart_7_prelim_mechanism.png"
+out = "figures/smart_7_mechanism.png"
 fig.savefig(out, dpi=130, facecolor=SURF, bbox_inches="tight")
 print("->", out)

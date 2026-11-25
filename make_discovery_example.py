@@ -497,7 +497,7 @@ def finder_md(res):
           "virtual reactor is not in the model at all; its effect is absorbed by the fitted constants. One thing makes "
           "this file a favourable case: how K_C falls with temperature is not fitted but assumed (a typical heat of "
           f"adsorption, {-PRIOR_E * R * T_REF / 1000:.0f} kJ/mol), and the virtual reactor happens to use the same value.", "",
-          "The run that would best tell the first two candidates apart, anywhere in the operating box and within one "
+          "Back to the noisy file (complex_noisy.csv): the run that would best tell its first two candidates apart, anywhere in the operating box and within one "
           "allowed step of the last run of the log:", ""]
     L += block(report_next_run(res["next:complex_free"]) + [""] + report_next_run(res["next:complex_step"]))
     L += ["The difference between the two predictions is given twice: against the GC noise alone, and against the GC noise "

@@ -55,12 +55,12 @@ Product spec and budget
     --remaining 8              runs you can still afford: the planner weighs exploration by it
 
 Advisor version
-    --advisor v5               correct the physics with one Gaussian process (v5) instead of the v6
-                               committee (Gaussian process + neural-network ensemble, weighted by
-                               held-out prediction; the default)
-    --advisor v7               v6 + a neural network that predicts profit from the knobs alone, and
+    (default v7)               v6 + a neural network that predicts profit from the knobs alone, and
                                after every run the advisor checks its reactions against the GC
-                               readings and repairs them one change at a time (slower)
+                               readings and repairs them one change at a time
+    --advisor v6               the committee (Gaussian process + neural-network ensemble, weighted by
+                               held-out prediction) with the reaction network taken as given
+    --advisor v5               correct the physics with one Gaussian process (v5)
 
 Safety: the advisor only SUGGESTS.  Check every suggestion against your plant's safety limits
 (use --limit to keep it inside them) before running it.  Prices are placeholders: replace them.
@@ -444,9 +444,9 @@ def main():
     ap.add_argument("--remaining", type=int, default=10, help="runs you can still afford (default 10)")
     ap.add_argument("--deactivation", type=float, default=0.0, help="virtual reactor only: activity lost per day, %% (default 0)")
     ap.add_argument("--check-every", type=int, default=0, help="--simulate-days only: repeat the base case every N days")
-    ap.add_argument("--advisor", choices=("v5", "v6", "v7"), default="v6",
-                    help="v6: committee of GP + neural networks (default); v5: one GP correction; v7: v6 + a "
-                         "neural network alone, and the reaction network is checked and repaired")
+    ap.add_argument("--advisor", choices=("v5", "v6", "v7"), default="v7",
+                    help="v7 (default): v6 + a neural network alone, and the reaction network is checked and "
+                         "repaired; v6: committee of GP + neural networks, network as given; v5: one GP correction")
     ap.add_argument("--seed", type=int, default=0)
     args = ap.parse_args()
     if args.log is None:                       # never overwrite a real log with demo data

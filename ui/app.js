@@ -69,7 +69,7 @@ function renderSetup() {
   $("s-cost").value = st.trial_cost ?? ""; $("s-hours").value = st.hours; $("s-seed").value = st.seed;
   $("s-spec-SC").value = st.spec.S_C ?? ""; $("s-spec-dT").value = st.spec.dT_ad ?? ""; $("s-remaining").value = st.remaining;
   $("s-deact").value = st.deactivation ?? 0;
-  $("s-version").value = st.version || "v6";
+  $("s-version").value = st.version || "v7";
 
   const L = $("limits");
   L.innerHTML = "";
