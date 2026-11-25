@@ -21,7 +21,11 @@ Example 2, the complex network (for ranking typed candidates)
                             the virtual "real" reactor (the 5 shared screening runs + 3 allowed
                             steps), to show what the finder does with few, step-limited runs
     candidates_truth.txt, candidates_close.txt, candidates_similar.txt, candidates_far.txt
-WORKED_EXAMPLE.md           the full calculation of one run by hand, and what the reaction finder
+Example 3, a rate law that does not follow the equation (for the automatic search)
+    zero_order_noisy.csv    the same 30 runs calculated from the network of candidates_close.txt
+                            taken as the TRUE one (the over-reaction C + B -> E runs at r = k P_C,
+                            zero order in B), with GC noise: can the search find the order?
+WORKED_EXAMPLE.md          the full calculation of one run by hand, and what the reaction finder
                             returns for every file
 finder_results.json         the finder's results in full (for the website and for checking)
 
@@ -46,7 +50,7 @@ warnings.filterwarnings("ignore")
 from smart import discovery as D
 from smart.systems import (COMPLEX, A_SPEC, R, T_REF, P_STD, T_STD, MAX_STEP, theta_from, scale, mfc_to_molar,
                            screening_runs, base_case)
-from smart.kinetics import GC_NOISE_REL, GC_NOISE_ABS
+from smart.kinetics import GC_NOISE_REL, GC_NOISE_ABS, PRIOR_E
 from smart.advisor import VirtualReactor
 from discover_reactions import report_discovery, report_ranking, report_next_run, strip
 
@@ -64,8 +68,12 @@ MYSTERY_EA = [65e3, 110e3, 85e3]          # activation energies, J/mol
 # ------------------------------------------------------------------ example 2: the complex network (systems.COMPLEX)
 COMPLEX_K = [3.0e-6, 3.0e-7, 1.0e-6]
 COMPLEX_EA = [70e3, 120e3, 150e3]
-SEEDS = dict(design=7, mystery_noise=5, complex_noise=3, complex_real=11, short_campaign=1)
+SEEDS = dict(design=7, mystery_noise=5, complex_noise=3, complex_real=11, short_campaign=1, zero_noise=0)
 SHORT = "complex_short_campaign.csv"
+# ------------------------------------------------------------------ example 3: a rate law that does not follow the equation
+ZERO = "zero_order_noisy.csv"
+ZERO_TEXT = D.CANDIDATES["close"]         # A + B <=> C;  C + B -> E with r = k P_C (zero order in B);  A -> D
+ZERO_K, ZERO_EA = COMPLEX_K, COMPLEX_EA   # the same placeholder numbers as the complex network
 
 
 def mystery_system():
@@ -75,6 +83,12 @@ def mystery_system():
 def complex_system():
     """The complex network with plain rate laws and its true kinetics (same numbers as systems.COMPLEX)."""
     return D.build_system(D.CANDIDATES["truth"], theta=theta_from(COMPLEX_K, COMPLEX_EA), name="complex")
+
+
+def zero_order_system():
+    """The network of candidates_close.txt taken as the truth: the over-reaction C + B -> E runs
+    at r = k P_C, whatever the pressure of B (zero order in B)."""
+    return D.build_system(ZERO_TEXT, theta=theta_from(ZERO_K, ZERO_EA), name="zero_order")
 
 
 def study_design(n=N_RUNS, seed=SEEDS["design"]):
@@ -129,10 +143,11 @@ def short_campaign(seed=SEEDS["short_campaign"]):
 
 
 def datasets():
-    """{file name: data} for the six CSV files."""
+    """{file name: data} for the seven CSV files."""
     phys = study_design()
     ym, yc = exact_gc(mystery_system(), phys), exact_gc(complex_system(), phys)
-    return {"mystery_exact.csv": D.make_data(phys, ym, name="mystery_exact.csv"),
+    return {ZERO: D.make_data(phys, noisy_gc(exact_gc(zero_order_system(), phys), SEEDS["zero_noise"]), name=ZERO),
+            "mystery_exact.csv": D.make_data(phys, ym, name="mystery_exact.csv"),
             "mystery_noisy.csv": D.make_data(phys, noisy_gc(ym, SEEDS["mystery_noise"]), name="mystery_noisy.csv"),
             "complex_exact.csv": D.make_data(phys, yc, name="complex_exact.csv"),
             "complex_noisy.csv": D.make_data(phys, noisy_gc(yc, SEEDS["complex_noise"]), name="complex_noisy.csv"),
@@ -247,7 +262,10 @@ def worked_example_md(data):
                   [[str(j), f"`{r.equation()}`", f"`{r.rate_law(j)}`", f"{MYSTERY_K[j - 1]:.2e} {r.k_units()}",
                     f"{k_m2[j - 1]:.2e}", f"{MYSTERY_EA[j - 1] / 1000:g}"] for j, r in enumerate(net, 1)])
     L += ["", f"Reaction 1 is reversible with dH = {dH / 1000:g} kJ/mol and dS = {dS:g} J/mol/K (it releases heat, so the "
-          "equilibrium moves back to A + B when hotter). Reactions 2 and 3 run one way.", "",
+          "equilibrium moves back to A + B when hotter). Reactions 2 and 3 run one way. (That they run one way is part of "
+          "how this made-up example is defined. The program's own placeholder table of reaction enthalpies and entropies "
+          "would let both run backwards to some extent at some conditions, so the search in part B is also offered their "
+          "two-way forms and has to find out from the data which form was used.)", "",
           "The mole balances written out (the same for every run):", "",
           "    dF_A/dS = -r1 - r3          dF_B/dS = -r1 + r2 - 2 r3",
           "    dF_C/dS = +r1 - r2          dF_D/dS = +r2",
@@ -298,8 +316,10 @@ def worked_example_md(data):
     atoms_in = (F0[0], F0[1])
     atoms_out = (Fout[0] + Fout[2] + Fout[3] + Fout[4], Fout[1] + Fout[2] + 2 * Fout[4])
     L += ["", f"The hand calculation and the file agree: the largest difference is {np.max(np.abs(yout - np.round(csv_row, 6))):.1e}, "
-          "which is the rounding of the file to 6 decimals (the file itself was made with the project's simulator, "
-          "a different integrator from the one used in step 4).", "",
+          "which is the rounding of the file to 6 decimals. (The file was made by the project's simulator, which "
+          "integrates all 30 runs in one call with a relative tolerance of 1e-8; step 4 integrates this one run on its own "
+          "with 1e-10. `test_discovery.py` also recalculates rows of both exact files from the rate laws written out by "
+          "hand, without using the project's simulator at all.)", "",
           f"**Check: atom balance.** A units in = {atoms_in[0] * u:.4f}, out (A + C + D + E) = {atoms_out[0] * u:.4f} micromol/s; "
           f"B units in = {atoms_in[1] * u:.4f}, out (B + C + 2 E) = {atoms_out[1] * u:.4f} micromol/s. "
           f"Conversion of A = 1 - {Fout[0] * u:.4f} / {F0[0] * u:.4f} = {100 * (1 - Fout[0] / F0[0]):.1f} %.", "",
@@ -322,8 +342,9 @@ def worked_example_md(data):
           "230-410 C, the same for every file, with 1 g of catalyst. They are **not** step-limited like an optimisation "
           "campaign: a kinetic study deliberately jumps between very different conditions. Conversion of A in the "
           f"mystery file ranges from {100 * _conv(S, d).min():.0f} % to {100 * _conv(S, d).max():.0f} %.", "",
-          f"One more file, `{SHORT}`, is deliberately different: {len(data[SHORT]['gc'])} step-limited runs from the start of an "
-          "optimisation campaign on the virtual \"real\" reactor (see B5).", ""]
+          f"Two more files: `{SHORT}` is deliberately different, {len(data[SHORT]['gc'])} step-limited runs from the start of an "
+          f"optimisation campaign on the virtual \"real\" reactor (see B5); `{ZERO}` holds the same 30 runs calculated from a "
+          "network with a rate law that does not follow its equation (see B6).", ""]
     return L
 
 
@@ -352,6 +373,8 @@ def run_finder(data, log=print):
     note(f"automatic search and ranking on {SHORT}")
     res[f"discover:{SHORT}"] = D.discover(data[SHORT])
     res[f"rank:{SHORT}"] = D.rank_candidates(D.CANDIDATES, data[SHORT])
+    note(f"automatic search on {ZERO}")
+    res[f"discover:{ZERO}"] = D.discover(data[ZERO])
     note("runs that tell networks apart")
     d = data["complex_noisy.csv"]
     res["next:complex_free"] = D.discriminating_run(res["rank:complex_noisy.csv"], d)
@@ -371,6 +394,8 @@ def finder_md(res):
         return ["```"] + lines + ["```", ""]
 
     my, mx, cr = res["discover:mystery_noisy.csv"], res["discover:mystery_exact.csv"], res["discover:complex_real.csv"]
+    lib = D.reaction_library()
+    n_var = sum(len(e["variants"]) for e in lib)
     L = ["## Part B. What the reaction finder returns", "",
          "How it decides, in short: every network tried is fitted to all GC readings (rate constants and activation "
          "energies). The misfit is counted in units of the GC noise, and networks are compared by BIC = misfit + a "
@@ -379,8 +404,11 @@ def finder_md(res):
          "### B1. Automatic search on the mystery data", "",
          "    python discover_reactions.py examples/discovery/mystery_noisy.csv", "",
          "The search starts with no reactions and may use any reaction from a library that is **enumerated from the "
-         f"atom balance** ({len(D.reaction_library())} reactions among A, B, C, D, E with at most 3 molecules reacting and "
-         "2 formed, each one-way in either direction or reversible), not written around the answer.", ""]
+         f"atom balance** ({len(lib)} reactions among A, B, C, D, E with at most 3 molecules reacting and 2 formed; "
+         f"{n_var} forms in all: one-way in either direction and reversible, except where the placeholder thermodynamics "
+         "says a direction runs to completion everywhere in the operating box, and then only that direction is offered), "
+         "not written around the answer. Each step of the search tries adding a reaction, removing one, changing one "
+         "reaction order and, if none of these helps, replacing a reaction.", ""]
     L += block(report_discovery(my, "mystery_noisy.csv"))
     truth = MYSTERY_TEXT
     hit = same_network(my["best"]["reactions"], truth)
@@ -417,10 +445,15 @@ def finder_md(res):
     L += [f"On the realistic file the best candidate is '{rr['name']}', fitted with {rr['model_words']}. "
           "The program is allowed one extra number for product C blocking catalyst sites and keeps it only when the data "
           "ask for it (they do here, and not on the two files made with plain rate laws). The reactant term K_A of the "
-          "virtual reactor is not in the model at all; its effect is absorbed by the fitted constants.", "",
+          "virtual reactor is not in the model at all; its effect is absorbed by the fitted constants. One thing makes "
+          "this file a favourable case: how K_C falls with temperature is not fitted but assumed (a typical heat of "
+          f"adsorption, {-PRIOR_E * R * T_REF / 1000:.0f} kJ/mol), and the virtual reactor happens to use the same value.", "",
           "The run that would best tell the first two candidates apart, anywhere in the operating box and within one "
           "allowed step of the last run of the log:", ""]
     L += block(report_next_run(res["next:complex_free"]) + [""] + report_next_run(res["next:complex_step"]))
+    L += ["The difference between the two predictions is given twice: against the GC noise alone, and against the GC noise "
+          "plus the uncertainty of each network's own prediction (its fitted rate constants are not exact, least of all far "
+          "from the runs done). The second, smaller number is the one to plan with; the expected gain in BIC is based on it.", ""]
     L += ["### B3. Repairing a wrong candidate", "",
           "    python discover_reactions.py examples/discovery/complex_noisy.csv --start examples/discovery/candidates_far.txt", "",
           "Starting from each wrong candidate, the search adds, removes and replaces reactions and re-checks the orders:", ""]
@@ -454,10 +487,37 @@ def finder_md(res):
     L += [("The search ends at the true reactions" if sc_hit else "The search does NOT end at the true reactions")
           + f" after starting again {sc['restarts']} time{'s' if sc['restarts'] != 1 else ''}. "
           + ("With 8 runs the fit is less sharp than with the 30-run study: compare the uncertainties of the fitted numbers above "
-             "with those in B2." if sc_hit else ""), "",
+             "with those in B2. " if sc_hit else "")
+          + ("What these 8 runs leave open, as reported by the search: " + " ".join(sc["undecided"]) if sc["undecided"] else
+             "The next best networks are ruled out, but by much smaller BIC differences than in the 30-run study."), "",
           "Ranking the four typed candidates on the same runs:", ""]
     L += block(report_ranking(sr, SHORT))
-    L += ["### B6. Summary", ""]
+    zo = res[f"discover:{ZERO}"]
+    zo_hit = same_network(zo["best"]["reactions"], ZERO_TEXT)
+    zo_tied = any(same_network(f["reactions"], ZERO_TEXT) and f["tied_with_best"] for f in zo["runners_up"])
+    L += ["### B6. A rate law that does not follow the equation (order of reaction)", "",
+          f"    python discover_reactions.py examples/discovery/{ZERO}", "",
+          f"`{ZERO}` holds the same 30 runs calculated from the network of `candidates_close.txt` taken as the TRUE one:", ""]
+    L += block(D.format_network(ZERO_TEXT))
+    L += ["Reaction 2 uses up B but its rate does not depend on the pressure of B (zero order in B: the catalyst surface "
+          "is saturated with B). So that B cannot go below zero, the data were calculated with the rate multiplied by "
+          f"y_B / (y_B + {D.ZERO_ORDER_CUT:g}), y_B being the mole fraction of B: 1 for all practical purposes, falling to zero "
+          "when B has run out. Kinetic numbers as for the complex network (A4); GC noise as in the other noisy files. "
+          "The search is not told that any order is unusual:", ""]
+    L += block(report_discovery(zo, ZERO))
+    L += [("The search returns exactly the true reactions and rate laws, including the zero order in B." if zo_hit else
+           "The true network is among the networks the search reports as tied with its best." if zo_tied else
+           "The search did NOT return the true network here; see the output above for what it found instead.")
+          + " A rate law that does not follow its equation is the hardest case for the search: it takes every rate to "
+          "follow its equation until the reactions are settled, and first tries to make up for the unusual order with extra "
+          f"reactions. This file is a favourable case ({'one pass' if not zo['restarts'] else 'see the output above'}). "
+          "In six further trials, not shipped as files, the same network was used with other noise on these 30 runs (2 "
+          "trials: found in one pass, as here) and with four other run designs. On those four the first pass and one new "
+          "start found it once and missed it three times, each miss ending with *does not fit within the GC noise* rather "
+          "than with a wrong answer presented as right. From its second new start on, the search therefore also tries every "
+          "reaction it may add with one of its orders changed; with that it found the true network in all four, after one "
+          "or two new starts and 2 to 3 minutes instead of about 1 (see B8).", ""]
+    L += ["### B7. Summary", ""]
     rows = [["mystery_noisy.csv", "automatic search", "; ".join(my["best"]["reactions"]), "yes" if hit else ("tied" if tied_hit else "NO"),
              f"{my['seconds']:.0f} s"],
             ["mystery_exact.csv", "automatic search", "; ".join(mx["best"]["reactions"]),
@@ -476,19 +536,42 @@ def finder_md(res):
                  "; ".join(sc["best"]["reactions"]) + f" ({sc['best']['model']})", "yes" if sc_hit else "NO", f"{sc['seconds']:.0f} s"])
     rows.append([SHORT, "rank 4 candidates", " > ".join(f["name"] for f in sr["ranking"]),
                  "yes" if sr["best"] == "truth" and sr["decided"] else ("tied" if sr["best"] == "truth" else "NO"), f"{sr['seconds']:.0f} s"])
+    rows.append([ZERO, f"automatic search ({zo['restarts']} restart{'s' if zo['restarts'] != 1 else ''})", "; ".join(zo["best"]["reactions"]),
+                 "yes" if zo_hit else ("tied" if zo_tied else "NO"), f"{zo['seconds']:.0f} s"])
     L += md_table(["file", "task", "result", "true network found", "time"], rows)
     L += ["", "Times are for one laptop core and vary by a factor of about two with what else the computer is doing "
           "and with its power mode.", "",
-          "### B7. Limits (honest list)", "",
+          "### B8. Limits (honest list)", "",
           "- The search can only return reactions that are in its library and rate laws of the power-law form (orders 0, 1, 2), "
           "with at most one adsorption term (product C). A real effect outside that (another species adsorbing, "
           "diffusion limits, a species the GC does not see) shows up as *does not fit within the GC noise*, not as a wrong answer presented as right.",
-          "- The search changes one reaction at a time and keeps the best change. It is not guaranteed to find the best "
-          "network there is. It starts again from another first reaction when its result does not fit within the GC noise "
-          "(B5), but a network that fits and is still not the best possible would not be noticed. Ranking typed "
-          "candidates (B2) compares exactly the networks you give and has no such limit.",
+          "- The search changes one thing at a time (a reaction or one reaction order) and keeps the best change. It is not "
+          "guaranteed to find the best network there is. It starts again from another first reaction when its result does "
+          "not fit within the GC noise (B5), but a network that fits and is still not the best possible would not be "
+          "noticed. Ranking typed candidates (B2) compares exactly the networks you give and has no such limit.",
+          "- The search is quickest and most reliable when the true rates follow the equations (mass action), as in the "
+          "mystery and the complex example. A true rate with an unusual order (B6) is harder. The search finds it when the "
+          "first pass happens to build the right reactions (as on the file of B6), or else from its second new start on, "
+          "when it also tries every reaction it may add with one of its orders changed; that took 2 to 3 minutes in the "
+          "trials. Those trials were few (seven in all) and of one kind (one reactant of order zero): two unusual orders at "
+          "once, or an order other than 0, 1 or 2, may well be missed. A miss is reported as *does not fit within the GC "
+          "noise*; the way forward is then to type the suspected network as a candidate and rank it (B2).",
+          "- When nothing the search can build fits the data, it starts again up to three times before it gives up, and the "
+          "later starts are the slow ones. Such a search can take several minutes (the command line has no time limit; "
+          "`discover(..., max_seconds=...)` and `n_restarts` set one).",
+          "- *Fits within the GC noise* is judged against the advisor's noise model (1 % of the reading plus 0.05 mol-%). "
+          "The noise in the example files is drawn with the two parts independent, which makes the real scatter up to 1.4 "
+          "times smaller than that sum; this is why a correct network shows typical misses of 0.5 to 0.8 times the noise "
+          "rather than 1, and it makes the test for *fits* lenient by about that factor.",
           "- Two rate laws that predict the same compositions over the runs done cannot be told apart by any method; "
           "the program says so and proposes the run that would decide.",
+          "- The run proposed to tell two networks apart is worked out from their fitted numbers. Far from the runs done "
+          "those numbers are uncertain, and two fits can then predict very different readings for that reason alone. The "
+          "program therefore also gives the difference counted against the GC noise plus that uncertainty, and says so "
+          "when one run would not be enough. The uncertainty itself is a rough estimate (a few dozen random draws from each fit).",
+          "- All fits use the project's fast bed solver, which agrees with the accurate solver to about 0.1 mol-% of a "
+          "reading. That can shift a BIC by a few units (about 3 for the true complex network on `complex_noisy.csv`), "
+          "one more reason why BIC differences below 6 are not called decisions.",
           "- The 30-run files are designed kinetic studies with a wide range of conditions. The step-limited runs of an "
           "optimisation campaign cover a much smaller region; B5 shows one such case that works, but fewer or less varied "
           "runs will leave more undecided.",

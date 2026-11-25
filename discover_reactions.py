@@ -12,7 +12,9 @@ Which reactions are happening in the bed?  Command-line front end of smart/disco
         repairs a starting network: adds, removes and replaces reactions until nothing improves
 
     add  --next-run   to print the experiment that would best tell the top two networks apart
-         (with --from-last-run it stays within one allowed step of the last run in the log)
+         (a free run anywhere in the operating box, as in a kinetic study; with --from-last-run
+         it stays within one allowed step of the last run in the log, as the next run of a
+         campaign must)
 
 The run log is the CSV the website and reactor_advisor.py use:
     pressure_bar, flow_A_mL_min, flow_B_mL_min, flow_I_mL_min, temperature_C, catalyst_g,
@@ -65,14 +67,18 @@ def report_ranking(res, source=""):
         out.append(f"  {f['rank']:<5}{f['name']:<{w}}{f['n_reactions']:>9}{f['bic']:>12.1f}{f['delta_bic']:>12.1f}"
                    f"{100 * f['weight']:>9.1f}%   {f['verdict']}")
     out.append("")
-    if res["decided"]:
+    fits = res["ranking"][0]["fits_noise"]
+    if not fits:
+        # never "the data support X" for a candidate that misses the data: it is only the least bad
+        out.append(f"None of the candidates fits the data within the GC noise. '{res['best']}' is the least bad, but "
+                   "something is happening that none of the candidates describes.")
+    elif res["decided"]:
         out.append(f"The data support '{res['best']}'.")
-    else:
+    if not res["decided"]:
         out += res["undecided"]
-    if not res["ranking"][0]["fits_noise"]:
-        out.append("Even the best candidate does not fit within the GC noise: something is happening that none of "
-                   "the candidates describes.")
-    out += ["", f"The best candidate, '{res['best']}':"] + lines_fit(res["ranking"][0])
+    if res["n_runs"] < D.FEW_RUNS:
+        out.append(D._few_runs_note(res["n_runs"]))
+    out += ["", f"The {'best' if fits else 'least bad'} candidate, '{res['best']}':"] + lines_fit(res["ranking"][0])
     return out
 
 
@@ -94,7 +100,11 @@ def report_next_run(nr):
            "  predicted GC reading (mol-%):   " + "".join(f"{s:>8}" for s in next(iter(nr["predicted"].values())))]
     for name, y in nr["predicted"].items():
         out.append(f"  {name[:30]:<32}" + "".join(f"{v:>8.2f}" for v in y.values()))
-    out.append(f"  one such run would add about {nr['expected_bic_gap']:.0f} to the BIC difference (6 is enough to decide).")
+    out.append(f"  allowing for the uncertainty of both fits, one such run would add about {nr['expected_bic_gap']:.0f} to the "
+               "BIC difference (6 is enough to decide).")
+    if not nr.get("step_limited"):
+        out.append("  This is a free run, as in a kinetic study, and may be far from the last run in the log. If the reactor must "
+                   "move one allowed step at a time, ask for the run within one step of the last run (--from-last-run).")
     return out
 
 
@@ -136,18 +146,35 @@ def main():
         if not args.quiet:
             print(f"   ... {info['elapsed_s']:4.0f} s  {info['message'][:100]}", file=sys.stderr, flush=True)
 
+    def read_network(path):
+        """A reaction file, with the file named in the message when a reaction in it cannot be used."""
+        try:
+            return D.read_network_file(path)
+        except D.ReactionError as e:
+            raise D.ReactionError(f"in {os.path.basename(path)}: {e}") from None
+
     try:
         if args.candidates:
-            cands = {os.path.splitext(os.path.basename(p))[0].replace("candidates_", ""): D.read_network_file(p)
-                     for p in args.candidates}
+            cands = {}
+            for p in args.candidates:
+                name = os.path.splitext(os.path.basename(p))[0].replace("candidates_", "")
+                if name in cands:
+                    raise ValueError(f"two candidate files have the same name '{name}'; give every candidate its own file name.")
+                cands[name] = read_network(p)
+                if not cands[name]:
+                    raise D.ReactionError(f"{os.path.basename(p)} holds no reaction (one reaction per line, for example 'A + B <=> C').")
             res = D.rank_candidates(cands, data, models=models, progress=progress)
             print("\n".join(report_ranking(res, source)))
         else:
-            start = D.read_network_file(args.start) if args.start else None
+            start = read_network(args.start) if args.start else None
             res = D.discover(data, start=start, max_reactions=args.max_reactions, models=models, progress=progress)
             print("\n".join(report_discovery(res, source)))
     except D.ReactionError as e:
         raise SystemExit(f"Problem with a reaction: {e}")
+    except OSError as e:                             # a candidate or starting-network file that cannot be opened
+        raise SystemExit(f"Could not read a reaction file: {e}")
+    except ValueError as e:
+        raise SystemExit(f"Cannot do this: {e}")
     out = dict(result=res)
     if args.next_run:
         try:

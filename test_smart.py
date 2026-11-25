@@ -350,16 +350,28 @@ m6, m7 = cm2.predict(Xc[:3], phys_c[:3])[2]["member_mu"], cm2h.predict(Xc[:3], p
 check("adding the direct member leaves what the GP and the correction networks compute unchanged",
       all(np.array_equal(m6[k], m7[k]) for k in ("gp", "nn")))
 
-# 23. the v7 (hybrid) advisor: a short campaign, its suggestion, and the logged weights
-h7 = run_smart("complex", budget=10, seed=2, correction="hybrid")
+# 23. the v7 advisor (hybrid committee + network revision): a short campaign, its suggestion, and the logged weights
+h7 = run_smart("complex", budget=10, seed=2, correction="hybrid", revise=True)
 adv7 = h7["advisor"]
 ph7 = unscale(h7["X"])
 check("v7: campaign is named smart_v7 and every run is within one step of the previous one, feasible",
       h7["strategy"] == "smart_v7" and bool(np.all(np.abs(np.diff(ph7, axis=0)) <= MAX_STEP + 1e-6)) and feasible(ph7).all())
+print(f"     v7 on the right network, 10 runs: typical miss of its kinetic fit {h7['network_fit'].min():.2f} to {h7['network_fit'].max():.2f} "
+      f"times the GC noise; searches for another network: {h7['n_searches']}; changes: {h7['n_revisions']}")
+check("v7 given the right network does not change it: no revision in the campaign, the same network at every run",
+      h7["n_revisions"] == 0 and adv7.revisions == [] and adv7.S is adv7.S_start and adv7.S is COMPLEX
+      and len(set(h7["network"])) == 1 and h7["network"][0] == h7["network_start"] == h7["network_final"]
+      and adv7.misfit["within_allowance"])
+check("v7: the network is logged per run as readable text (one reaction per line), with the fit of the kinetics at every update",
+      h7["network"].shape == (10,) and h7["network_start"] == "A + B <=> C\nB + C -> E\nA -> D" and h7["network_fit"].shape == (5,)
+      and h7["revision_runs"].shape == (0,) and h7["revision_words"].shape == (0,) and h7["revisions_json"] == "[]")
 x7, info7 = adv7.suggest(h7["X"][-1])
 check("v7: suggestion within one step of the last run, in the box, feasible",
       bool(np.all(np.abs(unscale(x7) - unscale(h7["X"][-1])) <= MAX_STEP + 1e-6)) and (x7 >= 0).all() and (x7 <= 1).all()
       and feasible(unscale(x7))[0])
+check("v7: the suggestion reports the network in use, the changes made to it and the last check of it, in plain words",
+      info7["network"] == ["A + B <=> C", "B + C -> E", "A -> D"] and info7["revisions"] == []
+      and "explains the GC readings" in info7["network_check"] and "network" not in info6)
 check("v7: the stand-alone network has joined the committee and the weights sum to 1",
       adv7.members == HYBRID_MEMBERS and "direct" in adv7.committee.weights and abs(sum(adv7.committee.weights.values()) - 1) < 1e-9)
 w7 = h7["committee_weights"]
@@ -391,17 +403,236 @@ check("nn_only: every run within one step of the previous one, in the box, feasi
       and bool(np.all(ph >= LOW - 1e-9)) and bool(np.all(ph <= HIGH + 1e-9)) and h["strategy"] == "nn_only")
 pol = NNOnlyPolicy(step, np.zeros(DIM), np.ones(DIM), seed=1)
 check("nn_only: recommends one of the tested runs", pol.recommend(h0) in range(len(h0["X"])))
-new = ("nn_only", "smart_v7", "smart_v6_nonn", "smart_v6_nogp", "smart_v7_missing_E", "smart_v6_nonn_missing_E", "smart_v6_nogp_missing_E")
-check("benchmark: the v7 methods are listed, labelled, and every listed method can be run",
-      all(m in B.LABELS for m in new) and all(m in B.SMART_KWARGS or m in POLICIES for m in B.LABELS)
-      and all(m in B.STRESS for m in new[4:]) and all(m in B.METHODS for m in new[:4]))
-check("benchmark: stress tests do not apply to the simple reaction, everything else applies everywhere",
-      not any(B.applies(m, "simple") for m in B.STRESS) and all(B.applies(m, "complex") for m in B.LABELS)
-      and all(B.applies(m, "simple") for m in B.METHODS))
+new_all = ("smart_v7", "smart_v7_fixednet", "nn_only", "smart_v6_nonn", "smart_v6_nogp")
+new_stress = ("smart_v7_missing_E", "smart_v7_norevise_missing_E", "smart_v6_nonn_missing_E", "smart_v6_nogp_missing_E")
+new_cand = tuple(f"smart{v}_cand_{c}" for v in ("", "_v7") for c in ("close", "similar", "far"))
+check("benchmark: the v7 study is listed and labelled (5 methods for every setting, 4 stress tests, 6 candidate-network "
+      "campaigns), and every listed method can be run",
+      tuple(B.V7_METHODS) == new_all and tuple(B.V7_STRESS) == new_stress and tuple(B.CANDIDATE_STUDY) == new_cand
+      and B.V7_STUDY == new_all + new_stress + new_cand and set(B.LABELS) == set(B.CLASSIC) | set(B.V7_STUDY)
+      and all(m in B.SMART_KWARGS or m in POLICIES for m in B.LABELS) and all(isinstance(v, str) and v for v in B.LABELS.values()))
+check("benchmark: the v6 benchmark is untouched (the same six methods and two stress tests, and run_all still runs those by default)",
+      list(B.METHODS) == ["smart_v6", "smart", "smart_v4", "chemist", "plain_bo", "random_walk"]
+      and list(B.STRESS) == ["smart_missing_E", "smart_v6_missing_E"] and B.CLASSIC == tuple(B.METHODS) + tuple(B.STRESS)
+      and B.run_all.__defaults__[1] == B.CLASSIC)
+check("benchmark: stress tests do not apply to the simple reaction, the candidate-network study only to the 'complex' "
+      "setting, everything else applies everywhere",
+      not any(B.applies(m, "simple") for m in list(B.STRESS) + list(B.V7_STRESS))
+      and all(B.applies(m, st) for m in list(B.STRESS) + list(B.V7_STRESS) for st in ("complex", "complex_deact"))
+      and all(B.applies(m, "complex") and not B.applies(m, "simple") and not B.applies(m, "complex_deact") for m in B.CANDIDATE_STUDY)
+      and all(B.applies(m, st) for m in list(B.METHODS) + list(B.V7_METHODS) for st in B.SETTINGS))
 check("benchmark: the v5 / v6 methods are run with the same arguments as before",
       B.SMART_KWARGS["smart"] == {} and B.SMART_KWARGS["smart_v6"] == dict(correction="committee")
       and B.SMART_KWARGS["smart_v4"] == dict(planner="greedy", models=("plain",))
       and B.SMART_KWARGS["smart_missing_E"] == dict(model="complex_missing_E")
       and B.SMART_KWARGS["smart_v6_missing_E"] == dict(model="complex_missing_E", correction="committee"))
+check("benchmark: v7 = hybrid committee + network revision; the two switches are taken off one at a time",
+      B.SMART_KWARGS["smart_v7"] == dict(correction="hybrid", revise=True) and B.SMART_KWARGS["smart_v7_fixednet"] == dict(correction="hybrid")
+      and B.SMART_KWARGS["smart_v7_missing_E"] == dict(correction="hybrid", revise=True, model="complex_missing_E")
+      and B.SMART_KWARGS["smart_v7_norevise_missing_E"] == dict(correction="hybrid", model="complex_missing_E")
+      and B.SMART_KWARGS["smart_cand_far"] == dict(model="cand_far")
+      and B.SMART_KWARGS["smart_v7_cand_far"] == dict(correction="hybrid", revise=True, model="cand_far"))
+
+# ================================================================= v7: the advisor checks and revises its reaction network
+import io
+import json
+import subprocess
+import sys
+import time
+from smart import discovery as D
+from smart.systems import MODELS
+from smart.advisor import model_system
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+Xs, gs, ys, hs = np.array(h5["X"]), np.array(h5["gc"]), np.array(h5["y_obs"]), np.array(h5["hours"])   # 5 screening runs, complex, seed 2
+
+# 25. the check of the network against the GC readings, on its own (any advisor can be asked)
+m6 = adv6.explains()
+check(f"network check: the right network explains the 5 screening runs (typical miss {m6['x_noise']:.2f} times the GC noise)",
+      m6["within_allowance"] and m6["not_made"] == [] and m6["beyond"] == [] and "explains the GC readings" in m6["words"]
+      and set(m6["miss"]) == {"A", "B", "C", "D", "E"} and adv6.misfit is None)
+adv_fix = SmartAdvisor(MODELS["complex_missing_E"], seed=2, correction="committee", remaining=6)
+adv_fix.update(Xs, gs, ys, hours=hs)
+mE = adv_fix.explains()
+print("     " + mE["words"])
+check("network check: a network without C + B -> E does not explain them, and the check says which species and why",
+      not mE["within_allowance"] and mE["not_made"] == ["E"] and "could not explain E" in mE["words"] and mE["x_allow"] > 1)
+check("revise=False (the default) never changes the network, however badly it fits",
+      adv_fix.S is MODELS["complex_missing_E"] and adv_fix.S is adv_fix.S_start and adv_fix.revisions == [] and adv_fix.n_searches == 0
+      and adv_fix.network() == ["A + B <=> C", "A -> D"] and not adv_fix.revise)
+
+# 26. revise=True: the same advisor repairs its network on the same 5 runs, and says what it did
+t0 = time.time()
+adv_rev = SmartAdvisor(MODELS["complex_missing_E"], seed=2, correction="hybrid", remaining=6, revise=True)
+adv_rev.update(Xs, gs, ys, hours=hs)
+rv = adv_rev.revisions
+print(f"     ({time.time() - t0:.0f} s) " + (rv[0]["words"] if rv else "no revision"))
+check("revise=True: given the network without C + B -> E, the advisor adopts a network that makes E after the screening runs",
+      len(rv) >= 1 and rv[0]["run"] == 5 and rv[0]["kind"] == "add" and "E" in D._made_by(D.parse_network(adv_rev.S))
+      and adv_rev.S is not adv_rev.S_start and adv_rev.S_start is MODELS["complex_missing_E"] and adv_rev.kin.S is adv_rev.S)
+check("revise=True: here the reaction it adds is the true one, and the repaired network explains the runs",
+      D.network_key(D.parse_network(adv_rev.S)) == D.network_key(D.parse_network(D.CANDIDATES["truth"]))
+      and adv_rev.misfit["within_allowance"] and rv[0]["miss_after"] < 2 < rv[0]["miss_before"])
+check("revise=True: the change is recorded in plain words (run number, what was wrong, what changed, the evidence)",
+      "After run 5" in rv[0]["words"] and "could not explain E" in rv[0]["words"] and "Adding 'B + C -> E'" in rv[0]["words"]
+      and "times the GC noise" in rv[0]["words"] and rv[0]["gain"] >= adv_rev.REVISE_GAIN and rv[0]["before"] == ["A + B <=> C", "A -> D"]
+      and rv[0]["after"] == adv_rev.network() and len(json.dumps(rv)) > 50 and adv_rev.revision_log[-1]["outcome"] == "revised")
+xr, info_r = adv_rev.suggest(Xs[-1])
+check("revise=True: after the change the advisor plans with the new network (kinetics of 3 reactions, suggestion within "
+      "one step, feasible) and reports the change with the suggestion",
+      adv_rev.S.nr == 3 and len(adv_rev.kin.theta_kin) == 6 and adv_rev.thetas.shape[1] == len(adv_rev.kin.theta)
+      and bool(np.all(np.abs(unscale(xr) - unscale(Xs[-1])) <= MAX_STEP + 1e-6)) and feasible(unscale(xr))[0]
+      and info_r["network"] == adv_rev.network() and info_r["revisions"] == rv and np.isfinite(info_r["pred"]))
+check("the profit and the KPIs of a run come from the measured GC reading and do not depend on the network",
+      np.allclose(profit_from_gc(adv_rev.S, physical(Xs, W), gs), profit_from_gc(COMPLEX, physical(Xs, W), gs))
+      and np.allclose(kpis_from_gc(adv_rev.S, physical(Xs, W), gs)[1], kpis_from_gc(MODELS["complex_missing_E"], physical(Xs, W), gs)[1])
+      and np.array_equal(adv_rev.y, ys))
+adv_rev.update(Xs, gs, ys, hours=hs)
+check("a second look at the same runs changes nothing more (the repaired network explains them)",
+      len(adv_rev.revisions) == 1 and adv_rev.n_searches == 1)
+# hysteresis and the cap on searches, with the thresholds made impossible to reach
+adv_cap = SmartAdvisor(MODELS["complex_missing_E"], seed=2, residual_gp=False, revise=True)
+adv_cap.REVISE_GAIN = 1e12                                    # no evidence is ever enough: every search ends without a change
+adv_cap.update(Xs, gs, ys, hours=hs)
+first = (adv_cap.n_searches, adv_cap.revisions == [], adv_cap._next_search, adv_cap.revision_log[-1]["outcome"])
+adv_cap.update(Xs, gs, ys, hours=hs)
+check("after a search that changed nothing the advisor waits 3 runs before it searches again (a campaign stays fast)",
+      first == (1, True, 5 + adv_cap.REVISE_WAIT, "kept") and adv_cap.n_searches == 1 and adv_cap.S is adv_cap.S_start
+      and "no single change of the network is clearly better" in adv_cap.revision_log[-1]["words"])
+
+# 27. the advisor can be given any network: a ReactionSystem object, or one of the candidate networks by name
+t0 = time.time()
+hc = run_smart("complex", budget=6, seed=2, model=D.candidate_system("close"))
+check("run_smart accepts a ReactionSystem object as the model (here the 'close' candidate, kept fixed: v5)",
+      hc["strategy"] == "smart_close" and len(hc["rec"]) == 6 and hc["advisor"].S.name == "close" and hc["n_revisions"] == 0
+      and list(hc["network"]) == ["A + B <=> C\nC + B -> E ; orders C=1, B=0\nA -> D"] * 6
+      and D.parse_network(hc["network_final"]) == D.parse_network(D.CANDIDATES["close"])
+      and bool(np.all(np.abs(np.diff(unscale(hc["X"]), axis=0)) <= MAX_STEP + 1e-6)) and feasible(unscale(hc["X"])).all())
+for cand in ("similar", "far"):
+    M_, name_ = model_system(f"cand_{cand}", COMPLEX)
+    adv_c = SmartAdvisor(M_, seed=2, remaining=6)
+    adv_c.update(Xs, gs, ys, hours=hs)
+    xc, info_c = adv_c.suggest(Xs[-1])
+    check(f"candidate network '{cand}' ({M_.nr} reactions) builds, is fitted and gives a suggestion within one step, feasible",
+          name_ == f"cand_{cand}" and adv_c.network() == D.network_text(D.CANDIDATES[cand]) and np.isfinite(info_c["pred"])
+          and bool(np.all(np.abs(unscale(xc) - unscale(Xs[-1])) <= MAX_STEP + 1e-6)) and feasible(unscale(xc))[0])
+print(f"     ({time.time() - t0:.0f} s)")
+try:
+    run_smart("simple", budget=6, seed=0, model=D.candidate_system("far"))
+    refused = False
+except ValueError as e:
+    refused = "species" in str(e)
+try:
+    run_smart("complex", budget=6, seed=0, model="cand_nonsense")
+    refused2 = False
+except ValueError as e:
+    refused2 = "cand_far" in str(e)
+check("a model whose species are not those of the system, or an unknown model name, is refused in plain words", refused and refused2)
+
+# 28. plan() and suggest() can be given settings to consider (the point picked on the profit-against-selectivity curve)
+adv_s = SmartAdvisor(COMPLEX, seed=2, spec={"S_C": 0.93}, remaining=6)
+adv_s.update(h7["X"], h7["gc"], h7["y_obs"], hours=h7["hours"])
+Cs = np.random.default_rng(11).random((4000, 5))
+Cs = Cs[adv_s._ok(Cs)]
+seed_x = Cs[int(np.argmax(adv_s.predict(Cs)[0]))]               # the best of another random search that the spec rule accepts
+mu_seed = float(adv_s.predict(seed_x[None])[0][0])
+p_plain, p_none, p_seed = (adv_s.plan(np.random.default_rng(0)), adv_s.plan(np.random.default_rng(0), seeds=None),
+                           adv_s.plan(np.random.default_rng(0), seeds=seed_x[None]))
+print(f"     plan under a minimum selectivity of 0.93: {p_plain[1]:.2f} /h without the seed, {p_seed[1]:.2f} /h with it (the seed itself: {mu_seed:.2f} /h)")
+check("plan(seeds=...): a seed that the spec rule accepts is never missed, and without seeds the plan is exactly as before",
+      p_seed[1] >= mu_seed - 1e-9 and np.array_equal(p_plain[0], p_none[0]) and p_plain[1:] == p_none[1:] and adv_s._ok(p_seed[0][None])[0])
+xs7, info_s = adv_s.suggest(h7["X"][-1], np.random.default_rng(0), seeds=seed_x[None])
+check("suggest(seeds=...): the plan behind the suggestion has considered the seed; the suggestion stays within one step",
+      info_s["model_opt_pred"] >= mu_seed - 1e-9 and bool(np.all(np.abs(unscale(xs7) - unscale(h7["X"][-1])) <= MAX_STEP + 1e-6)))
+
+# 29. every method of the v7 study runs a short campaign (7 runs = 2 advisor-chosen runs) on the complex reactor.  The
+# campaigns run side by side in separate processes; nothing is saved.  Three of them carry the checks of the revision
+# over a campaign: v7 given the network without C + B -> E repairs it, v7 given the right network leaves it alone,
+# and with the revision switched off the network never changes.
+CHILD = r'''
+import io, json, sys, warnings
+warnings.filterwarnings("ignore")
+import numpy as np
+from smart import benchmark as B
+from smart.systems import unscale, MAX_STEP, feasible
+m = sys.argv[1]
+h = B.run_one("complex", m, 0, 7)
+ph = unscale(h["X"])
+keep = {k: v for k, v in h.items() if isinstance(v, (np.ndarray, float, int, str, np.floating))}       # what benchmark.job saves
+buf = io.BytesIO()
+np.savez(buf, **keep)
+buf.seek(0)
+back = np.load(buf, allow_pickle=False)                                                               # readable without pickle
+out = dict(method=m, strategy=str(h["strategy"]), n=int(len(h["rec"])), finite=bool(np.isfinite(h["rec"]).all()),
+           step_ok=bool(np.all(np.abs(np.diff(ph, axis=0)) <= MAX_STEP + 1e-6)), feasible=bool(feasible(ph).all()),
+           saved=sorted(back.files), rec=float(h["rec"][-1]))
+for k in ("network_start", "network_final", "n_revisions", "n_searches"):
+    if k in h:
+        out[k] = h[k]
+for k in ("network", "revision_words", "revision_runs", "weight_columns", "committee_members", "network_fit"):
+    if k in back.files:
+        out[k] = back[k].tolist()
+if "committee_weights" in h:
+    out["weights_shape"] = list(h["committee_weights"].shape)
+print("RESULT " + json.dumps(out))
+'''
+t0 = time.time()
+todo, running, short = list(B.V7_STUDY), [], {}
+while todo or running:                                           # at most (cores - 2) campaigns at a time
+    while todo and len(running) < max(2, (os.cpu_count() or 4) - 2):
+        m = todo.pop(0)
+        running.append((m, subprocess.Popen([sys.executable, "-c", CHILD, m], cwd=HERE, stdout=subprocess.PIPE,
+                                            stderr=subprocess.PIPE, text=True)))
+    m, proc = running.pop(0)
+    so, se = proc.communicate()
+    line = [ln for ln in so.splitlines() if ln.startswith("RESULT ")]
+    if proc.returncode != 0 or not line:
+        print(f"     {m} failed:\n{se[-2000:]}")
+    short[m] = json.loads(line[0][7:]) if line else None
+print(f"     {len(short)} short campaigns of 7 runs in {time.time() - t0:.0f} s; final recommended profit (true, per hour): "
+      + ", ".join(f"{m} {r['rec']:.1f}" for m, r in short.items() if r))
+check("every method of the v7 study runs a 7-run campaign on the complex reactor: 7 runs, each within one step of the "
+      "previous one, feasible, and the campaign can be saved and read back",
+      all(r is not None and r["n"] == 7 and r["finite"] and r["step_ok"] and r["feasible"] and "rec" in r["saved"] for r in short.values()))
+named = {m: (r or {}).get("strategy") for m, r in short.items()}
+check("the campaigns are labelled by what was switched on (" + ", ".join(f"{m}: {s}" for m, s in named.items() if m.startswith("smart_v7")) + ")",
+      named["smart_v7"] == "smart_v7" and named["smart_v7_fixednet"] == "smart_v7_fixednet"
+      and named["smart_v7_missing_E"] == "smart_v7_complex_missing_E" and named["smart_v7_norevise_missing_E"] == "smart_v7_fixednet_complex_missing_E"
+      and named["smart_cand_far"] == "smart_cand_far" and named["smart_v7_cand_far"] == "smart_v7_cand_far"
+      and named["smart_v6_nonn"] == "smart_v6" and named["nn_only"] == "nn_only")
+net_keys = {"network", "network_start", "network_final", "network_fit", "n_revisions", "n_searches", "revision_runs", "revision_words", "revisions_json"}
+w_keys = {"committee_weights", "weight_columns", "committee_members", "committee_weights_final", "committee_heldout_rmse"}
+with_net = [m for m in B.V7_STUDY if m.startswith("smart_v7") or "_cand_" in m]
+with_w = [m for m in B.V7_STUDY if m.startswith("smart_v7") or m.startswith("smart_v6_")]
+check("what the figures need is in every campaign file: the committee weights per update with the member names, the network "
+      "per run as text, and the revisions",
+      all(net_keys <= set(short[m]["saved"]) and len(short[m]["network"]) == 7 and len(short[m]["network_fit"]) == 2 for m in with_net)
+      and all(w_keys <= set(short[m]["saved"]) and short[m]["weights_shape"] == [2, 4]
+              and short[m]["weight_columns"] == ["none", "gp", "nn", "direct"] for m in with_w)
+      and not net_keys & set(short["smart_v6_nonn"]["saved"]) and not (net_keys | w_keys) & set(short["nn_only"]["saved"])
+      and not w_keys & set(short["smart_cand_far"]["saved"]))
+r = short["smart_v7_missing_E"]
+print("     smart_v7_missing_E: " + (r["revision_words"][0] if r["revision_words"] else "no revision in 7 runs"))
+check("campaign: v7 given the network without C + B -> E adopts a network that makes E (here after the 5 screening runs, "
+      "and it is the true network), and from then on plans with it",
+      r["n_revisions"] >= 1 and r["revision_runs"][0] == 5 and r["network_start"] == "A + B <=> C\nA -> D"
+      and r["network"][:5] == [r["network_start"]] * 5 and "E" in D._made_by(D.parse_network(r["network_final"]))
+      and r["network"][5] == r["network"][6] == r["network_final"]
+      and D.network_key(D.parse_network(r["network_final"])) == D.network_key(D.parse_network(D.CANDIDATES["truth"])))
+r = short["smart_v7"]
+check("campaign: v7 given the right network does not change it",
+      r["n_revisions"] == 0 and r["n_searches"] == 0 and len(set(r["network"])) == 1 and r["network_final"] == r["network_start"])
+check("campaign: with the revision switched off the network never changes (v7 without revision, v5 with a candidate network)",
+      all(short[m]["n_revisions"] == 0 and short[m]["n_searches"] == 0 and len(set(short[m]["network"])) == 1
+          and short[m]["network_final"] == short[m]["network_start"]
+          for m in ("smart_v7_fixednet", "smart_v7_norevise_missing_E", "smart_cand_close", "smart_cand_similar", "smart_cand_far"))
+      and short["smart_v7_norevise_missing_E"]["network_start"] == "A + B <=> C\nA -> D")
+for c in ("close", "similar", "far"):
+    r = short[f"smart_v7_cand_{c}"]
+    print(f"     smart_v7_cand_{c}: {r['network_start']}  ->  {r['network_final']}   ({r['n_revisions']} change(s) in 7 runs, "
+          f"{r['n_searches']} search(es))".replace("\n", ";  "))
+check("campaign: v7 given a candidate network starts from exactly that network (what it then changes is printed above)",
+      all(short[f"smart_v7_cand_{c}"]["network_start"] == "\n".join(D.network_text(D.CANDIDATES[c]))
+          and short[f"smart_cand_{c}"]["network_start"] == short[f"smart_v7_cand_{c}"]["network_start"] for c in ("close", "similar", "far")))
 
 print("\nAll smart-advisor checks passed.")

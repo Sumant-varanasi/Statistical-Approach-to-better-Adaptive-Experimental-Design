@@ -36,11 +36,26 @@ How it works, in plain words
   coefficients), not written around a known answer.  Chemistry prunes the search: a reaction
   can only be added if its reactants are fed or made by the reactions chosen so far, a
   product the GC never sees is not proposed, and directions that thermodynamics rules out
-  over the whole operating box are left out.  The search changes one reaction at a time and
-  keeps the best change, so it is not guaranteed to find the best network there is; when
-  what it ends with does not fit within the GC noise it starts again from another first
-  reaction and says so.  Ranking typed candidates has no such limit: it compares exactly the
+  over the whole operating box are left out.  The search changes one thing at a time (add,
+  remove or replace a reaction, or change one reaction order) and keeps the best change, so
+  it is not guaranteed to find the best network there is; when what it ends with does not
+  fit within the GC noise it starts again from another first reaction and says so.  It is
+  quickest and most reliable when the true rates follow the equations (mass action).  A
+  true rate that is, for example, zero order in a reactant is harder: the first pass takes
+  every rate to follow its equation until the reactions are settled, and in trials with
+  four other run designs that pass and one new start missed such a network three times out
+  of four.  From its second new start on the search therefore also tries every reaction it
+  may add with one of its orders changed; with that, all four were found, at the price of
+  2 to 3 minutes instead of about 1.  That is a handful of trials with one kind of unusual
+  rate law, not a guarantee; a miss is reported as "does not fit within the GC noise", not
+  as an answer.  Ranking typed candidates has no such limit: it compares exactly the
   networks given.
+* "Within the GC noise" is judged against the advisor's noise model, 1 % of the reading PLUS
+  0.05 mol-%.  The virtual reactor draws the two parts independently, so the real scatter is
+  up to 1.4 times smaller than that sum and a correct network typically misses by 0.5 to 0.8
+  "times the noise", not 1.  The test for "fits" is therefore lenient by about that factor,
+  and BIC differences between networks come out somewhat smaller than with the exact scatter
+  (the cautious side for calling a decision).
 
 Which model classes of the kinetic fit are allowed here, and why
 ----------------------------------------------------------------
@@ -83,14 +98,17 @@ from .kinetics import (KineticFit, GC_REL, GC_ABS, GC_NOISE_REL, GC_NOISE_ABS, H
 
 # ------------------------------------------------------------------ constants of the method
 INDISTINGUISHABLE = 6.0     # BIC difference below which two networks are "not told apart" (Kass & Raftery: < 6 is not strong evidence)
+CLEAR_GAP = 10.0            # BIC difference from which "no other network comes close" is said (Kass & Raftery: > 10 is very strong)
 MIN_GAIN = 2.0              # a search move is accepted only if it lowers BIC by more than this
 MISS_LIMIT = 2.0            # a species is "not explained" when its typical miss is more than 2x the GC noise
 FIT_LEVEL = 0.01            # "fits within the GC noise" = passes a chi-square test at the 1 % level
+FEW_RUNS = 6                # below this number of runs every result carries a caution (5 screening runs are not a kinetic study)
 GENERIC_K, GENERIC_EA = 1e-6, 100e3    # starting guess of every rate constant (per gram at 100 m2/g) and Ea (J/mol)
 ZERO_ORDER_CUT = 1e-3       # a zero-order reactant stops driving the rate below 0.1 mol-% (it has run out)
 K_COMPLETE = 100.0          # a direction is "complete everywhere" if its equilibrium constant exceeds this over the whole box
 MODELS = ("plain", "inhib")
 ORDER_CHOICES = (0, 1, 2)
+N_UNCERTAIN = 256           # discriminating_run: how many of its best points are scored again with parameter uncertainty
 
 SPECIES_TABLE = {
     #        composition          formation enthalpy (J/mol) and entropy (J/mol/K): PLACEHOLDERS
@@ -109,7 +127,7 @@ class ReactionError(ValueError):
 
 
 # =================================================================================== reactions as text
-_ARROWS = (("<=>", True), ("<->", True), ("⇌", True), ("=>", False), ("->", False), ("→", False))
+_ARROWS = (("<=>", True), ("<-->", True), ("<->", True), ("⇌", True), ("-->", False), ("=>", False), ("->", False), ("→", False))
 _TERM = re.compile(r"^(\d*)\s*\*?\s*([A-Za-z][A-Za-z0-9_]*)$")
 
 
@@ -172,7 +190,10 @@ class Reaction:
                                 "(A and D are one A-unit, B is one B-unit, C = AB, E = AB2.)")
         for s, v in self.orders.items():
             if not (0 <= v <= 3):
-                raise ReactionError(f"'{eq}': the order of {s} must be between 0 and 3 (got {_num(v)}).")
+                raise ReactionError(f"'{eq}': the order of {s} must be between 0 and 3 (got {_num(v)})."
+                                    + (f" The order is taken from the coefficient {_num(v)} of {s}; write the rate you mean "
+                                       f"after the equation, for example '; orders {s}=1'."
+                                       if self.reactants.get(s) == v and v > 3 else ""))
         if not any(v > 0 for v in self.orders.values()):
             raise ReactionError(f"'{eq}': every order is zero, so the rate would not depend on any gas. "
                                 "Give at least one species a positive order.")
@@ -285,8 +306,11 @@ def parse_reaction(text, table=None):
                             "(both ways), for example 'A + B <=> C'.")
     lhs, _, rhs = eq.partition(arrow[0])
 
-    def side(s):
+    def side(s, where):
         out = {}
+        if not s.strip():
+            raise ReactionError(f"'{raw}': nothing is written {where} the arrow. A reaction needs at least one species on "
+                                "each side, for example 'A + B <=> C'.")
         for term in s.split("+"):
             m = _TERM.match(term.strip())
             if not m:
@@ -311,12 +335,14 @@ def parse_reaction(text, table=None):
                 continue
             name, eqs, val = item.partition("=")
             try:
+                if not name:
+                    raise ValueError(item)
                 orders[name if name in table else name.upper()] = float(val)
             except ValueError:
                 raise ReactionError(f"Could not read the order '{item}' in '{raw}'. Write it as 'A=2'.") from None
         if not orders:
             raise ReactionError(f"'{raw}': 'orders' is given but no order follows. Write for example '; orders A=2'.")
-    return Reaction(side(lhs), side(rhs), arrow[1], orders, table)
+    return Reaction(side(lhs, "before"), side(rhs, "after"), arrow[1], orders, table)
 
 
 def parse_network(source, table=None, unique=True):
@@ -663,7 +689,8 @@ def load_data(source, a_spec=A_SPEC):
         name = os.path.basename(str(source))
         with open(source, newline="", encoding="utf-8-sig") as fh:
             text = fh.read()
-    rows = [r for r in csv.DictReader(io.StringIO(text)) if any((v or "").strip() for v in r.values())]
+    text = text.lstrip("\ufeff")                     # a byte-order mark left in uploaded text would hide the first column
+    rows = [r for r in csv.DictReader(io.StringIO(text)) if any((v or "").strip() for v in r.values() if isinstance(v, str))]
     if not rows:
         raise ValueError("No runs found in the file.")
     sp = list(COMPLEX.species)
@@ -671,10 +698,32 @@ def load_data(source, a_spec=A_SPEC):
     miss = [c for c in need if c not in rows[0]]
     if miss:
         raise ValueError("The log is missing the columns " + ", ".join(miss) + ". Expected: "
-                         + ", ".join(LOG_COLS + [f"gc_{s}" for s in sp]) + " (hours_h is optional).")
-    user = np.array([[float(r[c]) for c in LOG_COLS] for r in rows])
-    gc = np.array([[float((r.get(f"gc_{s}") or "0").strip() or 0) for s in sp] for r in rows])
-    hours = np.array([float(r["hours_h"]) if (r.get("hours_h") or "").strip() else HOURS_PER_RUN for r in rows])
+                         + ", ".join(LOG_COLS + [f"gc_{s}" for s in sp]) + " (hours_h is optional)."
+                         + (" The columns must be separated by commas." if len(rows[0]) == 1 else ""))
+
+    def num(i, r, c, default=None):
+        """One number of the log, with a plain-word error that names the run and the column."""
+        v = (r.get(c) or "").strip()
+        if not v and default is not None:
+            return default
+        try:
+            x = float(v)
+        except ValueError:
+            raise ValueError(f"Run {i} of the log: " + (f"'{v}' in column {c} is not a number." if v else
+                                                         f"column {c} is empty.")) from None
+        if not np.isfinite(x) or x < 0:
+            raise ValueError(f"Run {i} of the log: {v} in column {c} cannot be right (it must be a number of zero or more).")
+        return x
+
+    user = np.array([[num(i, r, c) for c in LOG_COLS] for i, r in enumerate(rows, 1)])
+    gc = np.array([[num(i, r, f"gc_{s}", 0.0) for s in sp] for i, r in enumerate(rows, 1)])
+    hours = np.array([num(i, r, "hours_h", HOURS_PER_RUN) for i, r in enumerate(rows, 1)])
+    empty = np.nonzero(gc.sum(1) <= 0)[0]
+    if len(empty):
+        raise ValueError(f"Run {empty[0] + 1} of the log has no GC reading (every gc_ column is zero or empty).")
+    if np.any(user[:, 1] + user[:, 2] <= 0) or np.any(user[:, 0] <= 0) or np.any(user[:, 5] <= 0):
+        i = int(np.nonzero((user[:, 1] + user[:, 2] <= 0) | (user[:, 0] <= 0) | (user[:, 5] <= 0))[0][0]) + 1
+        raise ValueError(f"Run {i} of the log: the pressure, the catalyst mass and the feed of A or B must be above zero.")
     user[:, 4] += 273.15
     return make_data(user, gc, hours, a_spec, name)
 
@@ -701,11 +750,12 @@ def fed_species(data):
 
 def detected_species(data):
     """{species: largest mol-% seen} for the species that are made in the bed: seen by the GC
-    clearly above its noise (more than 3 standard deviations) in at least two runs."""
+    clearly above its noise (more than 3 standard deviations) in at least two runs (in the
+    only run, if the log holds just one)."""
     out = {}
     for i, s in enumerate(data["species"][:-1]):
         y = data["gc"][:, i]
-        if s not in ("A", "B") and np.sum(y > 3 * gc_noise(y)) >= 2:
+        if s not in ("A", "B") and np.sum(y > 3 * gc_noise(y)) >= min(2, len(y)):
             out[s] = float(100 * y.max())
     return out
 
@@ -797,8 +847,87 @@ def _verdict(f, det):
             f"noise, worst for {worst} at {f['miss'][worst]['x_noise']:.1f}x)")
 
 
+def misfit(network, data, yp, n_params=0):
+    """How well model mole fractions explain the GC readings, in units of the GC's own noise.
+
+    This is the yardstick of the whole module (the first half of what fit_network reports),
+    offered on its own so that the advisor can ask it of ITS OWN kinetic fit after every run:
+    "does my reaction network still explain what the GC prints?"
+
+    network   the reactions the model uses (text, lines, Reaction objects or a ReactionSystem)
+    data      the run log (load_data / make_data)
+    yp        the model's mole fractions at the runs of the log, (n, 6) [A, B, C, D, E, I], or
+              (n, 5) without E for the simple system
+    n_params  number of fitted parameters behind yp (for the chi-square test)
+
+    Returns a dict (JSON-friendly):
+      x_noise      overall typical miss as a multiple of the GC noise (about 0.5 to 0.8 for a
+                   network that is right, see the module docstring)
+      chi2, n_data, n_runs
+      miss         {species: {mol_pct, x_noise, bias_mol_pct}}: typical miss per species
+      unexplained  species missed by more than MISS_LIMIT (2) times the GC noise, worst first
+      not_made     species the GC sees but no reaction of the network makes
+      detected     {species: largest mol-% seen}
+      fits         True when the misses are no larger than GC noise alone would give (chi-square
+                   test at the 1 % level) and no species is unexplained or not made
+      verdict      the same in plain words
+
+    A second, more forgiving yardstick is reported next to it.  No textbook model is exact (the
+    virtual reactor has a reactant-adsorption term the advisor's model never has, and a catalyst
+    that ages cannot be described before a set point has been repeated), so the kinetic fit
+    weighs every reading with the GC noise PLUS an allowance for model error: 2 % of the reading
+    + 0.2 mol-% (kinetics.GC_REL, GC_ABS; about 2 to 4 times the GC noise).  Misses within that
+    allowance are what a RIGHT network leaves on a real reactor; only larger ones say that the
+    network itself is wrong.
+      x_allow           overall typical miss as a multiple of that allowance
+      chi2_allow        the chi-square counted with the allowance (the kinetic fit's own weights)
+      miss[s]['x_allow']  the same per species
+      beyond            species missed by more than the allowance (x_allow > 1), worst first
+      within_allowance  True when no species the GC sees is left unmade, none is missed by more
+                        than the allowance, and the misses overall are within it (chi-square per
+                        degree of freedom not above 1): the network is taken as adequate"""
+    net = parse_network(network)
+    y = data["gc"]
+    yp = np.atleast_2d(np.asarray(yp, float))
+    if yp.shape[1] == 5:
+        yp = np.insert(yp, 4, 0.0, axis=1)
+    sig = gc_noise(y)
+    z = np.nan_to_num((yp - y) / sig, nan=1e3)[:, :-1]
+    za = np.nan_to_num((yp - y) / (GC_REL * y + GC_ABS), nan=1e3)[:, :-1]
+    n_data = int(z.size)
+    dof = max(n_data - int(n_params), 1)
+    chi2, chi2a = float(np.sum(z ** 2)), float(np.sum(za ** 2))
+    miss = {}
+    for i, s in enumerate(data["species"][:-1]):
+        d = np.nan_to_num(yp[:, i] - y[:, i], nan=1.0)
+        miss[s] = dict(mol_pct=float(100 * np.sqrt(np.mean(d ** 2))), x_noise=float(np.sqrt(np.mean(z[:, i] ** 2))),
+                       bias_mol_pct=float(100 * np.mean(d)), x_allow=float(np.sqrt(np.mean(za[:, i] ** 2))))
+    det = detected_species(data)
+    not_made = [s for s in det if s not in _made_by(net)]
+    unexplained = sorted((s for s in miss if miss[s]["x_noise"] > MISS_LIMIT), key=lambda s: -miss[s]["x_noise"])
+    beyond = sorted((s for s in miss if miss[s]["x_allow"] > 1.0), key=lambda s: -miss[s]["x_allow"])
+    fits = bool(chi2 <= _chi2_dist.ppf(1 - FIT_LEVEL, dof)) and not unexplained and not not_made
+    out = dict(x_noise=float(np.sqrt(chi2 / n_data)), chi2=chi2, n_data=n_data, n_runs=int(len(y)), miss=miss,
+               unexplained=unexplained, not_made=not_made, detected=det, fits=fits,
+               x_allow=float(np.sqrt(chi2a / n_data)), chi2_allow=chi2a, beyond=beyond,
+               within_allowance=bool(not not_made and not beyond and chi2a / dof <= 1.0))
+    out["verdict"] = _verdict(dict(out, fits_noise=fits), det)
+    return out
+
+
+def _check_models(models):
+    """The model classes asked for, as a tuple; a plain-word error for a class discovery does not use."""
+    models = (models,) if isinstance(models, str) else tuple(models)
+    bad = [m for m in models if m not in MODELS]
+    if bad:
+        raise ValueError(f"Unknown model class {', '.join(repr(m) for m in bad)}: reaction discovery uses 'plain' (plain "
+                         "rate laws) and 'inhib' (product C blocking catalyst sites) only.")
+    return models or ("plain",)
+
+
 def _fit_net(net, data, models=MODELS, n_starts=4, seed=0, warm=None, name="network", system=None):
     t0 = time.time()
+    models = _check_models(models)
     if not net:
         return _empty_fit(data, name)
     S = system if system is not None else build_system(net, name=name)
@@ -894,6 +1023,8 @@ def rank_candidates(candidates, data, models=MODELS, n_starts=4, seed=0, progres
         items = list(candidates.items())
     else:
         items = [c if isinstance(c, tuple) else (f"candidate {i}", c) for i, c in enumerate(candidates, 1)]
+    if not items:
+        raise ValueError("No candidate network was given: give at least one to rank.")
     fits = []
     for i, (name, net) in enumerate(items):
         if progress:
@@ -903,22 +1034,39 @@ def rank_candidates(candidates, data, models=MODELS, n_starts=4, seed=0, progres
     return _ranking_result(fits, data, time.time() - t0)
 
 
+def _few_runs_note(n):
+    return (f"Caution: the log holds only {n} run{'s' if n != 1 else ''}. With so few runs a wrong network can fit by "
+            "chance, so take this as a first guess and confirm it with more runs at different conditions.")
+
+
 def _ranking_result(fits, data, seconds):
     fits = _add_ranks(fits)
     best = fits[0]
     tied = [f["name"] for f in fits[1:] if f["tied_with_best"]]
-    undecided = [f"'{best['name']}' and '{f['name']}' explain the data equally well (BIC difference {f['delta_bic']:.1f}, "
-                 f"below {INDISTINGUISHABLE:g}): the data cannot decide {_difference(best['reactions'], f['reactions'])}."
+
+    def same(f):                                     # the same reactions, rate laws and model class under another name
+        return f["model"] == best["model"] and network_key(parse_network(f["reactions"])) == network_key(parse_network(best["reactions"]))
+
+    def differs(f):
+        d = _difference(best["reactions"], f["reactions"])
+        return d + ("; and whether product C blocks catalyst sites" if f["model"] != best["model"] and "blocks catalyst sites" not in d else "")
+
+    undecided = [f"'{best['name']}' and '{f['name']}' are the same network (the same reactions and rate laws), so nothing can tell them apart."
+                 if same(f) else
+                 f"'{best['name']}' and '{f['name']}' explain the data equally well (BIC difference {f['delta_bic']:.1f}, "
+                 f"below {INDISTINGUISHABLE:g}): the data cannot decide {differs(f)}."
                  for f in fits[1:] if f["tied_with_best"]]
     summary = []
     for f in fits:
-        rel = ("best" if f["rank"] == 1 else
+        rel = (("best" if best["fits_noise"] else "the least bad of the candidates") if f["rank"] == 1 else
                f"cannot be told apart from the best (BIC difference {f['delta_bic']:.1f})" if f["tied_with_best"] else
                f"ruled out against the best (BIC difference {f['delta_bic']:.0f})")
         summary.append(f"{f['rank']}. {f['name']}: {f['verdict']}; {rel}.")
     if not best["fits_noise"]:
         summary.append("Note: even the best candidate does not fit within the GC noise, so something is happening "
                        "that none of the candidates describes.")
+    if len(data["gc"]) < FEW_RUNS:
+        summary.append(_few_runs_note(len(data["gc"])))
     return dict(ranking=fits, best=best["name"], tied=tied, decided=not tied, undecided=undecided,
                 detected=detected_species(data), n_runs=int(len(data["gc"])), seconds=float(seconds), summary=summary)
 
@@ -1057,6 +1205,7 @@ def _order_variants(r, choices=ORDER_CHOICES):
 N_SCREEN = 4        # iterations of the quick fit that screens the possible changes of a search step
 MAX_RECHECKS = 2    # how often the reactions are checked again after the order check changed a rate law
 ORDERS_IN_SEARCH = True   # a change of one reaction order competes with adding / removing a reaction at every step
+WIDE_RESTARTS = True      # from its second new start on, the search also tries every reaction it may add with one order changed
 
 
 def _batch_lm(nets, data, starts, n_iter=N_SCREEN, tol=1e-4):
@@ -1184,7 +1333,8 @@ def discover(data, library=None, start=None, max_reactions=4, models=MODELS, pro
                    what it found does not fit within the GC noise (see below); 0 = never
 
     The search:  each step tries every allowed single change (ADD a library reaction whose
-    reactants are fed or already made, REMOVE a reaction, and, when neither helps, REPLACE a
+    reactants are fed or already made, REMOVE a reaction, once every product seen is made by
+    some reaction also CHANGE ONE REACTION ORDER, and, when none of these helps, REPLACE a
     reaction by another variant of itself or by another reaction making the same product),
     fits each changed network and takes the best if it lowers BIC by more than MIN_GAIN.
     Additions are only tried while some species is still missed by more than the GC noise
@@ -1197,9 +1347,10 @@ def discover(data, library=None, start=None, max_reactions=4, models=MODELS, pro
     MAX_RECHECKS times): the reactions were chosen assuming mass-action orders, and when the
     true rate is, say, zero order in a reactant, the search first adds an extra reaction to
     make up for it, which must be removed again once the order is right.
-    Final check: if the best network still misses by more than the GC noise, the best
-    `n_final` networks are re-fitted with `models` (the best one from several starting
-    points).  If site blocking turns out to be supported, reactions are dropped one at a time
+    Final check: the best `n_final` networks are re-fitted with `models` (all of them, so that
+    the BIC differences reported compare like with like; when the best network still misses by
+    more than the GC noise, it is re-fitted from several starting points).  If site blocking
+    turns out to be supported, reactions are dropped one at a time
     while that does not raise BIC: the plain search may have added a reaction only to imitate
     the site blocking.  Networks with the same BIC (to 0.5) are listed with the one that has
     fewer two-way reactions first.
@@ -1208,8 +1359,14 @@ def discover(data, library=None, start=None, max_reactions=4, models=MODELS, pro
     reaction stood in for two real ones).  It notices this by the result: if the best network does not
     fit within the GC noise, it searches again from the next-best first reaction (a repair
     first searches again from no reactions), up to n_restarts times, and returns the best of
-    everything fitted.  A result that fits is NOT searched again, so the examples take one
-    pass; data that no network of the library can fit cost up to n_restarts more passes.
+    everything fitted.  The first new start is searched like the first pass.  From the second
+    on (WIDE_RESTARTS) every reaction that may be added is also tried with one of its orders
+    changed (0, 1 or 2 for one reactant): two failed passes suggest that a rate does not
+    follow its equation, which the passes before only test once the reactions are settled.
+    Such a pass fits several times more networks per step.  A result that fits is NOT
+    searched again, so most of the examples take one pass; data that no network of the
+    library can fit cost up to n_restarts more passes and several minutes (pass max_seconds
+    or a smaller n_restarts to limit that).
 
     Returns a dict (JSON-friendly):
       best          the fit_network dict of the best network (+ rank, delta_bic, weight)
@@ -1223,6 +1380,7 @@ def discover(data, library=None, start=None, max_reactions=4, models=MODELS, pro
       n_fits, seconds, library_size, detected, stopped_early (bool), restarts (how often the
       search started again), summary [plain-word lines]"""
     t0 = time.time()
+    models = _check_models(models)
     lib = [r for r in _library_reactions(library)]
     fed = fed_species(data)
     det = detected_species(data)
@@ -1290,9 +1448,11 @@ def discover(data, library=None, start=None, max_reactions=4, models=MODELS, pro
 
     firsts = set()                             # first reactions from which a search from nothing has already grown
 
-    def grow(net, cur):
+    def grow(net, cur, wide=False):
         """One greedy search from the network `net` (fitted: cur): the structure, then the orders,
         and, whenever an order changed, the structure once more (see tune_orders).
+        wide: every reaction that may be added is also tried with one of its orders changed (used
+        when the search starts again: see WIDE_RESTARTS).
         Returns the network it ends at, its fit, and True if the time limit stopped it."""
         step, halted, rechecks, changed = 0, False, 0, True
         while True:
@@ -1312,13 +1472,16 @@ def discover(data, library=None, start=None, max_reactions=4, models=MODELS, pro
                     starts_ok = set(r.reactants) <= have or (r.reversible and set(r.products) <= have)
                     if r.entry_key() not in entries and starts_ok and touches:
                         moves.append((f"add '{r.text()}'", net + [r]))
+                        if wide:
+                            moves += [(f"add '{q.text()}'", net + [q]) for q in _order_variants(r, order_choices)]
             n_add = len(moves)
             for j, r in enumerate(net):
                 rest = net[:j] + net[j + 1:]
                 if rest and _reachable(rest, fed):
                     moves.append((f"remove '{r.text()}'", rest))
             scored = best_of(moves, cur, f"step {step}") if moves else []
-            tried = f"tried {n_add} addition{'s' if n_add != 1 else ''} and {len(moves) - n_add} removal{'s' if len(moves) - n_add != 1 else ''}"
+            tried = (f"tried {n_add} addition{'s' if n_add != 1 else ''}" + (" (each reaction also with other orders)" if wide and n_add else "")
+                     + f" and {len(moves) - n_add} removal{'s' if len(moves) - n_add != 1 else ''}")
             if len(net) >= max_reactions:
                 tried += f" (no additions: {max_reactions} reaction{'s' if max_reactions != 1 else ''} is the largest network allowed)"
             elif net and not poor:
@@ -1436,24 +1599,45 @@ def discover(data, library=None, start=None, max_reactions=4, models=MODELS, pro
         # Site blocking and extra starting points are only worth trying when plain rate laws leave
         # misses larger than the GC noise; and only for networks within reach of the best one.
         refit = bool(plain) and not plain[0]["fits_noise"]
-        for i, f in enumerate(plain if refit else []):
+        # When the best network already fits, it is still fitted once more with the other model classes,
+        # so that the search reports the same model class and the same constants for a network as
+        # rank_candidates does (both keep site blocking only when it lowers BIC).  The runners-up get
+        # exactly the same treatment: the BIC differences reported must compare like with like (a
+        # best network allowed site blocking against runners-up that were not would look more
+        # clearly ahead than it is, and a tie could go unreported).
+        for i, f in enumerate(plain if refit or len(models) > 1 else []):
             if key_of(f) in refits or (i and f["bic"] > 10.0 * plain[0]["bic"] + 100.0):
                 continue
-            say("final", f"re-fitting the best networks, allowing site blocking ({i + 1} of {len(plain)})", cur)
-            refits[key_of(f)] = _fit_net(parse_network(f["reactions"]), data, tuple(models), 3 if i == 0 else 1, seed,
+            say("final", f"re-fitting the best networks, allowing site blocking ({i + 1} of {len(plain)})" if refit else
+                "does product C blocking catalyst sites improve the best network?" if i == 0 else
+                f"the same check for the next best networks ({i} of {len(plain) - 1})", cur)
+            refits[key_of(f)] = _fit_net(parse_network(f["reactions"]), data, tuple(models), 3 if i == 0 and refit else 1, seed,
                                          warm=np.asarray(f["theta"], float)[:2 * f["n_reactions"]])
             count[0] += 1
         final = [dict(refits[key_of(f)]) if key_of(f) in refits and refits[key_of(f)]["bic"] <= f["bic"] else dict(f)
                  for f in plain] or [dict(cur)]
         final += [dict(g) for k, g in refits.items() if k not in {key_of(f) for f in final}]
         final.sort(key=lambda f: f["bic"])
-        if not refit:
-            path.append("Final check: the best network already fits within the GC noise with plain rate laws, so there "
-                        "is nothing left for site blocking (product C occupying the catalyst) to explain.")
+        if not refit and final and final[0]["model"] != "plain" and key_of(final[0]) != key_of(plain[0]):
+            path.append("Final check: the best network found with plain rate laws fits within the GC noise, but when product C "
+                        "is allowed to block catalyst sites (one more fitted number; every network listed was given the same "
+                        f"chance) another network explains the data better still (BIC {plain[0]['bic']:.0f} -> {final[0]['bic']:.0f}); "
+                        "it is listed first.")
+        elif not refit and final and final[0]["model"] != "plain":
+            path.append("Final check: the best network fits within the GC noise with plain rate laws, and better still when "
+                        f"product C is allowed to block catalyst sites (BIC {plain[0]['bic']:.0f} -> {final[0]['bic']:.0f}), "
+                        "so site blocking is kept. The next best networks were given the same chance.")
+        elif not refit:
+            path.append("Final check: the best network already fits within the GC noise with plain rate laws"
+                        + ("; letting product C block catalyst sites (one more fitted number) does not improve on that."
+                           if len(models) > 1 and plain else "."))
         elif len(models) > 1:
             path.append("Final check: plain rate laws leave misses larger than the GC noise, so the best networks were "
                         "re-fitted allowing product C to block catalyst sites (the best one from several starting points). "
-                        + ("The data support site blocking." if final[0]["model"] != "plain" else "That does not help."))
+                        + ("That does not help." if final[0]["model"] == "plain" else
+                           f"That lowers BIC from {plain[0]['bic']:.0f} to {final[0]['bic']:.0f}"
+                           + (": the best network now fits within the GC noise, so the data support site blocking."
+                              if final[0]["fits_noise"] else ", but even so the best network does not fit within the GC noise.")))
         while len(models) > 1 and final[0]["model"] != "plain" and final[0]["n_reactions"] > 1 and not out_of_time():
             top, tnet, better = final[0], parse_network(final[0]["reactions"]), None
             rests = [tnet[:j] + tnet[j + 1:] for j in range(len(tnet))]
@@ -1506,17 +1690,24 @@ def discover(data, library=None, start=None, max_reactions=4, models=MODELS, pro
             alt = None
             for f in sorted((f for f in cache.values() if f["n_reactions"] == 1), key=lambda f: f["bic"]):
                 r = parse_reaction(f["reactions"][0])
-                if r.entry_key() not in firsts and set(r.reactants) <= set(fed):
+                if r.entry_key() not in firsts and set(r.reactants) <= set(fed) and r.default_orders:
                     alt, where = [r], f"'{r.text()}' as the first reaction"
                     break
             if alt is None:
                 break
             firsts.add(alt[0].entry_key())
         restarts += 1
+        # The first new start is searched like the first pass (cheap; it cures a wrong first reaction).
+        # If that fails too, the rate laws are suspected: later starts also try every reaction they
+        # may add with one of its orders changed (several times more fits per step).
+        wide = WIDE_RESTARTS and restarts >= 2
         path.append(f"The best network so far does not fit within the GC noise. The search changes one reaction at a "
-                    f"time, so it may have taken a wrong turn early on: search again, starting from {where}.")
+                    f"time, so it may have taken a wrong turn early on: search again, starting from {where}."
+                    + (" This time every reaction that may be added is also tried with one of its orders changed: so far the "
+                       "search took each rate to follow its equation until the reactions were settled, and that may be what "
+                       "leads it astray." if wide else ""))
         say("search", path[-1], final[0])
-        net, cur, stopped = grow(alt, cache.get(network_key(alt)) or keep(alt, _empty_fit(data)))
+        net, cur, stopped = grow(alt, cache.get(network_key(alt)) or keep(alt, _empty_fit(data)), wide=wide)
         final = finish(cur)
     final = _add_ranks(final)[:n_final + 2]
     # exactly tied networks (same BIC to 0.5): write the one with fewer two-way reactions first
@@ -1533,13 +1724,23 @@ def discover(data, library=None, start=None, max_reactions=4, models=MODELS, pro
     best = final[0]
     for f in final[1:]:
         f["differs_by"] = _difference(best["reactions"], f["reactions"])
-    path.append(f"Result: {'; '.join(best['reactions'])} with {best['model_words']} (BIC {best['bic']:.0f}).")
+        if f["model"] != best["model"] and "blocks catalyst sites" not in f["differs_by"]:
+            f["differs_by"] += "; and whether product C blocks catalyst sites"
+    path.append(f"Result: {'; '.join(best['reactions'])} with {best['model_words']} (BIC {best['bic']:.0f})." if best["reactions"]
+                else "Result: no reaction.")
     tied = [f["name"] for f in final[1:] if f["tied_with_best"]]
     undecided = [f"The data cannot decide {f['differs_by']} (BIC difference {f['delta_bic']:.1f}, below {INDISTINGUISHABLE:g})."
                  for f in final[1:] if f["tied_with_best"]]
     complete = not best["not_made"]
-    summary = ["The reactions that explain the data best:"] + ["   " + e for e in best["equations"]]
-    summary.append(f"This network {best['verdict']} ({best['model_words']}).")
+    if best["reactions"]:
+        summary = ["The reactions that explain the data best:"] + ["   " + e for e in best["equations"]]
+        summary.append(f"This network {best['verdict']} ({best['model_words']}).")
+    elif best["fits_noise"]:
+        summary = ["No reaction is needed to explain these data: the GC reading equals the feed within the GC noise "
+                   "in every run (nothing reacts at these conditions)."]
+    else:
+        summary = ["No reaction could be proposed: the GC reading differs from the feed, but no product is seen clearly "
+                   "enough above the GC noise to say what is made."]
     if not complete:
         summary.append("Warning: " + " and ".join(best["not_made"]) + (" is" if len(best["not_made"]) == 1 else " are")
                        + " seen by the GC but made by no reaction of this network (the search stopped before it "
@@ -1549,11 +1750,121 @@ def discover(data, library=None, start=None, max_reactions=4, models=MODELS, pro
                        "the library of reactions and rate laws does not describe (for example an adsorption effect), or "
                        "the step-by-step search did not find the right combination. If you have an idea of the "
                        "reactions, type it as a candidate and rank it against this result.")
-    summary += undecided if undecided else ["No other network tried comes close (next best: BIC difference "
-                                            f"{final[1]['delta_bic']:.0f})." if len(final) > 1 else ""]
+    if undecided:
+        summary += undecided
+    elif len(final) > 1 and best["fits_noise"] and final[1]["delta_bic"] < CLEAR_GAP:
+        summary.append(f"The next best network tried is ruled out, but only just (BIC difference {final[1]['delta_bic']:.1f}; "
+                       f"below {INDISTINGUISHABLE:g} would count as a tie): a few more runs would make this firm.")
+    elif len(final) > 1 and best["fits_noise"]:
+        summary.append(f"No other network tried comes close (next best: BIC difference {final[1]['delta_bic']:.0f}).")
+    if stopped:
+        summary.append(f"The search was stopped by the time limit ({max_seconds:g} s): this is the best network found so "
+                       "far, not the end of the search.")
+    if len(data["gc"]) < FEW_RUNS:
+        summary.append(_few_runs_note(len(data["gc"])))
     return dict(best=best, runners_up=final[1:], tied=tied, decided=not tied, undecided=undecided, path=path,
                 complete=bool(complete), n_fits=int(count[0]), seconds=float(time.time() - t0), library_size=len(lib),
                 detected=det, stopped_early=bool(stopped), restarts=int(restarts), summary=[s for s in summary if s])
+
+
+# =================================================================================== one step of the search, on its own
+def one_step_revision(network, data, library=None, theta=None, max_reactions=4, order_choices=ORDER_CHOICES,
+                      n_polish=3):
+    """Every SINGLE change of a network, fitted to the data, best first.
+
+    This is one step of the automatic search (discover), offered on its own so that the
+    advisor (advisor.SmartAdvisor with revise=True) can repair its reaction network DURING a
+    campaign, one well-supported change at a time, on the campaign's own runs.
+
+    network        the network as it stands (text, lines, Reaction objects or a ReactionSystem)
+    data           the run log (load_data / make_data)
+    library        reaction_library() by default (enumerated from the atom balance)
+    theta          fitted kinetics of the network [ln k_1, Ea_1/(R T_ref), ...] to start from
+                   (default: the generic starting guess)
+    max_reactions  no reaction is added to a network that already has this many
+    n_polish       how many of the best changes are fitted to convergence
+
+    The changes tried (the same four kinds the search uses):
+      add      a library reaction whose reactants are fed or already made.  While a product the GC
+               sees is made by no reaction, only reactions that make such a product; otherwise only
+               reactions that touch a species the network misses by more than the GC noise allows
+      remove   one reaction (if the others can still run from the feed)
+      order    one reactant order of one reaction set to another value of order_choices (0, 1, 2)
+      replace  one reaction by another variant of itself (the other direction, one way / both ways)
+               or by another library reaction that makes the same product
+    All changed networks are first compared by a quick fit in one batch (plain rate laws,
+    N_SCREEN iterations from the present fit); the best n_polish are then fitted to convergence.
+    Nothing is decided here: the caller compares the best changes with the network as it stands
+    (like for like, with its own kinetic model classes) and decides whether the evidence is
+    strong enough.
+
+    Returns a dict (JSON-friendly):
+      current   the fit_network dict of the network as given (plain rate laws, converged)
+      moves     the changed networks, best (lowest BIC) first, each a dict:
+                  kind ('add' | 'remove' | 'order' | 'replace'), what (the change in plain words),
+                  reactions [text], fit (fit_network dict, plain rate laws), converged (bool: among
+                  the n_polish fitted to convergence), gain (BIC of the present network minus BIC
+                  of the changed one; positive = the change explains the data better)
+      n_tried, seconds, detected {species: largest mol-% seen}"""
+    t0 = time.time()
+    net = parse_network(network)
+    lib = _library_reactions(library)
+    fed, det = fed_species(data), detected_species(data)
+    visible = set(fed) | set(det)
+    lib = [r for r in lib if set(r.products) <= visible or (r.reversible and set(r.reactants) | set(r.products) <= visible)]
+    if net:
+        th0 = generic_theta(len(net)) if theta is None else np.asarray(theta, float)[:2 * len(net)]
+        cur = _state_fit(net, _batch_lm([net], data, [th0], 20, tol=1e-6)[0], data)
+        th_cur = np.asarray(cur["theta"], float)
+    else:
+        cur, th_cur = _empty_fit(data), np.zeros(0)
+    have = set(fed) | _made_by(net)
+    entries = {r.entry_key() for r in net}
+    orphan = set(cur["not_made"])
+    poor = {s for s, m in cur["miss"].items() if m["x_noise"] > 1.3} | orphan
+    moves = {}
+
+    def offer(kind, what, new):
+        key = network_key(new)
+        if key != network_key(net) and key not in moves and _reachable(new, fed):
+            moves[key] = (kind, what, new)
+
+    if len(net) < max_reactions and poor:
+        for r in lib:
+            makes = set(r.products) | (set(r.reactants) if r.reversible else set())
+            touches = (makes & orphan) if orphan else ((set(r.reactants) | set(r.products)) & poor)
+            starts_ok = set(r.reactants) <= have or (r.reversible and set(r.products) <= have)
+            if r.entry_key() not in entries and starts_ok and touches:
+                offer("add", f"add '{r.text()}'", net + [r])
+    for j, r in enumerate(net):
+        rest = net[:j] + net[j + 1:]
+        if rest:
+            offer("remove", f"remove '{r.text()}'", rest)
+        for q in _order_variants(r, order_choices):
+            offer("order", f"change the rate law of '{r.equation()}' to {q.rate_law().strip()} (was {r.rate_law().strip()})",
+                  net[:j] + [q] + net[j + 1:])
+        others, made = entries - {r.entry_key()}, set(r.products) & set(det)
+        for q in lib:
+            twin = q.entry_key() == r.entry_key()
+            if q.key() != r.key() and q.entry_key() not in others and (twin or set(q.products) & made):
+                offer("replace", f"replace '{r.text()}' by '{q.text()}'", net[:j] + [q] + net[j + 1:])
+    out = []
+    if moves:
+        keys = list(moves)
+        nets = [moves[k][2] for k in keys]
+        fits = [_state_fit(n_, st, data) for n_, st in
+                zip(nets, _batch_lm(nets, data, [_warm_theta(n_, net, th_cur) for n_ in nets], N_SCREEN))]
+        order = sorted(range(len(keys)), key=lambda i: fits[i]["bic"])
+        top = order[:n_polish]
+        for i, st in zip(top, _batch_lm([nets[i] for i in top], data, [np.asarray(fits[i]["theta"], float) for i in top], 20, tol=1e-6)):
+            f = _state_fit(nets[i], st, data)
+            if f["bic"] < fits[i]["bic"]:
+                fits[i] = f
+        for i in sorted(range(len(keys)), key=lambda i: fits[i]["bic"]):     # the converged ones come first: they were the best
+            kind, what, new = moves[keys[i]]
+            out.append(dict(kind=kind, what=what, reactions=[r.text() for r in new], fit=fits[i], converged=i in top,
+                            gain=float(cur["bic"] - fits[i]["bic"])))
+    return dict(current=cur, moves=out, n_tried=len(out), seconds=float(time.time() - t0), detected=det)
 
 
 # =================================================================================== the run that tells two networks apart
@@ -1561,7 +1872,9 @@ def _model_of(fit):
     """A fitted network (fit_network dict) -> (KineticFit set to the fitted values, theta, cov)."""
     S = build_system(fit["reactions"], name=fit.get("name", "network"))
     kf = KineticFit(S, a_spec=fit["a_spec"], models=(fit["model"],))
-    kf.model, kf.theta, kf.cov = fit["model"], np.asarray(fit["theta"], float), np.asarray(fit["cov"], float)
+    kf.model, kf.theta = fit["model"], np.asarray(fit["theta"], float)
+    # a result saved without its covariance (discover_reactions.strip) still predicts; it only has no uncertainty
+    kf.cov = np.asarray(fit["cov"], float) if fit.get("cov") else np.zeros((len(kf.theta), len(kf.theta)))
     return kf
 
 
@@ -1604,25 +1917,33 @@ def discriminating_run(networks_fitted, data, x_last=None, max_step=None, lo=Non
     uncertain each network's own prediction is (parameter draws from each fit):
         score = sum over species of (y1 - y2)^2 / (noise^2 + var1 + var2)
     Set points are rounded to what can be set (0.5 bar, 0.5 mL/min, 1 deg C).
+    Far from the runs done, two fits can predict very different readings only because their
+    rate constants are still uncertain there; such a difference would shrink once the run is
+    made and both networks are fitted again.  The uncertainty-aware number is therefore the one
+    to plan with, and the message and expected_bic_gap are based on it.
 
     Returns a dict (JSON-friendly): run {pressure_bar, ..., temperature_C, catalyst_g} (the CSV
     columns), x [P, V_A, V_B, V_I, T_K], networks [the two names], predicted {name: {species:
     mol-%}}, difference_x_noise {species: difference / GC noise}, separation (overall difference
-    in units of the GC noise), separation_uncertain (the same allowing for parameter
-    uncertainty), expected_bic_gap (about separation^2: what one such run adds to the BIC
-    difference), best_so_far (largest separation among the runs already in the log),
-    step_limited (bool), message (plain words)."""
+    of the two best-fit predictions in units of the GC noise), separation_uncertain (the same
+    allowing for the uncertainty of the fitted numbers of both networks; equal to separation
+    when the fits carry no covariance), expected_bic_gap (separation_uncertain^2: about what
+    one such run adds to the BIC difference), best_so_far (largest best-fit separation among
+    the runs already in the log), step_limited (bool), message (plain words)."""
     f1, f2 = _pair(networks_fitted)
     k1, k2 = _model_of(f1), _model_of(f2)
     lo = LOW.copy() if lo is None else np.asarray(lo, float)
     hi = HIGH.copy() if hi is None else np.asarray(hi, float)
     lo, hi = np.maximum(lo, LOW), np.minimum(hi, HIGH)
     limited = x_last is not None
+    outside = False
     if limited:
         x_last = np.asarray(x_last, float)[:5]
         step = MAX_STEP if max_step is None else np.asarray(max_step, float)
-        lo, hi = np.maximum(lo, x_last - step), np.minimum(hi, x_last + step)
-        hi = np.maximum(hi, lo)
+        # the box comes first: if the last run itself lies outside it, the new run is the nearest
+        # point of the box, even where that is more than one step away
+        outside = bool(np.any(x_last < lo - 1e-9) or np.any(x_last > hi + 1e-9))
+        lo, hi = np.clip(x_last - step, lo, hi), np.clip(x_last + step, lo, hi)
     W = float(data["phys"][-1, 5]) if wcat is None else float(wcat)
     grid, off = np.array([0.5, 0.5, 0.5, 0.5, 1.0]), np.array([0.0, 0.0, 0.0, 0.0, 273.15])   # whole deg C
     rng = np.random.default_rng(seed)
@@ -1676,10 +1997,16 @@ def discriminating_run(networks_fitted, data, x_last=None, max_step=None, lo=Non
         sz, _, _ = sep(Z)
         X, s = np.vstack([X, Z]), np.r_[s, sz]
         xb = X[np.argmax(s)]
-    top = X[np.argsort(-s)[:48]]
+    # the points where the best-fit predictions differ most are scored again allowing for the
+    # uncertainty of both fits; the run proposed is the best by THAT score
+    top = X[np.argsort(-s)[:N_UNCERTAIN]]
     top = np.unique(top, axis=0)
-    su, _, _ = sep(top, draws=n_draws)
+    has_cov = bool(np.any(k1.cov) or np.any(k2.cov))
+    su, _, _ = sep(top, draws=n_draws if has_cov else 0)
     x = top[np.argmax(su)]
+    # the score that picked x is the largest of many rough ones (few draws), so it flatters x:
+    # the number reported is worked out again at x alone, from fresh and more numerous draws
+    su_x, _, _ = sep(x[None, :], draws=4 * n_draws if has_cov else 0)
     s1, y1, y2 = sep(x[None, :])
     sig = gc_noise(0.5 * (y1 + y2))
     dz = ((y1 - y2) / sig)[0]
@@ -1690,18 +2017,28 @@ def discriminating_run(networks_fitted, data, x_last=None, max_step=None, lo=Non
     big = sorted(range(len(sp) - 1), key=lambda i: -abs(dz[i]))[:2]
     run = dict(zip(LOG_COLS, [float(x[0]), float(x[1]), float(x[2]), float(x[3]), float(round(x[4] - 273.15, 2)), W]))
     separation = float(np.sqrt(s1[0]))
+    sure = min(float(np.sqrt(su_x[0])), separation)          # never more than the best-fit difference itself
     words = (f"Run at {x[0]:g} bar, {x[1]:g} / {x[2]:g} / {x[3]:g} mL/min of A / B / inert and {x[4] - 273.15:.0f} C"
-             + (" (within one allowed step of the last run)" if limited else "") + ". "
-             f"There '{names[0]}' and '{names[1]}' predict clearly different GC readings: "
+             + (" (the last run lies outside the operating box; this run is inside the box, as close to one allowed step "
+                "from it as the box permits)" if outside else " (within one allowed step of the last run)" if limited else
+                " (a free run: anywhere in the operating box, not held to one allowed step from the last run)") + ". "
+             f"There the fitted '{names[0]}' and '{names[1]}' predict these GC readings: "
              + "; ".join(f"{sp[i]} {100 * y1[0, i]:.2f} against {100 * y2[0, i]:.2f} mol-% ({abs(dz[i]):.0f}x the GC noise)" for i in big)
              + f". Overall the two predictions are {separation:.0f}x the GC noise apart"
              + (f" (the runs done so far reach at most {np.sqrt(done.max()):.0f}x)." if len(done) else "."))
-    if separation < 3:
+    if has_cov:
+        words += (" Each network's own prediction is still uncertain there, because its fitted rate constants are; counted "
+                  f"against the GC noise and that uncertainty together, the two predictions are about {sure:.0f}x apart.")
+    if sure < 3 and separation >= 3:
+        words += (" That is not enough to decide with one run: the two fits differ there mainly because their rate constants "
+                  "are not yet pinned down at such conditions, and the difference would shrink once the run is made and both "
+                  "networks are fitted again. Several runs" + (" in this direction" if limited else "") + " would be needed.")
+    elif sure < 3:
         words += (" That is not enough to decide" + (" within one step; several steps in this direction or a "
                   "free kinetic run would be needed." if limited else ": inside this box the two networks predict almost the same."))
     return dict(run=run, x=[float(v) for v in x], networks=names,
                 predicted={n: {s_: float(100 * y[0, i]) for i, s_ in enumerate(sp)} for n, y in zip(names, (y1, y2))},
                 difference_x_noise={s_: float(dz[i]) for i, s_ in enumerate(sp[:-1])},
-                separation=separation, separation_uncertain=float(np.sqrt(su.max())),
-                expected_bic_gap=float(s1[0]), best_so_far=float(np.sqrt(done.max())) if len(done) else 0.0,
+                separation=separation, separation_uncertain=sure,
+                expected_bic_gap=sure ** 2, best_so_far=float(np.sqrt(done.max())) if len(done) else 0.0,
                 step_limited=bool(limited), message=words)

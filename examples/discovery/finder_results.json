@@ -16,92 +16,93 @@
    "n_params": 6,
    "n_data": 150,
    "n_runs": 30,
-   "chi2": 82.81060409796493,
-   "chi2_per_point": 0.5520706939864328,
-   "x_noise": 0.7430145987707326,
-   "bic": 112.87441586254246,
+   "chi2": 82.81052198742104,
+   "chi2_per_point": 0.552070146582807,
+   "x_noise": 0.7430142304039721,
+   "bic": 112.87433375199858,
    "model": "plain",
    "miss": {
     "A": {
-     "mol_pct": 0.19964691130620305,
-     "x_noise": 0.794301067457451,
-     "bias_mol_pct": -0.03221195575028211
+     "mol_pct": 0.19964670348636623,
+     "x_noise": 0.794314097143465,
+     "bias_mol_pct": -0.03221096514495036
     },
     "B": {
-     "mol_pct": 0.21928801628823932,
-     "x_noise": 0.7709672406935989,
-     "bias_mol_pct": -0.01131613416331455
+     "mol_pct": 0.21928773079156502,
+     "x_noise": 0.7709571408040383,
+     "bias_mol_pct": -0.011315629914741722
     },
     "C": {
-     "mol_pct": 0.08947029636555862,
-     "x_noise": 0.5363406993518914,
-     "bias_mol_pct": 0.01635376476873279
+     "mol_pct": 0.08947035365898018,
+     "x_noise": 0.536339908463663,
+     "bias_mol_pct": 0.01635324396145787
     },
     "D": {
-     "mol_pct": 0.1257049257279366,
-     "x_noise": 0.7595956251457678,
-     "bias_mol_pct": -0.01912909162852294
+     "mol_pct": 0.12570364516406568,
+     "x_noise": 0.7595918857347117,
+     "bias_mol_pct": -0.019129492353142756
     },
     "E": {
-     "mol_pct": 0.05767689167103534,
-     "x_noise": 0.8187807633448347,
-     "bias_mol_pct": 0.0027360687568470416
+     "mol_pct": 0.057676839244457975,
+     "x_noise": 0.818779948918898,
+     "bias_mol_pct": 0.0027359050241351148
     }
    },
    "unexplained": [],
    "not_made": [],
    "fits_noise": true,
-   "seconds": 0.2704218626022339,
+   "seconds": 0.9575338363647461,
    "a_spec": 100.0,
    "rate_constants": [
     {
      "reaction": "A + B <=> C",
      "rate_law": "r1 = k1 (P_A P_B - P_C / K1)",
-     "k_ref": 2.0166837448176913e-06,
-     "k_ref_low": 1.9978873702208186e-06,
-     "k_ref_high": 2.035656958060852e-06,
+     "k_ref": 2.0166837438297722e-06,
+     "k_ref_low": 1.997887369201448e-06,
+     "k_ref_high": 2.0356569571050667e-06,
      "k_units": "mol g^-1 s^-1 bar^-2",
-     "Ea_kJ": 65.06725580198152,
-     "Ea_sd_kJ": 0.6008502579362183
+     "Ea_kJ": 65.06725561930222,
+     "Ea_sd_kJ": 0.6008502608575459
     },
     {
      "reaction": "A + 2 B -> E",
      "rate_law": "r2 = k2 P_A P_B^2",
-     "k_ref": 6.005058839387981e-08,
-     "k_ref_low": 5.8390511091323806e-08,
-     "k_ref_high": 6.175786269127204e-08,
+     "k_ref": 6.0050590396908e-08,
+     "k_ref_low": 5.839051309948489e-08,
+     "k_ref_high": 6.175786468725226e-08,
      "k_units": "mol g^-1 s^-1 bar^-3",
-     "Ea_kJ": 85.29243504340437,
-     "Ea_sd_kJ": 1.2338918221312591
+     "Ea_kJ": 85.29243333460143,
+     "Ea_sd_kJ": 1.2338917884199438
     },
     {
      "reaction": "C -> B + D",
      "rate_law": "r3 = k3 P_C",
-     "k_ref": 9.937186526146103e-07,
-     "k_ref_low": 9.684204218283827e-07,
-     "k_ref_high": 1.0196777538931232e-06,
+     "k_ref": 9.937186497847668e-07,
+     "k_ref_low": 9.684204189651643e-07,
+     "k_ref_high": 1.0196777511003525e-06,
      "k_units": "mol g^-1 s^-1 bar^-1",
-     "Ea_kJ": 110.1956020113181,
-     "Ea_sd_kJ": 1.5990057449868182
+     "Ea_kJ": 110.19560226853645,
+     "Ea_sd_kJ": 1.5990057520558567
     }
    ],
    "inhibition": null,
    "scores": {
-    "plain": 112.87441586254246
+    "plain": 112.87441565600992,
+    "inhib": 121.02772098264825
    },
    "theta": [
-    -17.719226292108942,
-    13.654763228020915,
-    -21.233248676057183,
-    17.899141300862624,
-    -18.426981902002257,
-    23.125223827065888
+    -17.719226292598815,
+    13.654763189684541,
+    -21.233248642701504,
+    17.89914094225983,
+    -18.42698190484999,
+    23.125223881044732
    ],
    "model_words": "plain rate laws",
    "verdict": "fits the data within the GC noise",
    "rank": 1,
    "delta_bic": 0.0,
-   "weight": 0.4988370895606324,
+   "weight": 0.49883825167664997,
    "tied_with_best": true
   },
   "runners_up": [
@@ -121,92 +122,93 @@
     "n_params": 6,
     "n_data": 150,
     "n_runs": 30,
-    "chi2": 82.80783997355131,
-    "chi2_per_point": 0.5520522664903421,
-    "x_noise": 0.7430021981732908,
-    "bic": 112.87165173812885,
+    "chi2": 82.80776993506487,
+    "chi2_per_point": 0.5520517995670992,
+    "x_noise": 0.7430018839593202,
+    "bic": 112.8715816996424,
     "model": "plain",
     "miss": {
      "A": {
-      "mol_pct": 0.19964651065236413,
-      "x_noise": 0.7942863464261996,
-      "bias_mol_pct": -0.03221400431380029
+      "mol_pct": 0.1996463143262463,
+      "x_noise": 0.7943001906926633,
+      "bias_mol_pct": -0.03221290773230044
      },
      "B": {
-      "mol_pct": 0.2192823942937897,
-      "x_noise": 0.7709505713822358,
-      "bias_mol_pct": -0.011322790696519652
+      "mol_pct": 0.21928210666576275,
+      "x_noise": 0.7709404768546597,
+      "bias_mol_pct": -0.011322335105931614
      },
      "C": {
-      "mol_pct": 0.08947889501737039,
-      "x_noise": 0.5363662257898058,
-      "bias_mol_pct": 0.016359905285515373
+      "mol_pct": 0.0894788197060894,
+      "x_noise": 0.5363652961843153,
+      "bias_mol_pct": 0.016359473305169257
      },
      "D": {
-      "mol_pct": 0.1257147215386288,
-      "x_noise": 0.7596362630245316,
-      "bias_mol_pct": -0.019123933197821994
+      "mol_pct": 0.1257133328344897,
+      "x_noise": 0.7596320708414298,
+      "bias_mol_pct": -0.01912449306976646
      },
      "E": {
-      "mol_pct": 0.057638168431114634,
-      "x_noise": 0.8187000479712687,
-      "bias_mol_pct": 0.0027305110839635064
+      "mol_pct": 0.05763811320392852,
+      "x_noise": 0.8186991950933369,
+      "bias_mol_pct": 0.002730330586877731
      }
     },
     "unexplained": [],
     "not_made": [],
     "fits_noise": true,
-    "seconds": 0.2058540185292562,
+    "seconds": 0.871361494064331,
     "a_spec": 100.0,
     "rate_constants": [
      {
       "reaction": "A + B <=> C",
       "rate_law": "r1 = k1 (P_A P_B - P_C / K1)",
-      "k_ref": 2.016685972462773e-06,
-      "k_ref_low": 1.9978895693454117e-06,
-      "k_ref_high": 2.0356592145684204e-06,
+      "k_ref": 2.0166859291495066e-06,
+      "k_ref_low": 1.997889526502522e-06,
+      "k_ref_high": 2.0356591707797186e-06,
       "k_units": "mol g^-1 s^-1 bar^-2",
-      "Ea_kJ": 65.06726006754843,
-      "Ea_sd_kJ": 0.600849382920171
+      "Ea_kJ": 65.06726318841672,
+      "Ea_sd_kJ": 0.6008493694067651
      },
      {
       "reaction": "A + 2 B <=> E",
       "rate_law": "r2 = k2 (P_A P_B^2 - P_E / K2)",
-      "k_ref": 6.00506135704162e-08,
-      "k_ref_low": 5.8390515791730415e-08,
-      "k_ref_high": 6.175790950444332e-08,
+      "k_ref": 6.00506140128963e-08,
+      "k_ref_low": 5.839051625170739e-08,
+      "k_ref_high": 6.175790992805982e-08,
       "k_units": "mol g^-1 s^-1 bar^-3",
-      "Ea_kJ": 85.29390436010004,
-      "Ea_sd_kJ": 1.2339454342525578
+      "Ea_kJ": 85.2939060306278,
+      "Ea_sd_kJ": 1.2339454076112903
      },
      {
       "reaction": "C -> B + D",
       "rate_law": "r3 = k3 P_C",
-      "k_ref": 9.937212581300176e-07,
-      "k_ref_low": 9.684230281444047e-07,
-      "k_ref_high": 1.0196803567874868e-06,
+      "k_ref": 9.93721052894722e-07,
+      "k_ref_low": 9.68422824011532e-07,
+      "k_ref_high": 1.0196801505314748e-06,
       "k_units": "mol g^-1 s^-1 bar^-1",
-      "Ea_kJ": 110.19544151857592,
-      "Ea_sd_kJ": 1.5990024559807978
+      "Ea_kJ": 110.19545102122218,
+      "Ea_sd_kJ": 1.5990026983010677
      }
     ],
     "inhibition": null,
     "scores": {
-     "plain": 112.87165173812885
+     "plain": 112.87166357485042,
+     "inhib": 121.02553372913337
     },
     "theta": [
-     -17.71922518750151,
-     13.654764123176328,
-     -21.233248256801822,
-     17.899449645994736,
-     -18.42697928002069,
-     23.125190146678303
+     -17.71922520897896,
+     13.654764778109705,
+     -21.23324824943337,
+     17.89944999656524,
+     -18.426979486552767,
+     23.125192140866982
     ],
     "model_words": "plain rate laws",
     "verdict": "fits the data within the GC noise",
     "rank": 2,
     "delta_bic": 0.0,
-    "weight": 0.4995269900823724,
+    "weight": 0.49952513864843284,
     "tied_with_best": true,
     "differs_by": "whether 'A + 2 B -> E' runs one way or both ways"
    },
@@ -226,92 +228,93 @@
     "n_params": 6,
     "n_data": 150,
     "n_runs": 30,
-    "chi2": 95.63520357082258,
-    "chi2_per_point": 0.6375680238054838,
-    "x_noise": 0.7984785681566436,
-    "bic": 125.69901533540012,
+    "chi2": 95.63419985753674,
+    "chi2_per_point": 0.6375613323835783,
+    "x_noise": 0.798474378038255,
+    "bic": 125.69801162211428,
     "model": "plain",
     "miss": {
      "A": {
-      "mol_pct": 0.20189347065752858,
-      "x_noise": 0.8012240320478495,
-      "bias_mol_pct": -0.034027466561585645
+      "mol_pct": 0.2018930394878722,
+      "x_noise": 0.8012322861147811,
+      "bias_mol_pct": -0.03402690742074644
      },
      "B": {
-      "mol_pct": 0.221986287035622,
-      "x_noise": 0.8004319689028417,
-      "bias_mol_pct": -0.013162752422501747
+      "mol_pct": 0.22198609359512889,
+      "x_noise": 0.8004215795633665,
+      "bias_mol_pct": -0.013161559087894141
      },
      "C": {
-      "mol_pct": 0.0961564408965269,
-      "x_noise": 0.8009166407723586,
-      "bias_mol_pct": 0.023725213337762622
+      "mol_pct": 0.09615592027379802,
+      "x_noise": 0.8009000560201862,
+      "bias_mol_pct": 0.023723329904812997
      },
      "D": {
-      "mol_pct": 0.12306624593615091,
-      "x_noise": 0.7690353881950822,
-      "bias_mol_pct": -0.022636860529221446
+      "mol_pct": 0.123065601698239,
+      "x_noise": 0.7690335903890657,
+      "bias_mol_pct": -0.022636007292714793
      },
      "E": {
-      "mol_pct": 0.059229387974973825,
-      "x_noise": 0.8199426436600832,
-      "bias_mol_pct": 0.0013712848022823724
+      "mol_pct": 0.05922938589197487,
+      "x_noise": 0.8199422038745319,
+      "bias_mol_pct": 0.0013712902186379305
      }
     },
     "unexplained": [],
     "not_made": [],
     "fits_noise": true,
-    "seconds": 1.184520959854126,
+    "seconds": 1.0217890739440918,
     "a_spec": 100.0,
     "rate_constants": [
      {
       "reaction": "A + B <=> C",
       "rate_law": "r1 = k1 (P_A P_B - P_C / K1)",
-      "k_ref": 2.016333052258039e-06,
-      "k_ref_low": 1.9975420456361267e-06,
-      "k_ref_high": 2.0353008270889786e-06,
+      "k_ref": 2.0163331797159693e-06,
+      "k_ref_low": 1.997542171179297e-06,
+      "k_ref_high": 2.0353009564865843e-06,
       "k_units": "mol g^-1 s^-1 bar^-2",
-      "Ea_kJ": 65.07274428247794,
-      "Ea_sd_kJ": 0.6008352250730264
+      "Ea_kJ": 65.07274087778906,
+      "Ea_sd_kJ": 0.6008352805107383
      },
      {
       "reaction": "A + 2 B <=> E",
       "rate_law": "r2 = k2 (P_A P_B^2 - P_E / K2)",
-      "k_ref": 5.996128558403535e-08,
-      "k_ref_low": 5.830327320070071e-08,
-      "k_ref_high": 6.166644806568141e-08,
+      "k_ref": 5.996130593722876e-08,
+      "k_ref_low": 5.830329356167852e-08,
+      "k_ref_high": 6.166646839418168e-08,
       "k_units": "mol g^-1 s^-1 bar^-3",
-      "Ea_kJ": 85.20059533963904,
-      "Ea_sd_kJ": 1.2335797940348379
+      "Ea_kJ": 85.20057751991622,
+      "Ea_sd_kJ": 1.2335794523676453
      },
      {
       "reaction": "B + D <=> C",
       "rate_law": "r3 = k3 (P_B P_D - P_C / K3)",
-      "k_ref": 1.803230706414719e-08,
-      "k_ref_low": 1.756470801426708e-08,
-      "k_ref_high": 1.8512354306805178e-08,
+      "k_ref": 1.8032343396336618e-08,
+      "k_ref_low": 1.756474410542645e-08,
+      "k_ref_high": 1.851239086727989e-08,
       "k_units": "mol g^-1 s^-1 bar^-2",
-      "Ea_kJ": -60.008731777045355,
-      "Ea_sd_kJ": 1.6258828707836679
+      "Ea_kJ": -60.0088525322763,
+      "Ea_sd_kJ": 1.625880513622664
      }
     ],
     "inhibition": null,
     "scores": {
-     "plain": 125.69901533540012
+     "plain": 125.69884639556042,
+     "inhib": 134.05700974276868
     },
     "theta": [
-     -17.719400202894928,
-     13.655915019359533,
-     -21.23473690923557,
-     17.87986817501168,
-     -22.436271036936287,
-     -12.59320089544049
+     -17.719400139682193,
+     13.655914304864659,
+     -21.234736569796716,
+     17.879864435433408,
+     -22.436269022099655,
+     -12.5932262366673
     ],
     "model_words": "plain rate laws",
     "verdict": "fits the data within the GC noise",
     "rank": 3,
-    "delta_bic": 12.824599472857656,
-    "weight": 0.0008187142412399535,
+    "delta_bic": 12.823677870115702,
+    "weight": 0.000819093501017185,
     "tied_with_best": false,
     "differs_by": "whether 'A + 2 B -> E' runs one way or both ways; whether 'C -> B + D' runs one way or both ways"
    },
@@ -331,92 +334,93 @@
     "n_params": 6,
     "n_data": 150,
     "n_runs": 30,
-    "chi2": 95.63889109975554,
-    "chi2_per_point": 0.6375926073317036,
-    "x_noise": 0.7984939619882567,
-    "bic": 125.70270286433308,
+    "chi2": 95.63805496759687,
+    "chi2_per_point": 0.6375870331173125,
+    "x_noise": 0.7984904715256861,
+    "bic": 125.70186673217441,
     "model": "plain",
     "miss": {
      "A": {
-      "mol_pct": 0.20189414096156727,
-      "x_noise": 0.8012322906164534,
-      "bias_mol_pct": -0.03402624297201495
+      "mol_pct": 0.2018938855822747,
+      "x_noise": 0.801244460545727,
+      "bias_mol_pct": -0.034025250876659814
      },
      "B": {
-      "mol_pct": 0.22199276406913976,
-      "x_noise": 0.8004495245313314,
-      "bias_mol_pct": -0.013154934155212723
+      "mol_pct": 0.22199249902233004,
+      "x_noise": 0.8004396408401439,
+      "bias_mol_pct": -0.013154196569735774
      },
      "C": {
-      "mol_pct": 0.09614736584572706,
-      "x_noise": 0.8008772790974541,
-      "bias_mol_pct": 0.0237172853913376
+      "mol_pct": 0.09614717263279193,
+      "x_noise": 0.8008624894798408,
+      "bias_mol_pct": 0.023716411424591577
      },
      "D": {
-      "mol_pct": 0.123059171640725,
-      "x_noise": 0.7690075266881807,
-      "bias_mol_pct": -0.02264001122265183
+      "mol_pct": 0.12305779112361023,
+      "x_noise": 0.7690033128767363,
+      "bias_mol_pct": -0.022640180165169742
      },
      "E": {
-      "mol_pct": 0.0592836911667005,
-      "x_noise": 0.8200569611508578,
-      "bias_mol_pct": 0.001376864076835322
+      "mol_pct": 0.059283635801077296,
+      "x_noise": 0.8200561195014686,
+      "bias_mol_pct": 0.0013766796158387097
      }
     },
     "unexplained": [],
     "not_made": [],
     "fits_noise": true,
-    "seconds": 0.20711191495259604,
+    "seconds": 0.9090478420257568,
     "a_spec": 100.0,
     "rate_constants": [
      {
       "reaction": "A + B <=> C",
       "rate_law": "r1 = k1 (P_A P_B - P_C / K1)",
-      "k_ref": 2.0163310715336395e-06,
-      "k_ref_low": 1.997540090121523e-06,
-      "k_ref_high": 2.035298820853533e-06,
+      "k_ref": 2.016331071896769e-06,
+      "k_ref_low": 1.99754009043682e-06,
+      "k_ref_high": 2.0352988212653666e-06,
       "k_units": "mol g^-1 s^-1 bar^-2",
-      "Ea_kJ": 65.07272669274472,
-      "Ea_sd_kJ": 0.6008361633782033
+      "Ea_kJ": 65.07272643012996,
+      "Ea_sd_kJ": 0.6008361668051476
      },
      {
       "reaction": "A + 2 B -> E",
       "rate_law": "r2 = k2 P_A P_B^2",
-      "k_ref": 5.99612746720418e-08,
-      "k_ref_low": 5.830328276014101e-08,
-      "k_ref_high": 6.166641551020866e-08,
+      "k_ref": 5.996127671042432e-08,
+      "k_ref_low": 5.8303284803274643e-08,
+      "k_ref_high": 6.16664175419176e-08,
       "k_units": "mol g^-1 s^-1 bar^-3",
-      "Ea_kJ": 85.1991062258557,
-      "Ea_sd_kJ": 1.2335261245094888
+      "Ea_kJ": 85.1991044490703,
+      "Ea_sd_kJ": 1.2335260904614465
      },
      {
       "reaction": "B + D <=> C",
       "rate_law": "r3 = k3 (P_B P_D - P_C / K3)",
-      "k_ref": 1.8032325517408425e-08,
-      "k_ref_low": 1.756472612316734e-08,
-      "k_ref_high": 1.8512373109928347e-08,
+      "k_ref": 1.8032325745944813e-08,
+      "k_ref_low": 1.756472634948386e-08,
+      "k_ref_high": 1.85123733406424e-08,
       "k_units": "mol g^-1 s^-1 bar^-2",
-      "Ea_kJ": -60.00878171494451,
-      "Ea_sd_kJ": 1.6258815740883377
+      "Ea_kJ": -60.008782405832555,
+      "Ea_sd_kJ": 1.6258815621876086
      }
     ],
     "inhibition": null,
     "scores": {
-     "plain": 125.70270286433308
+     "plain": 125.70270147504641,
+     "inhib": 134.06046558858992
     },
     "theta": [
-     -17.719401185235306,
-     13.655911328045992,
-     -21.234737091219568,
-     17.87955567533914,
-     -22.436270013592367,
-     -12.593211375215313
+     -17.71940118505521,
+     13.65591127293467,
+     -21.234737057224585,
+     17.879555302469814,
+     -22.43627000091866,
+     -12.593211520202413
     ],
     "model_words": "plain rate laws",
     "verdict": "fits the data within the GC noise",
     "rank": 4,
-    "delta_bic": 12.828287001790613,
-    "weight": 0.0008172061157550804,
+    "delta_bic": 12.827532980175832,
+    "weight": 0.0008175161738999911,
     "tied_with_best": false,
     "differs_by": "whether 'C -> B + D' runs one way or both ways"
    }
@@ -434,19 +438,20 @@
    "Step 1: tried 6 additions and 0 removals. Best: add 'A -> D' (BIC 3315322 -> 586049); now cannot explain C and E: no reaction in this network makes them (the GC sees up to 21.8 mol-% C and 20.0 mol-% E); it also misses A, B, D by more than 2x the GC noise.",
    "Step 2: tried 11 additions and 0 removals. Best: add 'A + B -> C' (BIC 586049 -> 285800); now cannot explain E: no reaction in this network makes it (the GC sees up to 20.0 mol-% E); it also misses C, A, D, B by more than 2x the GC noise.",
    "Step 3: tried 11 additions and 2 removals. Best: add '2 C -> D + E' (BIC 285800 -> 77778); now cannot explain E, D, A, C, B: typical miss 27.0x, 26.1x, 20.9x, 20.1x, 18.4x the GC noise (3.56 mol-%, 3.36 mol-%, 2.67 mol-%, 2.76 mol-%, 4.68 mol-%).",
-   "Step 4: tried 17 additions and 2 removals. Best: add 'B + D <=> C' (BIC 77778 -> 13295); now cannot explain E, C, B, D, A: typical miss 18.5x, 5.7x, 5.6x, 5.4x, 2.8x the GC noise (2.40 mol-%, 1.03 mol-%, 2.05 mol-%, 1.11 mol-%, 0.45 mol-%).",
-   "Step 5: tried 0 additions and 4 removals (no additions: 4 reactions is the largest network allowed), then 4 replacements. Best: replace 'A + B -> C' by 'A + B <=> C' (BIC 13295 -> 13235); now cannot explain E, C, B, D, A: typical miss 18.4x, 5.7x, 5.6x, 5.4x, 2.8x the GC noise (2.39 mol-%, 1.02 mol-%, 2.03 mol-%, 1.11 mol-%, 0.45 mol-%).",
-   "Step 6: tried 0 additions and 4 removals (no additions: 4 reactions is the largest network allowed), then 26 replacements. Best: replace '2 C -> D + E' by 'A + 2 B <=> E' (BIC 13235 -> 140); now fits the data within the GC noise.",
-   "Step 7: tried 0 additions and 4 removals (no additions: 4 reactions is the largest network allowed). Best: remove 'A -> D' (BIC 140 -> 126); now fits the data within the GC noise.",
-   "Step 8: tried 0 additions and 2 removals (no additions: every species is already explained within the GC noise), then 3 replacements. Best: replace 'B + D <=> C' by 'C -> B + D' (BIC 126 -> 113); now fits the data within the GC noise.",
-   "Step 9: tried 0 additions and 2 removals (no additions: every species is already explained within the GC noise), then 18 replacements; none lowers BIC by more than 2. The reactions are settled.",
-   "Order check: tried 4 other orders (each reactant at 0, 1, 2); none is better than the present rate laws.",
-   "Final check: the best network already fits within the GC noise with plain rate laws, so there is nothing left for site blocking (product C occupying the catalyst) to explain.",
+   "Step 4: tried 17 additions and 2 removals and 6 other reaction orders. Best: add 'B + D <=> C' (BIC 77778 -> 13295); now cannot explain E, C, B, D, A: typical miss 18.5x, 5.7x, 5.6x, 5.4x, 2.8x the GC noise (2.40 mol-%, 1.03 mol-%, 2.05 mol-%, 1.11 mol-%, 0.45 mol-%).",
+   "Step 5: tried 0 additions and 4 removals (no additions: 4 reactions is the largest network allowed) and 10 other reaction orders. Best: change the rate law of 'A -> D' to r = k P_A^2 (was r = k P_A) (BIC 13295 -> 13291); now cannot explain E, C, B, D, A: typical miss 18.4x, 6.0x, 5.6x, 5.4x, 2.6x the GC noise (2.40 mol-%, 1.07 mol-%, 2.03 mol-%, 1.14 mol-%, 0.40 mol-%).",
+   "Step 6: tried 0 additions and 4 removals (no additions: 4 reactions is the largest network allowed) and 10 other reaction orders, then 5 replacements. Best: replace 'A + B -> C' by 'A + B <=> C' (BIC 13291 -> 13231); now cannot explain E, C, B, D, A: typical miss 18.4x, 6.0x, 5.5x, 5.3x, 2.8x the GC noise (2.38 mol-%, 1.07 mol-%, 2.01 mol-%, 1.12 mol-%, 0.38 mol-%).",
+   "Step 7: tried 0 additions and 4 removals (no additions: 4 reactions is the largest network allowed) and 10 other reaction orders, then 27 replacements. Best: replace '2 C -> D + E' by 'A + 2 B <=> E' (BIC 13231 -> 144); now fits the data within the GC noise.",
+   "Step 8: tried 0 additions and 4 removals (no additions: 4 reactions is the largest network allowed). Best: remove 'A -> D ; orders A=2' (BIC 144 -> 126); now fits the data within the GC noise.",
+   "Step 9: tried 0 additions and 2 removals (no additions: every species is already explained within the GC noise) and 12 other reaction orders, then 3 replacements. Best: replace 'B + D <=> C' by 'C -> B + D' (BIC 126 -> 113); now fits the data within the GC noise.",
+   "Step 10: tried 0 additions and 2 removals (no additions: every species is already explained within the GC noise) and 9 other reaction orders, then 18 replacements; none lowers BIC by more than 2. The reactions are settled.",
+   "Order check: tried 9 other orders (each reactant at 0, 1, 2); none is better than the present rate laws.",
+   "Final check: the best network already fits within the GC noise with plain rate laws; letting product C block catalyst sites (one more fitted number) does not improve on that.",
    "Result: A + B <=> C; A + 2 B -> E; C -> B + D with plain rate laws (BIC 113)."
   ],
   "complete": true,
-  "n_fits": 132,
-  "seconds": 42.532652139663696,
+  "n_fits": 203,
+  "seconds": 40.32192587852478,
   "library_size": 22,
   "detected": {
    "C": 21.834678165321833,
@@ -481,92 +486,92 @@
    "n_params": 6,
    "n_data": 150,
    "n_runs": 30,
-   "chi2": 1.1849700786512432,
-   "chi2_per_point": 0.00789980052434162,
-   "x_noise": 0.08888082202782342,
-   "bic": 31.248781843228777,
+   "chi2": 1.1849649530810606,
+   "chi2_per_point": 0.007899766353873738,
+   "x_noise": 0.08888062980128875,
+   "bic": 31.248776717658593,
    "model": "plain",
    "miss": {
     "A": {
-     "mol_pct": 0.013294157046986877,
-     "x_noise": 0.0981434620453694,
-     "bias_mol_pct": -0.0020578357103869303
+     "mol_pct": 0.013294154523532409,
+     "x_noise": 0.09814462650247993,
+     "bias_mol_pct": -0.002057767859530827
     },
     "B": {
-     "mol_pct": 0.012360093196676735,
-     "x_noise": 0.06730226015824836,
-     "bias_mol_pct": -0.0004622972127661517
+     "mol_pct": 0.012360005505816713,
+     "x_noise": 0.06729896098781793,
+     "bias_mol_pct": -0.00046235999403555365
     },
     "C": {
-     "mol_pct": 0.017754466435764227,
-     "x_noise": 0.11633269193231918,
-     "bias_mol_pct": 0.0017677476252280038
+     "mol_pct": 0.01775470944550392,
+     "x_noise": 0.1163334946512701,
+     "bias_mol_pct": 0.001767551107986218
     },
     "D": {
-     "mol_pct": 0.011131486706503433,
-     "x_noise": 0.10443258144554901,
-     "bias_mol_pct": 0.0011706049292903975
+     "mol_pct": 0.01113145070662193,
+     "x_noise": 0.10443168514861897,
+     "bias_mol_pct": 0.001170581053384255
     },
     "E": {
-     "mol_pct": 0.0024819187139566855,
-     "x_noise": 0.029963477392445467,
-     "bias_mol_pct": -0.00014120794631920384
+     "mol_pct": 0.0024817246588508374,
+     "x_noise": 0.029964229795878098,
+     "bias_mol_pct": -0.0001410576031342545
     }
    },
    "unexplained": [],
    "not_made": [],
    "fits_noise": true,
-   "seconds": 0.2647916078567505,
+   "seconds": 0.1581867535909017,
    "a_spec": 100.0,
    "rate_constants": [
     {
      "reaction": "A + B <=> C",
      "rate_law": "r1 = k1 (P_A P_B - P_C / K1)",
-     "k_ref": 2.00978114054584e-06,
-     "k_ref_low": 1.9910128810522824e-06,
-     "k_ref_high": 2.028726318816654e-06,
+     "k_ref": 2.009781136762553e-06,
+     "k_ref_low": 1.991012876498289e-06,
+     "k_ref_high": 2.0287263158190076e-06,
      "k_units": "mol g^-1 s^-1 bar^-2",
-     "Ea_kJ": 64.97009637606583,
-     "Ea_sd_kJ": 0.6020085690703176
+     "Ea_kJ": 64.97008978725447,
+     "Ea_sd_kJ": 0.6020086383694302
     },
     {
      "reaction": "A + 2 B -> E",
      "rate_law": "r2 = k2 P_A P_B^2",
-     "k_ref": 6.038689281885666e-08,
-     "k_ref_low": 5.8729792687959316e-08,
-     "k_ref_high": 6.20907491312105e-08,
+     "k_ref": 6.038692745558462e-08,
+     "k_ref_low": 5.872982749350994e-08,
+     "k_ref_high": 6.20907835618794e-08,
      "k_units": "mol g^-1 s^-1 bar^-3",
-     "Ea_kJ": 84.93812543595251,
-     "Ea_sd_kJ": 1.2283475758613818
+     "Ea_kJ": 84.93808697346432,
+     "Ea_sd_kJ": 1.2283469679971886
     },
     {
      "reaction": "C -> B + D",
      "rate_law": "r3 = k3 P_C",
-     "k_ref": 9.967025391158594e-07,
-     "k_ref_low": 9.71337646170212e-07,
-     "k_ref_high": 1.022729794728784e-06,
+     "k_ref": 9.967024398947283e-07,
+     "k_ref_low": 9.713375467370745e-07,
+     "k_ref_high": 1.022729695798536e-06,
      "k_units": "mol g^-1 s^-1 bar^-1",
-     "Ea_kJ": 110.09590266462622,
-     "Ea_sd_kJ": 1.5986503635799674
+     "Ea_kJ": 110.09591053155324,
+     "Ea_sd_kJ": 1.5986505527176549
     }
    ],
    "inhibition": null,
    "scores": {
-    "plain": 31.248781843228777
+    "plain": 31.248776717658593
    },
    "theta": [
-    -17.722654913110393,
-    13.634373725806672,
-    -21.22766394785333,
-    17.82478725381488,
-    -18.423983653441653,
-    23.104301306878327
+    -17.72265491499283,
+    13.634372343104143,
+    -21.227663374273263,
+    17.824779182225523,
+    -18.42398375299105,
+    23.104302957801277
    ],
    "model_words": "plain rate laws",
    "verdict": "fits the data within the GC noise",
    "rank": 1,
    "delta_bic": 0.0,
-   "weight": 0.4977019898798311,
+   "weight": 0.4977017845970988,
    "tied_with_best": true
   },
   "runners_up": [
@@ -586,92 +591,92 @@
     "n_params": 6,
     "n_data": 150,
     "n_runs": 30,
-    "chi2": 1.184911852347164,
-    "chi2_per_point": 0.007899412348981094,
-    "x_noise": 0.08887863831642052,
-    "bic": 31.248723616924696,
+    "chi2": 1.1849071265807516,
+    "chi2_per_point": 0.007899380843871677,
+    "x_noise": 0.08887846107956458,
+    "bic": 31.248718891158283,
     "model": "plain",
     "miss": {
      "A": {
-      "mol_pct": 0.013293999559143248,
-      "x_noise": 0.09812261178804584,
-      "bias_mol_pct": -0.0020596581452964934
+      "mol_pct": 0.013293902717231064,
+      "x_noise": 0.098124893072131,
+      "bias_mol_pct": -0.0020592776381572727
      },
      "B": {
-      "mol_pct": 0.012362059641293216,
-      "x_noise": 0.0673615554083633,
-      "bias_mol_pct": -0.0004688207272245376
+      "mol_pct": 0.012362008340178362,
+      "x_noise": 0.06735934110389886,
+      "bias_mol_pct": -0.00046870443066031125
      },
      "C": {
-      "mol_pct": 0.017754149826760223,
-      "x_noise": 0.11634284297779712,
-      "bias_mol_pct": 0.001773620562858426
+      "mol_pct": 0.017754346915174815,
+      "x_noise": 0.1163431175633941,
+      "bias_mol_pct": 0.0017731542463960243
      },
      "D": {
-      "mol_pct": 0.01113675587098436,
-      "x_noise": 0.10444861490722153,
-      "bias_mol_pct": 0.00117563133123158
+      "mol_pct": 0.011136706053527746,
+      "x_noise": 0.10444673638461875,
+      "bias_mol_pct": 0.001175479338532056
      },
      "E": {
-      "mol_pct": 0.0024307740753626845,
-      "x_noise": 0.029770209699807197,
-      "bias_mol_pct": -0.00014674407513358049
+      "mol_pct": 0.002430607019616095,
+      "x_noise": 0.029770572705644455,
+      "bias_mol_pct": -0.00014659962922927206
      }
     },
     "unexplained": [],
     "not_made": [],
     "fits_noise": true,
-    "seconds": 0.7000027894973755,
+    "seconds": 0.10476291179656982,
     "a_spec": 100.0,
     "rate_constants": [
      {
       "reaction": "A + B <=> C",
       "rate_law": "r1 = k1 (P_A P_B - P_C / K1)",
-      "k_ref": 2.0097832789380012e-06,
-      "k_ref_low": 1.9910149909798977e-06,
-      "k_ref_high": 2.0287284860225175e-06,
+      "k_ref": 2.0097831264277637e-06,
+      "k_ref_low": 1.991014839192944e-06,
+      "k_ref_high": 2.028728332788847e-06,
       "k_units": "mol g^-1 s^-1 bar^-2",
-      "Ea_kJ": 64.97009685735046,
-      "Ea_sd_kJ": 0.6020077540866471
+      "Ea_kJ": 64.97009068271053,
+      "Ea_sd_kJ": 0.602007807011968
      },
      {
       "reaction": "A + 2 B <=> E",
       "rate_law": "r2 = k2 (P_A P_B^2 - P_E / K2)",
-      "k_ref": 6.038696793059963e-08,
-      "k_ref_low": 5.8729847704217393e-08,
-      "k_ref_high": 6.209084542865937e-08,
+      "k_ref": 6.038699476660104e-08,
+      "k_ref_low": 5.872987478055268e-08,
+      "k_ref_high": 6.209087198920782e-08,
       "k_units": "mol g^-1 s^-1 bar^-3",
-      "Ea_kJ": 84.93952965300784,
-      "Ea_sd_kJ": 1.2283997274306409
+      "Ea_kJ": 84.93949565612925,
+      "Ea_sd_kJ": 1.2283991916518757
      },
      {
       "reaction": "C -> B + D",
       "rate_law": "r3 = k3 P_C",
-      "k_ref": 9.967048302093354e-07,
-      "k_ref_low": 9.713399384795144e-07,
-      "k_ref_high": 1.0227320829797953e-06,
+      "k_ref": 9.967047484817845e-07,
+      "k_ref_low": 9.71339855876377e-07,
+      "k_ref_high": 1.0227320022298873e-06,
       "k_units": "mol g^-1 s^-1 bar^-1",
-      "Ea_kJ": 110.09576123949331,
-      "Ea_sd_kJ": 1.598647578526566
+      "Ea_kJ": 110.09576726949214,
+      "Ea_sd_kJ": 1.5986477856892167
      }
     ],
     "inhibition": null,
     "scores": {
-     "plain": 31.248723616924696
+     "plain": 31.248718891158283
     },
     "theta": [
-     -17.72265384911841,
-     13.634373826807208,
-     -21.22766270401228,
-     17.825081937387665,
-     -18.423981354771033,
-     23.104271627945653
+     -17.722653925002334,
+     13.6343725310211,
+     -21.227662259611833,
+     17.82507480293391,
+     -18.423981436768784,
+     23.10427289337794
     ],
     "model_words": "plain rate laws",
     "verdict": "fits the data within the GC noise",
     "rank": 2,
     "delta_bic": 0.0,
-    "weight": 0.49771647976445527,
+    "weight": 0.4977161749813348,
     "tied_with_best": true,
     "differs_by": "whether 'A + 2 B -> E' runs one way or both ways"
    },
@@ -691,92 +696,93 @@
     "n_params": 6,
     "n_data": 150,
     "n_runs": 30,
-    "chi2": 11.946586075245744,
-    "chi2_per_point": 0.07964390716830495,
-    "x_noise": 0.2822125212819321,
-    "bic": 42.01039783982328,
+    "chi2": 11.94635157182196,
+    "chi2_per_point": 0.0796423438121464,
+    "x_noise": 0.28220975144765353,
+    "bic": 42.01016333639949,
     "model": "plain",
     "miss": {
      "A": {
-      "mol_pct": 0.016738405174854,
-      "x_noise": 0.11136982745879463,
-      "bias_mol_pct": -0.003846548617165263
+      "mol_pct": 0.0167387246753344,
+      "x_noise": 0.1113819811581418,
+      "bias_mol_pct": -0.0038458705066997155
      },
      "B": {
-      "mol_pct": 0.024703724828896635,
-      "x_noise": 0.10216709451912363,
-      "bias_mol_pct": -0.0022742051731172905
+      "mol_pct": 0.024704082650905332,
+      "x_noise": 0.10217790512432394,
+      "bias_mol_pct": -0.002273216794050228
      },
      "C": {
-      "mol_pct": 0.03880731131020826,
-      "x_noise": 0.5534823730980606,
-      "bias_mol_pct": 0.009136081515060977
+      "mol_pct": 0.03880757924270486,
+      "x_noise": 0.5534710187612076,
+      "bias_mol_pct": 0.009134901147311879
      },
      "D": {
-      "mol_pct": 0.030912447427654244,
-      "x_noise": 0.2534900759980974,
-      "bias_mol_pct": -0.0023536262796601216
+      "mol_pct": 0.030912993108928734,
+      "x_noise": 0.25348892214008256,
+      "bias_mol_pct": -0.002353569423195409
      },
      "E": {
-      "mol_pct": 0.009809951825512008,
-      "x_noise": 0.06912471490763376,
-      "bias_mol_pct": -0.0015370524144695998
+      "mol_pct": 0.009809598652905203,
+      "x_noise": 0.06912775695850507,
+      "bias_mol_pct": -0.0015370853863858269
      }
     },
     "unexplained": [],
     "not_made": [],
     "fits_noise": true,
-    "seconds": 0.20275473594665527,
+    "seconds": 0.9072604179382324,
     "a_spec": 100.0,
     "rate_constants": [
      {
       "reaction": "A + B <=> C",
       "rate_law": "r1 = k1 (P_A P_B - P_C / K1)",
-      "k_ref": 2.0094210254859806e-06,
-      "k_ref_low": 1.9906583398531003e-06,
-      "k_ref_high": 2.028360556318818e-06,
+      "k_ref": 2.009420960132366e-06,
+      "k_ref_low": 1.9906582742998512e-06,
+      "k_ref_high": 2.0283604911744247e-06,
       "k_units": "mol g^-1 s^-1 bar^-2",
-      "Ea_kJ": 64.97579296901759,
-      "Ea_sd_kJ": 0.6019911187451659
+      "Ea_kJ": 64.97578655113938,
+      "Ea_sd_kJ": 0.6019911837712592
      },
      {
       "reaction": "A + 2 B <=> E",
       "rate_law": "r2 = k2 (P_A P_B^2 - P_E / K2)",
-      "k_ref": 6.029587992934375e-08,
-      "k_ref_low": 5.864085457553526e-08,
-      "k_ref_high": 6.199761519114346e-08,
+      "k_ref": 6.029591200827306e-08,
+      "k_ref_low": 5.864088686214829e-08,
+      "k_ref_high": 6.199764702494847e-08,
       "k_units": "mol g^-1 s^-1 bar^-3",
-      "Ea_kJ": 84.84718853113338,
-      "Ea_sd_kJ": 1.2280404465503358
+      "Ea_kJ": 84.84715097305909,
+      "Ea_sd_kJ": 1.2280398485716484
      },
      {
       "reaction": "B + D <=> C",
       "rate_law": "r3 = k3 (P_B P_D - P_C / K3)",
-      "k_ref": 1.8087181235338512e-08,
-      "k_ref_low": 1.761830929723991e-08,
-      "k_ref_high": 1.8568531152488756e-08,
+      "k_ref": 1.8087182827470242e-08,
+      "k_ref_low": 1.7618310863009814e-08,
+      "k_ref_high": 1.8568532771276496e-08,
       "k_units": "mol g^-1 s^-1 bar^-2",
-      "Ea_kJ": -60.1111123704114,
-      "Ea_sd_kJ": 1.6255971534274989
+      "Ea_kJ": -60.11111643123157,
+      "Ea_sd_kJ": 1.625597126512749
      }
     ],
     "inhibition": null,
     "scores": {
-     "plain": 42.01039783982328
+     "plain": 42.01039279007554,
+     "inhib": 50.858021830212785
     },
     "theta": [
-     -17.722834110396793,
-     13.635569190822126,
-     -21.22917224774891,
-     17.80570358586716,
-     -22.43323255461037,
-     -12.61468609170898
+     -17.722834142920398,
+     13.635567843990968,
+     -21.229171715723822,
+     17.805695704074616,
+     -22.433232466584954,
+     -12.614686943897034
     ],
     "model_words": "plain rate laws",
     "verdict": "fits the data within the GC noise",
     "rank": 3,
-    "delta_bic": 10.7616159965945,
-    "weight": 0.002291469891591261,
+    "delta_bic": 10.7613866187409,
+    "weight": 0.0022917317676342825,
     "tied_with_best": false,
     "differs_by": "whether 'A + 2 B -> E' runs one way or both ways; whether 'C -> B + D' runs one way or both ways"
    },
@@ -796,92 +802,93 @@
     "n_params": 6,
     "n_data": 150,
     "n_runs": 30,
-    "chi2": 11.947816605137668,
-    "chi2_per_point": 0.07965211070091778,
-    "x_noise": 0.28222705522489827,
-    "bic": 42.0116283697152,
+    "chi2": 11.947593912453545,
+    "chi2_per_point": 0.07965062608302363,
+    "x_noise": 0.2822244250291311,
+    "bic": 42.01140567703108,
     "model": "plain",
     "miss": {
      "A": {
-      "mol_pct": 0.01674486453824398,
-      "x_noise": 0.11139851333681448,
-      "bias_mol_pct": -0.003844837452702909
+      "mol_pct": 0.01674525445284877,
+      "x_noise": 0.1114110254470227,
+      "bias_mol_pct": -0.003844120551753127
      },
      "B": {
-      "mol_pct": 0.024710715668216164,
-      "x_noise": 0.10214566864963107,
-      "bias_mol_pct": -0.002267588943379241
+      "mol_pct": 0.024711067355664213,
+      "x_noise": 0.10215625305947763,
+      "bias_mol_pct": -0.0022666293683825584
      },
      "C": {
-      "mol_pct": 0.03880537100832552,
-      "x_noise": 0.55345145665252,
-      "bias_mol_pct": 0.009130255422043786
+      "mol_pct": 0.0388056763503281,
+      "x_noise": 0.5534401169845806,
+      "bias_mol_pct": 0.009129159776945561
      },
      "D": {
-      "mol_pct": 0.030916407548107944,
-      "x_noise": 0.25350368381564975,
-      "bias_mol_pct": -0.002358510078634845
+      "mol_pct": 0.030917025762396796,
+      "x_noise": 0.2535032231579556,
+      "bias_mol_pct": -0.0023585387528203233
      },
      "E": {
-      "mol_pct": 0.00992261092321567,
-      "x_noise": 0.06960283419628156,
-      "bias_mol_pct": -0.0015316468552466723
+      "mol_pct": 0.009922225697414685,
+      "x_noise": 0.06960579390704823,
+      "bias_mol_pct": -0.001531703743818902
      }
     },
     "unexplained": [],
     "not_made": [],
     "fits_noise": true,
-    "seconds": 0.21905104319254556,
+    "seconds": 0.852257490158081,
     "a_spec": 100.0,
     "rate_constants": [
      {
       "reaction": "A + B <=> C",
       "rate_law": "r1 = k1 (P_A P_B - P_C / K1)",
-      "k_ref": 2.0094189474832814e-06,
-      "k_ref_low": 1.990656289667213e-06,
-      "k_ref_high": 2.028358450157073e-06,
+      "k_ref": 2.0094188698799346e-06,
+      "k_ref_low": 1.990656212039665e-06,
+      "k_ref_high": 2.0283583725852796e-06,
       "k_units": "mol g^-1 s^-1 bar^-2",
-      "Ea_kJ": 64.97578888089657,
-      "Ea_sd_kJ": 0.6019919151035205
+      "Ea_kJ": 64.9757825422897,
+      "Ea_sd_kJ": 0.6019919759681298
      },
      {
       "reaction": "A + 2 B -> E",
       "rate_law": "r2 = k2 P_A P_B^2",
-      "k_ref": 6.029580644073444e-08,
-      "k_ref_low": 5.864080117157621e-08,
-      "k_ref_high": 6.1997520526727e-08,
+      "k_ref": 6.029583664463505e-08,
+      "k_ref_low": 5.8640831585580814e-08,
+      "k_ref_high": 6.19975504844387e-08,
       "k_units": "mol g^-1 s^-1 bar^-3",
-      "Ea_kJ": 84.84578229500276,
-      "Ea_sd_kJ": 1.2279884528509981
+      "Ea_kJ": 84.8457459996779,
+      "Ea_sd_kJ": 1.2279878855032278
      },
      {
       "reaction": "B + D <=> C",
       "rate_law": "r3 = k3 (P_B P_D - P_C / K3)",
-      "k_ref": 1.8087142426014662e-08,
-      "k_ref_low": 1.761827055215954e-08,
-      "k_ref_high": 1.856849230294288e-08,
+      "k_ref": 1.8087140732956218e-08,
+      "k_ref_low": 1.7618268853850744e-08,
+      "k_ref_high": 1.856849061661705e-08,
       "k_units": "mol g^-1 s^-1 bar^-2",
-      "Ea_kJ": -60.11097841400718,
-      "Ea_sd_kJ": 1.6255994166080276
+      "Ea_kJ": -60.11097124291628,
+      "Ea_sd_kJ": 1.6255996055548054
      }
     ],
     "inhibition": null,
     "scores": {
-     "plain": 42.0116283697152
+     "plain": 42.01163496893462,
+     "inhib": 50.85878751324001
     },
     "theta": [
-     -17.722835144527394,
-     13.635568332904825,
-     -21.2291734665495,
-     17.80540847857902,
-     -22.433234700293823,
-     -12.614657980134886
+     -17.72283518314719,
+     13.635567002709244,
+     -21.229172965620915,
+     17.8054008617822,
+     -22.433234793899462,
+     -12.614656475237421
     ],
     "model_words": "plain rate laws",
     "verdict": "fits the data within the GC noise",
     "rank": 4,
-    "delta_bic": 10.76284652648642,
-    "weight": 0.0022900604641223608,
+    "delta_bic": 10.762628959372485,
+    "weight": 0.0022903086539322226,
     "tied_with_best": false,
     "differs_by": "whether 'C -> B + D' runs one way or both ways"
    }
@@ -899,19 +906,20 @@
    "Step 1: tried 6 additions and 0 removals. Best: add 'A -> D' (BIC 3323910 -> 581934); now cannot explain C and E: no reaction in this network makes them (the GC sees up to 21.8 mol-% C and 20.1 mol-% E); it also misses A, B, D by more than 2x the GC noise.",
    "Step 2: tried 11 additions and 0 removals. Best: add 'A + B -> C' (BIC 581934 -> 283831); now cannot explain E: no reaction in this network makes it (the GC sees up to 20.1 mol-% E); it also misses C, A, D, B by more than 2x the GC noise.",
    "Step 3: tried 11 additions and 2 removals. Best: add '2 C -> D + E' (BIC 283831 -> 77710); now cannot explain E, D, A, C, B: typical miss 27.0x, 26.2x, 20.7x, 20.1x, 18.4x the GC noise (3.56 mol-%, 3.33 mol-%, 2.62 mol-%, 2.75 mol-%, 4.69 mol-%).",
-   "Step 4: tried 17 additions and 2 removals. Best: add 'B + D <=> C' (BIC 77710 -> 13362); now cannot explain E, B, C, D, A: typical miss 18.6x, 5.8x, 5.6x, 5.3x, 2.6x the GC noise (2.42 mol-%, 2.06 mol-%, 1.01 mol-%, 1.08 mol-%, 0.40 mol-%).",
-   "Step 5: tried 0 additions and 4 removals (no additions: 4 reactions is the largest network allowed), then 4 replacements. Best: replace 'A + B -> C' by 'A + B <=> C' (BIC 13362 -> 13296); now cannot explain E, B, C, D, A: typical miss 18.5x, 5.7x, 5.6x, 5.3x, 2.6x the GC noise (2.41 mol-%, 2.05 mol-%, 0.99 mol-%, 1.06 mol-%, 0.40 mol-%).",
-   "Step 6: tried 0 additions and 4 removals (no additions: 4 reactions is the largest network allowed), then 26 replacements. Best: replace '2 C -> D + E' by 'A + 2 B <=> E' (BIC 13296 -> 57); now fits the data within the GC noise.",
-   "Step 7: tried 0 additions and 4 removals (no additions: 4 reactions is the largest network allowed). Best: remove 'A -> D' (BIC 57 -> 42); now fits the data within the GC noise.",
-   "Step 8: tried 0 additions and 2 removals (no additions: every species is already explained within the GC noise), then 3 replacements. Best: replace 'B + D <=> C' by 'C -> B + D' (BIC 42 -> 31); now fits the data within the GC noise.",
-   "Step 9: tried 0 additions and 2 removals (no additions: every species is already explained within the GC noise), then 18 replacements; none lowers BIC by more than 2. The reactions are settled.",
-   "Order check: tried 4 other orders (each reactant at 0, 1, 2); none is better than the present rate laws.",
-   "Final check: the best network already fits within the GC noise with plain rate laws, so there is nothing left for site blocking (product C occupying the catalyst) to explain.",
+   "Step 4: tried 17 additions and 2 removals and 6 other reaction orders. Best: add 'B + D <=> C' (BIC 77710 -> 13362); now cannot explain E, B, C, D, A: typical miss 18.6x, 5.8x, 5.6x, 5.3x, 2.6x the GC noise (2.42 mol-%, 2.06 mol-%, 1.01 mol-%, 1.08 mol-%, 0.40 mol-%).",
+   "Step 5: tried 0 additions and 4 removals (no additions: 4 reactions is the largest network allowed) and 10 other reaction orders. Best: change the rate law of 'A -> D' to r = k P_A^2 (was r = k P_A) (BIC 13362 -> 13321); now cannot explain E, C, B, D, A: typical miss 18.5x, 5.9x, 5.7x, 5.2x, 2.4x the GC noise (2.42 mol-%, 1.05 mol-%, 2.05 mol-%, 1.10 mol-%, 0.31 mol-%).",
+   "Step 6: tried 0 additions and 4 removals (no additions: 4 reactions is the largest network allowed) and 10 other reaction orders, then 5 replacements. Best: replace 'A + B -> C' by 'A + B <=> C' (BIC 13321 -> 13256); now cannot explain E, C, B, D, A: typical miss 18.5x, 5.9x, 5.7x, 5.1x, 2.6x the GC noise (2.40 mol-%, 1.04 mol-%, 2.03 mol-%, 1.08 mol-%, 0.30 mol-%).",
+   "Step 7: tried 0 additions and 4 removals (no additions: 4 reactions is the largest network allowed) and 10 other reaction orders, then 27 replacements. Best: replace '2 C -> D + E' by 'A + 2 B -> E' (BIC 13256 -> 58); now fits the data within the GC noise.",
+   "Step 8: tried 0 additions and 4 removals (no additions: 4 reactions is the largest network allowed). Best: remove 'A -> D ; orders A=2' (BIC 58 -> 42); now fits the data within the GC noise.",
+   "Step 9: tried 0 additions and 2 removals (no additions: every species is already explained within the GC noise) and 12 other reaction orders, then 3 replacements. Best: replace 'B + D <=> C' by 'C -> B + D' (BIC 42 -> 31); now fits the data within the GC noise.",
+   "Step 10: tried 0 additions and 2 removals (no additions: every species is already explained within the GC noise) and 9 other reaction orders, then 18 replacements; none lowers BIC by more than 2. The reactions are settled.",
+   "Order check: tried 9 other orders (each reactant at 0, 1, 2); none is better than the present rate laws.",
+   "Final check: the best network already fits within the GC noise with plain rate laws; letting product C block catalyst sites (one more fitted number) does not improve on that.",
    "Result: A + B <=> C; A + 2 B -> E; C -> B + D with plain rate laws (BIC 31)."
   ],
   "complete": true,
-  "n_fits": 130,
-  "seconds": 49.59735369682312,
+  "n_fits": 201,
+  "seconds": 41.12302589416504,
   "library_size": 22,
   "detected": {
    "C": 21.754421754421756,
@@ -981,7 +989,7 @@
    "unexplained": [],
    "not_made": [],
    "fits_noise": true,
-   "seconds": 1.6962378025054932,
+   "seconds": 0.6853752136230469,
    "a_spec": 100.0,
    "rate_constants": [
     {
@@ -1096,7 +1104,7 @@
     "unexplained": [],
     "not_made": [],
     "fits_noise": true,
-    "seconds": 5.757503271102905,
+    "seconds": 1.9668688774108887,
     "a_spec": 100.0,
     "rate_constants": [
      {
@@ -1223,7 +1231,7 @@
     "unexplained": [],
     "not_made": [],
     "fits_noise": true,
-    "seconds": 2.8178155422210693,
+    "seconds": 0.9804527759552002,
     "a_spec": 100.0,
     "rate_constants": [
      {
@@ -1350,7 +1358,7 @@
     "unexplained": [],
     "not_made": [],
     "fits_noise": true,
-    "seconds": 3.4347116947174072,
+    "seconds": 1.2798511981964111,
     "a_spec": 100.0,
     "rate_constants": [
      {
@@ -1477,7 +1485,7 @@
     "unexplained": [],
     "not_made": [],
     "fits_noise": true,
-    "seconds": 3.458509683609009,
+    "seconds": 1.2301366329193115,
     "a_spec": 100.0,
     "rate_constants": [
      {
@@ -1561,20 +1569,20 @@
    "Step 1: tried 6 additions and 0 removals. Best: add 'A -> D' (BIC 5607908 -> 1425784); now cannot explain C and E: no reaction in this network makes them (the GC sees up to 33.5 mol-% C and 38.0 mol-% E); it also misses B, A, D by more than 2x the GC noise.",
    "Step 2: tried 11 additions and 0 removals. Best: add 'A + 2 B <=> E' (BIC 1425784 -> 296422); now cannot explain C: no reaction in this network makes it (the GC sees up to 33.5 mol-% C); it also misses E, A, B, D by more than 2x the GC noise.",
    "Step 3: tried 10 additions and 2 removals. Best: add 'A + B <=> C' (BIC 296422 -> 36247); now cannot explain C, E, B, D, A: typical miss 22.6x, 16.3x, 16.2x, 11.5x, 6.1x the GC noise (2.29 mol-%, 3.30 mol-%, 2.73 mol-%, 1.78 mol-%, 0.75 mol-%).",
-   "Step 4: tried 16 additions and 3 removals. Best: add 'B + C -> E' (BIC 36247 -> 1158); now cannot explain B, C, A: typical miss 3.9x, 3.6x, 2.6x the GC noise (0.63 mol-%, 0.66 mol-%, 0.41 mol-%).",
-   "Step 5: tried 0 additions and 3 removals (no additions: 4 reactions is the largest network allowed). Best: remove 'A + 2 B <=> E' (BIC 1158 -> 1143); now cannot explain B, C, A: typical miss 3.8x, 3.6x, 2.6x the GC noise (0.62 mol-%, 0.67 mol-%, 0.41 mol-%).",
-   "Step 6: tried 17 additions and 2 removals. Best: add '2 A + B -> C + D' (BIC 1143 -> 1111); now cannot explain B, C, A: typical miss 3.7x, 3.7x, 2.5x the GC noise (0.59 mol-%, 0.67 mol-%, 0.41 mol-%).",
-   "Step 7: tried 0 additions and 4 removals (no additions: 4 reactions is the largest network allowed), then 29 replacements; none lowers BIC by more than 2. The reactions are settled.",
-   "Order check: tried 11 other orders. Better: '2 A + B -> C + D': r = k P_A^2 P_B^2 instead of r = k P_A^2 P_B (BIC 1111 -> 1103).",
-   "Order check: tried 11 other orders. Better: '2 A + B -> C + D': r = k P_A P_B^2 instead of r = k P_A^2 P_B^2 (BIC 1103 -> 1094).",
-   "Order check: tried 11 other orders (each reactant at 0, 1, 2); none is better than the present rate laws.",
-   "Final check: plain rate laws leave misses larger than the GC noise, so the best networks were re-fitted allowing product C to block catalyst sites (the best one from several starting points). The data support site blocking.",
+   "Step 4: tried 16 additions and 3 removals and 9 other reaction orders. Best: add 'B + C -> E' (BIC 36247 -> 1158); now cannot explain B, C, A: typical miss 3.9x, 3.6x, 2.6x the GC noise (0.63 mol-%, 0.66 mol-%, 0.41 mol-%).",
+   "Step 5: tried 0 additions and 3 removals (no additions: 4 reactions is the largest network allowed) and 13 other reaction orders. Best: remove 'A + 2 B <=> E' (BIC 1158 -> 1143); now cannot explain B, C, A: typical miss 3.8x, 3.6x, 2.6x the GC noise (0.62 mol-%, 0.67 mol-%, 0.41 mol-%).",
+   "Step 6: tried 17 additions and 2 removals and 9 other reaction orders. Best: add '2 A + B -> C + D' (BIC 1143 -> 1111); now cannot explain B, C, A: typical miss 3.7x, 3.7x, 2.5x the GC noise (0.59 mol-%, 0.67 mol-%, 0.41 mol-%).",
+   "Step 7: tried 0 additions and 4 removals (no additions: 4 reactions is the largest network allowed) and 13 other reaction orders. Best: change the rate law of '2 A + B -> C + D' to r = k P_A^2 P_B^2 (was r = k P_A^2 P_B) (BIC 1111 -> 1103); now cannot explain B, C, A: typical miss 3.7x, 3.6x, 2.4x the GC noise (0.59 mol-%, 0.67 mol-%, 0.40 mol-%).",
+   "Step 8: tried 0 additions and 4 removals (no additions: 4 reactions is the largest network allowed) and 13 other reaction orders. Best: change the rate law of '2 A + B -> C + D' to r = k P_A P_B^2 (was r = k P_A^2 P_B^2) (BIC 1103 -> 1094); now cannot explain C, B, A: typical miss 3.7x, 3.7x, 2.4x the GC noise (0.67 mol-%, 0.59 mol-%, 0.40 mol-%).",
+   "Step 9: tried 0 additions and 4 removals (no additions: 4 reactions is the largest network allowed) and 13 other reaction orders, then 30 replacements; none lowers BIC by more than 2. The reactions are settled.",
+   "Order check: tried 13 other orders (each reactant at 0, 1, 2); none is better than the present rate laws.",
+   "Final check: plain rate laws leave misses larger than the GC noise, so the best networks were re-fitted allowing product C to block catalyst sites (the best one from several starting points). That lowers BIC from 1094 to 139: the best network now fits within the GC noise, so the data support site blocking.",
    "With site blocking allowed, '2 A + B -> C + D ; orders A=1, B=2' is no longer needed (BIC 139 -> 125): the plain search had added it to imitate the site blocking.",
    "Result: A -> D; A + B <=> C; B + C -> E with rate laws with product C blocking catalyst sites, K_C = 0.0328 per bar at 300 C (BIC 125)."
   ],
   "complete": true,
-  "n_fits": 143,
-  "seconds": 90.89941215515137,
+  "n_fits": 190,
+  "seconds": 52.18155789375305,
   "library_size": 22,
   "detected": {
    "C": 33.548100000000005,
@@ -1645,7 +1653,7 @@
     "unexplained": [],
     "not_made": [],
     "fits_noise": true,
-    "seconds": 5.887745380401611,
+    "seconds": 2.0541069507598877,
     "a_spec": 100.0,
     "rate_constants": [
      {
@@ -1756,7 +1764,7 @@
     ],
     "not_made": [],
     "fits_noise": false,
-    "seconds": 9.09762167930603,
+    "seconds": 3.3279263973236084,
     "a_spec": 100.0,
     "rate_constants": [
      {
@@ -1867,7 +1875,7 @@
     ],
     "not_made": [],
     "fits_noise": false,
-    "seconds": 21.961971044540405,
+    "seconds": 8.369466066360474,
     "a_spec": 100.0,
     "rate_constants": [
      {
@@ -1985,7 +1993,7 @@
      "E"
     ],
     "fits_noise": false,
-    "seconds": 3.632106065750122,
+    "seconds": 1.4223268032073975,
     "a_spec": 100.0,
     "rate_constants": [
      {
@@ -2038,7 +2046,7 @@
    "E": 37.99530000000001
   },
   "n_runs": 30,
-  "seconds": 40.58458352088928,
+  "seconds": 15.17628026008606,
   "summary": [
    "1. truth: fits the data within the GC noise; best.",
    "2. close: cannot explain E, B, C, D, A: typical miss 10.9x, 7.8x, 6.4x, 3.0x, 2.3x the GC noise (1.15 mol-%, 0.96 mol-%, 0.79 mol-%, 0.47 mol-%, 0.24 mol-%); ruled out against the best (BIC difference 7121).",
@@ -2099,7 +2107,7 @@
     "unexplained": [],
     "not_made": [],
     "fits_noise": true,
-    "seconds": 5.978962659835815,
+    "seconds": 2.149641752243042,
     "a_spec": 100.0,
     "rate_constants": [
      {
@@ -2210,7 +2218,7 @@
     ],
     "not_made": [],
     "fits_noise": false,
-    "seconds": 5.749240159988403,
+    "seconds": 2.1060521602630615,
     "a_spec": 100.0,
     "rate_constants": [
      {
@@ -2321,7 +2329,7 @@
     ],
     "not_made": [],
     "fits_noise": false,
-    "seconds": 21.713080883026123,
+    "seconds": 9.048023223876953,
     "a_spec": 100.0,
     "rate_constants": [
      {
@@ -2439,7 +2447,7 @@
      "E"
     ],
     "fits_noise": false,
-    "seconds": 4.1945481300354,
+    "seconds": 1.878401279449463,
     "a_spec": 100.0,
     "rate_constants": [
      {
@@ -2492,7 +2500,7 @@
    "E": 38.5043
   },
   "n_runs": 30,
-  "seconds": 37.64201068878174,
+  "seconds": 15.184744834899902,
   "summary": [
    "1. truth: fits the data within the GC noise; best.",
    "2. close: cannot explain E, B, C, D, A: typical miss 11.1x, 7.8x, 6.6x, 3.2x, 2.5x the GC noise (1.11 mol-%, 0.94 mol-%, 0.78 mol-%, 0.56 mol-%, 0.29 mol-%); ruled out against the best (BIC difference 7198).",
@@ -2553,7 +2561,7 @@
     "unexplained": [],
     "not_made": [],
     "fits_noise": true,
-    "seconds": 4.836559772491455,
+    "seconds": 1.6305832862854004,
     "a_spec": 100.0,
     "rate_constants": [
      {
@@ -2671,7 +2679,7 @@
     ],
     "not_made": [],
     "fits_noise": false,
-    "seconds": 6.699497938156128,
+    "seconds": 2.5446109771728516,
     "a_spec": 100.0,
     "rate_constants": [
      {
@@ -2789,7 +2797,7 @@
     ],
     "not_made": [],
     "fits_noise": false,
-    "seconds": 18.901344537734985,
+    "seconds": 7.349996328353882,
     "a_spec": 100.0,
     "rate_constants": [
      {
@@ -2907,7 +2915,7 @@
      "E"
     ],
     "fits_noise": false,
-    "seconds": 5.543368816375732,
+    "seconds": 1.682433843612671,
     "a_spec": 100.0,
     "rate_constants": [
      {
@@ -2960,7 +2968,7 @@
    "E": 37.95433795433796
   },
   "n_runs": 30,
-  "seconds": 35.98679971694946,
+  "seconds": 13.210196018218994,
   "summary": [
    "1. truth: fits the data within the GC noise; best.",
    "2. close: cannot explain E, B, C, D, A: typical miss 10.6x, 7.7x, 6.6x, 3.1x, 2.2x the GC noise (1.09 mol-%, 0.95 mol-%, 0.76 mol-%, 0.53 mol-%, 0.27 mol-%); ruled out against the best (BIC difference 6827).",
@@ -2985,92 +2993,92 @@
    "n_params": 6,
    "n_data": 150,
    "n_runs": 30,
-   "chi2": 83.88313762559348,
-   "chi2_per_point": 0.5592209175039565,
-   "x_noise": 0.7478107497916545,
-   "bic": 113.94694939017101,
+   "chi2": 83.88308824735722,
+   "chi2_per_point": 0.5592205883157149,
+   "x_noise": 0.7478105296903186,
+   "bic": 113.94690001193476,
    "model": "plain",
    "miss": {
     "A": {
-     "mol_pct": 0.14870213968083362,
-     "x_noise": 0.8195114735342633,
-     "bias_mol_pct": 0.02195685255055997
+     "mol_pct": 0.14870311641609973,
+     "x_noise": 0.8195072688870255,
+     "bias_mol_pct": 0.02196019593517142
     },
     "B": {
-     "mol_pct": 0.20427320000852506,
-     "x_noise": 0.7337052971155616,
-     "bias_mol_pct": 0.027816651672629374
+     "mol_pct": 0.2042722859408296,
+     "x_noise": 0.7337071122931921,
+     "bias_mol_pct": 0.027814659088291973
     },
     "C": {
-     "mol_pct": 0.10271333411749621,
-     "x_noise": 0.6790414363043016,
-     "bias_mol_pct": -0.035341670389322295
+     "mol_pct": 0.10271380702049991,
+     "x_noise": 0.6790411021613614,
+     "bias_mol_pct": -0.035342301755105096
     },
     "D": {
-     "mol_pct": 0.17452187887754053,
-     "x_noise": 0.76447088142572,
-     "bias_mol_pct": 0.01845935184918362
+     "mol_pct": 0.17452174994246314,
+     "x_noise": 0.764470085600581,
+     "bias_mol_pct": 0.018455615379137858
     },
     "E": {
-     "mol_pct": 0.1315797274957279,
-     "x_noise": 0.7353020253501428,
-     "bias_mol_pct": 0.0004190270704973103
+     "mol_pct": 0.13158102567888513,
+     "x_noise": 0.7353049170157993,
+     "bias_mol_pct": 0.0004209697456876777
     }
    },
    "unexplained": [],
    "not_made": [],
    "fits_noise": true,
-   "seconds": 0.4675993124643962,
+   "seconds": 0.13030234972635904,
    "a_spec": 100.0,
    "rate_constants": [
     {
      "reaction": "A + B <=> C",
      "rate_law": "r1 = k1 (P_A P_B - P_C / K1)",
-     "k_ref": 3.014059114093064e-06,
-     "k_ref_low": 2.9863041111407357e-06,
-     "k_ref_high": 3.042072074761758e-06,
+     "k_ref": 3.014059536942991e-06,
+     "k_ref_low": 2.986304531489392e-06,
+     "k_ref_high": 3.0420725001231402e-06,
      "k_units": "mol g^-1 s^-1 bar^-2",
-     "Ea_kJ": 70.02147694345939,
-     "Ea_sd_kJ": 0.634999288938545
+     "Ea_kJ": 70.02149355611563,
+     "Ea_sd_kJ": 0.6349993035810522
     },
     {
      "reaction": "B + C -> E",
      "rate_law": "r2 = k2 P_B P_C",
-     "k_ref": 2.974962641562126e-07,
-     "k_ref_low": 2.8639178930861374e-07,
-     "k_ref_high": 3.090313007944921e-07,
+     "k_ref": 2.974974215148981e-07,
+     "k_ref_low": 2.8639294016728624e-07,
+     "k_ref_high": 3.0903246342705267e-07,
      "k_units": "mol g^-1 s^-1 bar^-2",
-     "Ea_kJ": 121.0540549086936,
-     "Ea_sd_kJ": 2.2081096515814216
+     "Ea_kJ": 121.05388132122678,
+     "Ea_sd_kJ": 2.208103222441998
     },
     {
      "reaction": "A -> D",
      "rate_law": "r3 = k3 P_A",
-     "k_ref": 1.0113976660613804e-06,
-     "k_ref_low": 9.912172872255014e-07,
-     "k_ref_high": 1.0319889010185237e-06,
+     "k_ref": 1.0113949823594253e-06,
+     "k_ref_low": 9.91214623512622e-07,
+     "k_ref_high": 1.031986197617671e-06,
      "k_units": "mol g^-1 s^-1 bar^-1",
-     "Ea_kJ": 149.93412502102993,
-     "Ea_sd_kJ": 1.0997099681070157
+     "Ea_kJ": 149.93424929642984,
+     "Ea_sd_kJ": 1.0997113840359671
     }
    ],
    "inhibition": null,
    "scores": {
-    "plain": 113.94694939017101
+    "plain": 113.94690001193476
    },
    "theta": [
-    -17.317393030770834,
-    14.69443695995162,
-    -19.633034355485773,
-    25.403936852669847,
-    -18.4093475419229,
-    31.464596927112183
+    -17.31739289047833,
+    14.694440446219554,
+    -19.63303046516319,
+    25.403900424273882,
+    -18.40935019538514,
+    31.464623007068067
    ],
    "model_words": "plain rate laws",
    "verdict": "fits the data within the GC noise",
    "rank": 1,
    "delta_bic": 0.0,
-   "weight": 0.9999989992022549,
+   "weight": 0.9993566733994973,
    "tied_with_best": true
   },
   "runners_up": [
@@ -3078,13 +3086,13 @@
     "name": "runner-up 1",
     "reactions": [
      "A + B <=> C",
-     "B + D <=> C",
+     "C -> D + B",
      "B + C -> E",
      "A -> D"
     ],
     "equations": [
      "1.  A + B <=> C    r1 = k1 (P_A P_B - P_C / K1)",
-     "2.  B + D <=> C    r2 = k2 (P_B P_D - P_C / K2)",
+     "2.  C -> D + B     r2 = k2 P_C",
      "3.  B + C -> E     r3 = k3 P_B P_C",
      "4.  A -> D         r4 = k4 P_A"
     ],
@@ -3092,239 +3100,118 @@
     "n_params": 8,
     "n_data": 150,
     "n_runs": 30,
-    "chi2": 101.49129129760993,
-    "chi2_per_point": 0.6766086086507329,
-    "x_noise": 0.8225622217502655,
-    "bic": 141.57637365038,
+    "chi2": 88.5582466525735,
+    "chi2_per_point": 0.5903883110171567,
+    "x_noise": 0.7683673021525296,
+    "bic": 128.64332900534356,
     "model": "plain",
     "miss": {
      "A": {
-      "mol_pct": 0.15275231536541814,
-      "x_noise": 0.8875364884673216,
-      "bias_mol_pct": 0.025996495270212715
+      "mol_pct": 0.15216464409785385,
+      "x_noise": 0.8458979818052118,
+      "bias_mol_pct": 0.02439867484302938
      },
      "B": {
-      "mol_pct": 0.2088620133840377,
-      "x_noise": 0.8007860013671716,
-      "bias_mol_pct": 0.03493895885009281
+      "mol_pct": 0.20697350433599412,
+      "x_noise": 0.7602120284316324,
+      "bias_mol_pct": 0.03261985912088187
      },
      "C": {
-      "mol_pct": 0.11871673160024436,
-      "x_noise": 0.8824104866710301,
-      "bias_mol_pct": -0.04394151875077109
+      "mol_pct": 0.12264241656982201,
+      "x_noise": 0.7386467948310625,
+      "bias_mol_pct": -0.041536579524656475
      },
      "D": {
-      "mol_pct": 0.1867630776367988,
-      "x_noise": 0.7703257517904708,
-      "bias_mol_pct": 0.01992993108265914
+      "mol_pct": 0.1788389250032934,
+      "x_noise": 0.7593669491336055,
+      "bias_mol_pct": 0.020111511135485725
      },
      "E": {
-      "mol_pct": 0.12861619018086035,
-      "x_noise": 0.7628982724115836,
-      "bias_mol_pct": -0.0005852947824775927
+      "mol_pct": 0.12768543726899284,
+      "x_noise": 0.7322831285376125,
+      "bias_mol_pct": 0.00016340936567615954
      }
     },
     "unexplained": [],
     "not_made": [],
     "fits_noise": true,
-    "seconds": 1.4243783950805664,
+    "seconds": 0.2282103697458903,
     "a_spec": 100.0,
     "rate_constants": [
      {
       "reaction": "A + B <=> C",
       "rate_law": "r1 = k1 (P_A P_B - P_C / K1)",
-      "k_ref": 3.0159126595900064e-06,
-      "k_ref_low": 2.9880170853769763e-06,
-      "k_ref_high": 3.04406866171842e-06,
+      "k_ref": 3.0183047296321827e-06,
+      "k_ref_low": 2.9898244815765147e-06,
+      "k_ref_high": 3.0470562727201552e-06,
       "k_units": "mol g^-1 s^-1 bar^-2",
-      "Ea_kJ": 70.06492958031927,
-      "Ea_sd_kJ": 0.6382130800581409
+      "Ea_kJ": 70.0672882912426,
+      "Ea_sd_kJ": 0.6394236434416636
      },
      {
-      "reaction": "B + D <=> C",
-      "rate_law": "r2 = k2 (P_B P_D - P_C / K2)",
-      "k_ref": 1.6491162295948322e-11,
-      "k_ref_low": 4.14583237119282e-12,
-      "k_ref_high": 6.559802942371761e-11,
-      "k_units": "mol g^-1 s^-1 bar^-2",
-      "Ea_kJ": 23.913445521020464,
-      "Ea_sd_kJ": 42.99730854302039
+      "reaction": "C -> D + B",
+      "rate_law": "r2 = k2 P_C",
+      "k_ref": 5.707030622869777e-09,
+      "k_ref_low": 1.3212425020105725e-09,
+      "k_ref_high": 2.465118892316164e-08,
+      "k_units": "mol g^-1 s^-1 bar^-1",
+      "Ea_kJ": 80.24627415280284,
+      "Ea_sd_kJ": 45.28002808106886
      },
      {
       "reaction": "B + C -> E",
       "rate_law": "r3 = k3 P_B P_C",
-      "k_ref": 2.951845670877767e-07,
-      "k_ref_low": 2.838564451219639e-07,
-      "k_ref_high": 3.069647709050945e-07,
+      "k_ref": 2.963092269108009e-07,
+      "k_ref_low": 2.850993103584969e-07,
+      "k_ref_high": 3.0795990997689125e-07,
       "k_units": "mol g^-1 s^-1 bar^-2",
-      "Ea_kJ": 121.73002462151369,
-      "Ea_sd_kJ": 2.3406601604771686
+      "Ea_kJ": 121.15358094882586,
+      "Ea_sd_kJ": 2.214760037883734
      },
      {
       "reaction": "A -> D",
       "rate_law": "r4 = k4 P_A",
-      "k_ref": 1.0113750418779056e-06,
-      "k_ref_low": 9.910283964154102e-07,
-      "k_ref_high": 1.0321394210633434e-06,
+      "k_ref": 1.0062479393889098e-06,
+      "k_ref_low": 9.847418160781256e-07,
+      "k_ref_high": 1.0282237425003355e-06,
       "k_units": "mol g^-1 s^-1 bar^-1",
-      "Ea_kJ": 149.59579212587244,
-      "Ea_sd_kJ": 1.17400245501215
+      "Ea_kJ": 150.0265396416415,
+      "Ea_sd_kJ": 1.1238145803759272
      }
     ],
     "inhibition": null,
     "scores": {
-     "plain": 141.57637365038
+     "plain": 128.64332900534356
     },
     "theta": [
-     -17.316778253247858,
-     14.703555762652636,
-     -29.43336668293227,
-     5.018383402389742,
-     -19.640835211087758,
-     25.54579324824248,
-     -18.409369911399597,
-     31.393595691257303
+     -17.315985417984166,
+     14.704050752625465,
+     -23.586737165550666,
+     16.84017344794812,
+     -19.63703242840514,
+     25.424823003411543,
+     -18.41445224201609,
+     31.483990702794056
     ],
     "model_words": "plain rate laws",
     "verdict": "fits the data within the GC noise",
     "rank": 2,
-    "delta_bic": 27.629424260208978,
-    "weight": 1.0007977450910277e-06,
+    "delta_bic": 14.696428993408801,
+    "weight": 0.0006433266005025756,
     "tied_with_best": false,
-    "differs_by": "whether 'B + D <=> C' happens at all"
+    "differs_by": "whether 'C -> D + B' happens at all"
    },
    {
     "name": "runner-up 2",
     "reactions": [
      "A + B -> C",
-     "B + D <=> C",
-     "B + C -> E",
-     "A -> D"
-    ],
-    "equations": [
-     "1.  A + B -> C     r1 = k1 P_A P_B",
-     "2.  B + D <=> C    r2 = k2 (P_B P_D - P_C / K2)",
-     "3.  B + C -> E     r3 = k3 P_B P_C",
-     "4.  A -> D         r4 = k4 P_A"
-    ],
-    "n_reactions": 4,
-    "n_params": 8,
-    "n_data": 150,
-    "n_runs": 30,
-    "chi2": 611.1441786570815,
-    "chi2_per_point": 4.0742945243805435,
-    "x_noise": 2.0184881779144863,
-    "bic": 651.2292610098516,
-    "model": "plain",
-    "miss": {
-     "A": {
-      "mol_pct": 0.27950438534538374,
-      "x_noise": 3.511609423903273,
-      "bias_mol_pct": -0.020322575854989384
-     },
-     "B": {
-      "mol_pct": 0.28231380239944354,
-      "x_noise": 1.7771911131329803,
-      "bias_mol_pct": 0.011957844794794163
-     },
-     "C": {
-      "mol_pct": 0.1773525449242694,
-      "x_noise": 1.2287988965331773,
-      "bias_mol_pct": 0.033667741998439915
-     },
-     "D": {
-      "mol_pct": 0.25560692811375446,
-      "x_noise": 1.4451791912054444,
-      "bias_mol_pct": 0.04077630191441354
-     },
-     "E": {
-      "mol_pct": 0.21844141637264275,
-      "x_noise": 1.1327727046690454,
-      "bias_mol_pct": -0.03578289415576427
-     }
-    },
-    "unexplained": [
-     "A"
-    ],
-    "not_made": [],
-    "fits_noise": false,
-    "seconds": 0.5562481880187988,
-    "a_spec": 100.0,
-    "rate_constants": [
-     {
-      "reaction": "A + B -> C",
-      "rate_law": "r1 = k1 P_A P_B",
-      "k_ref": 3.01348545468502e-06,
-      "k_ref_low": 2.9854676586609697e-06,
-      "k_ref_high": 3.0417661900484962e-06,
-      "k_units": "mol g^-1 s^-1 bar^-2",
-      "Ea_kJ": 70.20397960777302,
-      "Ea_sd_kJ": 0.6331709807291005
-     },
-     {
-      "reaction": "B + D <=> C",
-      "rate_law": "r2 = k2 (P_B P_D - P_C / K2)",
-      "k_ref": 3.0415796161572483e-10,
-      "k_ref_low": 2.5432571663409326e-10,
-      "k_ref_high": 3.6375427085626925e-10,
-      "k_units": "mol g^-1 s^-1 bar^-2",
-      "Ea_kJ": 29.527100588162217,
-      "Ea_sd_kJ": 7.027545705344957
-     },
-     {
-      "reaction": "B + C -> E",
-      "rate_law": "r3 = k3 P_B P_C",
-      "k_ref": 2.9861653879931656e-07,
-      "k_ref_low": 2.87192788887883e-07,
-      "k_ref_high": 3.104946944865509e-07,
-      "k_units": "mol g^-1 s^-1 bar^-2",
-      "Ea_kJ": 122.62298961415358,
-      "Ea_sd_kJ": 2.4862348796027978
-     },
-     {
-      "reaction": "A -> D",
-      "rate_law": "r4 = k4 P_A",
-      "k_ref": 9.937437282914574e-07,
-      "k_ref_low": 9.721240105473434e-07,
-      "k_ref_high": 1.0158442614359355e-06,
-      "k_units": "mol g^-1 s^-1 bar^-1",
-      "Ea_kJ": 148.0689222577466,
-      "Ea_sd_kJ": 1.246635158557592
-     }
-    ],
-    "inhibition": null,
-    "scores": {
-     "plain": 651.2292610098516
-    },
-    "theta": [
-     -17.317583376741148,
-     14.732736264862673,
-     -26.518644124883206,
-     6.196443393407008,
-     -19.62927575155577,
-     25.73318743591987,
-     -18.426956668139127,
-     31.073172672454923
-    ],
-    "model_words": "plain rate laws",
-    "verdict": "cannot explain A: typical miss 3.5x the GC noise (0.28 mol-%)",
-    "rank": 3,
-    "delta_bic": 537.2823116196806,
-    "weight": 2.141055795309562e-117,
-    "tied_with_best": false,
-    "differs_by": "whether 'A + B -> C' runs one way or both ways; whether 'B + D <=> C' happens at all"
-   },
-   {
-    "name": "runner-up 3",
-    "reactions": [
-     "A + B -> C",
-     "C -> B + D",
+     "C -> D + B",
      "B + C -> E",
      "A -> D"
     ],
     "equations": [
      "1.  A + B -> C    r1 = k1 P_A P_B",
-     "2.  C -> B + D    r2 = k2 P_C",
+     "2.  C -> D + B    r2 = k2 P_C",
      "3.  B + C -> E    r3 = k3 P_B P_C",
      "4.  A -> D        r4 = k4 P_A"
     ],
@@ -3332,36 +3219,36 @@
     "n_params": 8,
     "n_data": 150,
     "n_runs": 30,
-    "chi2": 620.9435001087154,
-    "chi2_per_point": 4.139623334058102,
-    "x_noise": 2.034606432226661,
-    "bic": 661.0285824614855,
+    "chi2": 620.938722631628,
+    "chi2_per_point": 4.139591484210854,
+    "x_noise": 2.034598605182569,
+    "bic": 661.0238049843981,
     "model": "plain",
     "miss": {
      "A": {
-      "mol_pct": 0.28135595252540646,
-      "x_noise": 3.5262152390645625,
-      "bias_mol_pct": -0.019889113712885226
+      "mol_pct": 0.28137123702904443,
+      "x_noise": 3.5262773870639745,
+      "bias_mol_pct": -0.01987262742377079
      },
      "B": {
-      "mol_pct": 0.288491772185272,
-      "x_noise": 1.7854997921707654,
-      "bias_mol_pct": 0.013982834950161387
+      "mol_pct": 0.2884879195748634,
+      "x_noise": 1.7853888428356695,
+      "bias_mol_pct": 0.013980638117212953
      },
      "C": {
-      "mol_pct": 0.1681871439882276,
-      "x_noise": 1.2328274199502758,
-      "bias_mol_pct": 0.03396547262792949
+      "mol_pct": 0.1681396509596983,
+      "x_noise": 1.2327158275470393,
+      "bias_mol_pct": 0.03395061619786737
      },
      "D": {
-      "mol_pct": 0.26738466275963624,
-      "x_noise": 1.5317985568087344,
-      "bias_mol_pct": 0.042101493617140766
+      "mol_pct": 0.26745493779901663,
+      "x_noise": 1.5320631629284098,
+      "bias_mol_pct": 0.04208695020426918
      },
      "E": {
-      "mol_pct": 0.2311274789429532,
-      "x_noise": 1.099837708125588,
-      "bias_mol_pct": -0.039047347602813615
+      "mol_pct": 0.23108180132210532,
+      "x_noise": 1.0995026347063763,
+      "bias_mol_pct": -0.039035262337345826
      }
     },
     "unexplained": [
@@ -3369,71 +3256,181 @@
     ],
     "not_made": [],
     "fits_noise": false,
-    "seconds": 1.4254307746887207,
+    "seconds": 1.1088898181915283,
     "a_spec": 100.0,
     "rate_constants": [
      {
       "reaction": "A + B -> C",
       "rate_law": "r1 = k1 P_A P_B",
-      "k_ref": 3.0162482801073824e-06,
-      "k_ref_low": 2.9881880604805425e-06,
-      "k_ref_high": 3.044571995842757e-06,
+      "k_ref": 3.016268698855085e-06,
+      "k_ref_low": 2.9882081605696305e-06,
+      "k_ref_high": 3.0445927374613194e-06,
       "k_units": "mol g^-1 s^-1 bar^-2",
-      "Ea_kJ": 70.24147547689854,
-      "Ea_sd_kJ": 0.6332410661189046
+      "Ea_kJ": 70.2419639968926,
+      "Ea_sd_kJ": 0.6332434370509982
      },
      {
-      "reaction": "C -> B + D",
+      "reaction": "C -> D + B",
       "rate_law": "r2 = k2 P_C",
-      "k_ref": 1.8254176045453137e-08,
-      "k_ref_low": 1.5325342772367317e-08,
-      "k_ref_high": 2.1742739986162358e-08,
+      "k_ref": 1.8261169750911746e-08,
+      "k_ref_low": 1.5331586171510813e-08,
+      "k_ref_high": 2.1750542764535965e-08,
       "k_units": "mol g^-1 s^-1 bar^-1",
-      "Ea_kJ": 196.2626426177292,
-      "Ea_sd_kJ": 6.8919196230376345
+      "Ea_kJ": 196.24992157473216,
+      "Ea_sd_kJ": 6.891080019954294
      },
      {
       "reaction": "B + C -> E",
       "rate_law": "r3 = k3 P_B P_C",
-      "k_ref": 2.995599894570296e-07,
-      "k_ref_low": 2.881560405553747e-07,
-      "k_ref_high": 3.1141525650666045e-07,
+      "k_ref": 2.9957488062999864e-07,
+      "k_ref_low": 2.8817100774696047e-07,
+      "k_ref_high": 3.114300422035587e-07,
       "k_units": "mol g^-1 s^-1 bar^-2",
-      "Ea_kJ": 122.11475104586353,
-      "Ea_sd_kJ": 2.4684481596887493
+      "Ea_kJ": 122.1099105534105,
+      "Ea_sd_kJ": 2.4682935740256102
      },
      {
       "reaction": "A -> D",
       "rate_law": "r4 = k4 P_A",
-      "k_ref": 9.913406824549394e-07,
-      "k_ref_low": 9.696905098560875e-07,
-      "k_ref_high": 1.0134742360591697e-06,
+      "k_ref": 9.913305253666279e-07,
+      "k_ref_low": 9.696802680021885e-07,
+      "k_ref_high": 1.0134641726271122e-06,
       "k_units": "mol g^-1 s^-1 bar^-1",
-      "Ea_kJ": 148.16627544814762,
-      "Ea_sd_kJ": 1.250156392084878
+      "Ea_kJ": 148.16599355776498,
+      "Ea_sd_kJ": 1.250165164464656
      }
     ],
     "inhibition": null,
     "scores": {
-     "plain": 661.0285824614855
+     "plain": 661.0257779384314,
+     "inhib": 668.5306338542358
     },
     "theta": [
-     -17.31666697620433,
-     14.740605003272298,
-     -22.424042144673923,
-     41.18692086241582,
-     -19.62612132674819,
-     25.626530451115265,
-     -18.42937777123917,
-     31.093602837336373
+     -17.316660206642712,
+     14.740707522193198,
+     -22.423659088980948,
+     41.18425127341906,
+     -19.626071617830497,
+     25.62551464404705,
+     -18.429388017101694,
+     31.093543680908404
     ],
     "model_words": "plain rate laws",
     "verdict": "cannot explain A: typical miss 3.5x the GC noise (0.28 mol-%)",
-    "rank": 4,
-    "delta_bic": 547.0816330713145,
-    "weight": 1.594895999181402e-119,
+    "rank": 3,
+    "delta_bic": 547.0769049724634,
+    "weight": 1.597644003808343e-119,
     "tied_with_best": false,
-    "differs_by": "whether 'A + B -> C' runs one way or both ways; whether 'C -> B + D' happens at all"
+    "differs_by": "whether 'A + B -> C' runs one way or both ways; whether 'C -> D + B' happens at all"
+   },
+   {
+    "name": "runner-up 3",
+    "reactions": [
+     "A + B <=> C",
+     "B + C -> E ; orders B=2, C=1",
+     "A -> D"
+    ],
+    "equations": [
+     "1.  A + B <=> C    r1 = k1 (P_A P_B - P_C / K1)",
+     "2.  B + C -> E     r2 = k2 P_B^2 P_C",
+     "3.  A -> D         r3 = k3 P_A"
+    ],
+    "n_reactions": 3,
+    "n_params": 6,
+    "n_data": 150,
+    "n_runs": 30,
+    "chi2": 2016.8498624694435,
+    "chi2_per_point": 13.445665749796289,
+    "x_noise": 3.6668332045235283,
+    "bic": 2046.913674234021,
+    "model": "plain",
+    "miss": {
+     "A": {
+      "mol_pct": 0.16558997662333297,
+      "x_noise": 1.1670013363726262,
+      "bias_mol_pct": 0.015521570403993426
+     },
+     "B": {
+      "mol_pct": 0.4753119792334275,
+      "x_noise": 5.205377025164564,
+      "bias_mol_pct": 0.16751620720406896
+     },
+     "C": {
+      "mol_pct": 0.5069609877243001,
+      "x_noise": 2.717056292593436,
+      "bias_mol_pct": 0.05468585929554828
+     },
+     "D": {
+      "mol_pct": 0.28590417276024294,
+      "x_noise": 1.561998498831879,
+      "bias_mol_pct": -0.0014176227930667398
+     },
+     "E": {
+      "mol_pct": 0.5124862467549081,
+      "x_noise": 5.380358022316009,
+      "bias_mol_pct": -0.15645019672545335
+     }
+    },
+    "unexplained": [
+     "E",
+     "B",
+     "C"
+    ],
+    "not_made": [],
+    "fits_noise": false,
+    "seconds": 0.0,
+    "a_spec": 100.0,
+    "rate_constants": [
+     {
+      "reaction": "A + B <=> C",
+      "rate_law": "r1 = k1 (P_A P_B - P_C / K1)",
+      "k_ref": 3.012814371442385e-06,
+      "k_ref_low": 2.9810969990884967e-06,
+      "k_ref_high": 3.04486920068189e-06,
+      "k_units": "mol g^-1 s^-1 bar^-2",
+      "Ea_kJ": 69.92564606434082,
+      "Ea_sd_kJ": 0.7269406653989537
+     },
+     {
+      "reaction": "B + C -> E ; orders B=2, C=1",
+      "rate_law": "r2 = k2 P_B^2 P_C",
+      "k_ref": 1.1086686824429245e-07,
+      "k_ref_low": 1.056232724164666e-07,
+      "k_ref_high": 1.1637077883586826e-07,
+      "k_units": "mol g^-1 s^-1 bar^-3",
+      "Ea_kJ": 154.256092471267,
+      "Ea_sd_kJ": 3.095644535488691
+     },
+     {
+      "reaction": "A -> D",
+      "rate_law": "r3 = k3 P_A",
+      "k_ref": 9.817577062619769e-07,
+      "k_ref_low": 9.585465408390154e-07,
+      "k_ref_high": 1.0055309291097355e-06,
+      "k_units": "mol g^-1 s^-1 bar^-1",
+      "Ea_kJ": 151.4832846590835,
+      "Ea_sd_kJ": 1.3259279553617938
+     }
+    ],
+    "inhibition": null,
+    "scores": {
+     "plain": 2046.913674234021
+    },
+    "theta": [
+     -17.317806094914744,
+     14.674326261441767,
+     -20.62010592664677,
+     32.37158833907217,
+     -18.439091479991554,
+     31.78969759102221
+    ],
+    "model_words": "plain rate laws",
+    "verdict": "cannot explain E, B, C: typical miss 5.4x, 5.2x, 2.7x the GC noise (0.51 mol-%, 0.48 mol-%, 0.51 mol-%)",
+    "rank": 4,
+    "delta_bic": 1932.9667742220863,
+    "weight": 9.853333551566818e-305,
+    "tied_with_best": false,
+    "differs_by": "the rate law of 'B + C -> E' (r = k P_B P_C  or  r = k P_B^2 P_C)"
    }
   ],
   "tied": [],
@@ -3443,20 +3440,20 @@
    "The feed is A and B; the GC sees these products: C (up to 33.1 mol-%), D (up to 44.4 mol-%), E (up to 38.5 mol-%).",
    "Start: the network you gave (A + B -> C ; orders A=1, B=0; C -> D + B): cannot explain E: no reaction in this network makes it (the GC sees up to 38.5 mol-% E); it also misses B, D, C, A by more than 2x the GC noise (BIC 715679).",
    "Step 1: tried 11 additions and 1 removal. Best: add '2 B + D <=> E' (BIC 715679 -> 103169); now cannot explain C, A, D, B, E: typical miss 37.7x, 25.8x, 25.3x, 22.6x, 14.1x the GC noise (5.67 mol-%, 2.81 mol-%, 3.74 mol-%, 3.77 mol-%, 2.54 mol-%).",
-   "Step 2: tried 14 additions and 1 removal. Best: add 'A -> D' (BIC 103169 -> 70038); now cannot explain C, B, A, D, E: typical miss 34.6x, 22.7x, 21.2x, 11.3x, 7.1x the GC noise (4.37 mol-%, 3.53 mol-%, 2.71 mol-%, 1.46 mol-%, 2.15 mol-%).",
-   "Step 3: tried 0 additions and 3 removals (no additions: 4 reactions is the largest network allowed), then 5 replacements. Best: replace 'A + B -> C ; orders A=1, B=0' by 'A + B -> C' (BIC 70038 -> 13055); now cannot explain B, D, C, E, A: typical miss 11.6x, 11.1x, 10.1x, 7.1x, 4.9x the GC noise (1.97 mol-%, 1.53 mol-%, 1.43 mol-%, 2.16 mol-%, 0.39 mol-%).",
-   "Step 4: tried 0 additions and 3 removals (no additions: 4 reactions is the largest network allowed), then 4 replacements. Best: replace 'C -> D + B' by 'B + D <=> C' (BIC 13055 -> 13048); now cannot explain B, D, C, E, A: typical miss 11.6x, 11.1x, 10.0x, 7.1x, 4.9x the GC noise (1.97 mol-%, 1.52 mol-%, 1.42 mol-%, 2.16 mol-%, 0.40 mol-%).",
-   "Step 5: tried 0 additions and 4 removals (no additions: 4 reactions is the largest network allowed), then 26 replacements. Best: replace '2 B + D <=> E' by 'B + C -> E' (BIC 13048 -> 651); now cannot explain A: typical miss 3.5x the GC noise (0.28 mol-%).",
-   "Step 6: tried 0 additions and 4 removals (no additions: 4 reactions is the largest network allowed), then 4 replacements. Best: replace 'A + B -> C' by 'A + B <=> C' (BIC 651 -> 142); now fits the data within the GC noise.",
-   "Step 7: tried 0 additions and 4 removals (no additions: 4 reactions is the largest network allowed). Best: remove 'B + D <=> C' (BIC 142 -> 114); now fits the data within the GC noise.",
-   "Step 8: tried 0 additions and 2 removals (no additions: every species is already explained within the GC noise), then 19 replacements; none lowers BIC by more than 2. The reactions are settled.",
-   "Order check: tried 7 other orders (each reactant at 0, 1, 2); none is better than the present rate laws.",
-   "Final check: the best network already fits within the GC noise with plain rate laws, so there is nothing left for site blocking (product C occupying the catalyst) to explain.",
+   "Step 2: tried 14 additions and 1 removal and 8 other reaction orders. Best: change the rate law of 'A + B -> C' to r = k P_A P_B (was r = k P_A   (zero order in B)) (BIC 103169 -> 65293); now cannot explain D, C, A, B, E: typical miss 27.2x, 22.7x, 20.4x, 17.7x, 13.8x the GC noise (4.16 mol-%, 4.52 mol-%, 3.05 mol-%, 2.76 mol-%, 2.45 mol-%).",
+   "Step 3: tried 14 additions and 1 removal and 9 other reaction orders. Best: add 'A -> D' (BIC 65293 -> 13056); now cannot explain B, D, C, E, A: typical miss 11.6x, 11.1x, 10.1x, 7.1x, 4.9x the GC noise (1.97 mol-%, 1.53 mol-%, 1.43 mol-%, 2.16 mol-%, 0.39 mol-%).",
+   "Step 4: tried 0 additions and 3 removals (no additions: 4 reactions is the largest network allowed) and 10 other reaction orders. Best: change the rate law of '2 B + D <=> E' to r = k (P_B^2 P_D^2 - P_D P_E / K) (was r = k (P_B^2 P_D - P_E / K)) (BIC 13056 -> 11631); now cannot explain C, D, E, B, A: typical miss 10.7x, 9.8x, 9.8x, 7.8x, 4.3x the GC noise (1.53 mol-%, 1.45 mol-%, 2.22 mol-%, 1.89 mol-%, 0.35 mol-%).",
+   "Step 5: tried 0 additions and 3 removals (no additions: 4 reactions is the largest network allowed) and 10 other reaction orders, then 24 replacements. Best: replace '2 B + D <=> E ; orders B=2, D=2' by 'B + C -> E' (BIC 11631 -> 661); now cannot explain A: typical miss 3.5x the GC noise (0.28 mol-%).",
+   "Step 6: tried 0 additions and 3 removals (no additions: 4 reactions is the largest network allowed) and 10 other reaction orders, then 3 replacements. Best: replace 'A + B -> C' by 'A + B <=> C' (BIC 661 -> 129); now fits the data within the GC noise.",
+   "Step 7: tried 0 additions and 3 removals (no additions: 4 reactions is the largest network allowed). Best: remove 'C -> D + B' (BIC 129 -> 114); now fits the data within the GC noise.",
+   "Step 8: tried 0 additions and 2 removals (no additions: every species is already explained within the GC noise) and 9 other reaction orders, then 19 replacements; none lowers BIC by more than 2. The reactions are settled.",
+   "Order check: tried 9 other orders (each reactant at 0, 1, 2); none is better than the present rate laws.",
+   "Final check: the best network already fits within the GC noise with plain rate laws; letting product C block catalyst sites (one more fitted number) does not improve on that.",
    "Result: A + B <=> C; B + C -> E; A -> D with plain rate laws (BIC 114)."
   ],
   "complete": true,
-  "n_fits": 125,
-  "seconds": 84.24277806282043,
+  "n_fits": 177,
+  "seconds": 42.69630241394043,
   "library_size": 22,
   "detected": {
    "C": 33.08,
@@ -3471,7 +3468,7 @@
    "   2.  B + C -> E     r2 = k2 P_B P_C",
    "   3.  A -> D         r3 = k3 P_A",
    "This network fits the data within the GC noise (plain rate laws).",
-   "No other network tried comes close (next best: BIC difference 28)."
+   "No other network tried comes close (next best: BIC difference 15)."
   ]
  },
  "repair:similar": {
@@ -3491,92 +3488,92 @@
    "n_params": 6,
    "n_data": 150,
    "n_runs": 30,
-   "chi2": 83.88306254786104,
-   "chi2_per_point": 0.5592204169857403,
-   "x_noise": 0.7478104151359088,
-   "bic": 113.94687431243858,
+   "chi2": 83.88302874367,
+   "chi2_per_point": 0.5592201916244667,
+   "x_noise": 0.7478102644551402,
+   "bic": 113.94684050824753,
    "model": "plain",
    "miss": {
     "A": {
-     "mol_pct": 0.1487030969062932,
-     "x_noise": 0.8195102735763187,
-     "bias_mol_pct": 0.02195678289122206
+     "mol_pct": 0.14870391080187761,
+     "x_noise": 0.8195096458737567,
+     "bias_mol_pct": 0.02195863766025168
     },
     "B": {
-     "mol_pct": 0.20427403139772443,
-     "x_noise": 0.7337039921510231,
-     "bias_mol_pct": 0.02781877369458224
+     "mol_pct": 0.204274053598945,
+     "x_noise": 0.7337031395704672,
+     "bias_mol_pct": 0.02781887648606908
     },
     "C": {
-     "mol_pct": 0.10270915951401778,
-     "x_noise": 0.6790400182939141,
-     "bias_mol_pct": -0.03533361448629368
+     "mol_pct": 0.10270761464172805,
+     "x_noise": 0.6790395085270837,
+     "bias_mol_pct": -0.03533049414985764
     },
     "D": {
-     "mol_pct": 0.17452258132441337,
-     "x_noise": 0.7644726960035867,
-     "bias_mol_pct": 0.018456475826716435
+     "mol_pct": 0.17452272005195857,
+     "x_noise": 0.7644726020493651,
+     "bias_mol_pct": 0.01845327109810326
     },
     "E": {
-     "mol_pct": 0.13157859450837953,
-     "x_noise": 0.735302386065507,
-     "bias_mol_pct": 0.0004129609157483616
+     "mol_pct": 0.13157852275580076,
+     "x_noise": 0.7353037386018191,
+     "bias_mol_pct": 0.0004111734450986647
     }
    },
    "unexplained": [],
    "not_made": [],
    "fits_noise": true,
-   "seconds": 0.39311885833740234,
+   "seconds": 0.14686942100524902,
    "a_spec": 100.0,
    "rate_constants": [
     {
      "reaction": "A + B <=> C",
      "rate_law": "r1 = k1 (P_A P_B - P_C / K1)",
-     "k_ref": 3.0140599227595554e-06,
-     "k_ref_low": 2.9863049099545943e-06,
-     "k_ref_high": 3.042072893395023e-06,
+     "k_ref": 3.0140600996696175e-06,
+     "k_ref_low": 2.9863050855891726e-06,
+     "k_ref_high": 3.042073071589107e-06,
      "k_units": "mol g^-1 s^-1 bar^-2",
-     "Ea_kJ": 70.02152155825281,
-     "Ea_sd_kJ": 0.6349993333580791
+     "Ea_kJ": 70.02153349206907,
+     "Ea_sd_kJ": 0.6349993335316644
     },
     {
      "reaction": "A -> D",
      "rate_law": "r2 = k2 P_A",
-     "k_ref": 1.011395350165662e-06,
-     "k_ref_low": 9.912149825445055e-07,
-     "k_ref_high": 1.0319865744067213e-06,
+     "k_ref": 1.0113932555685092e-06,
+     "k_ref_low": 9.91212901823171e-07,
+     "k_ref_high": 1.0319844662312038e-06,
      "k_units": "mol g^-1 s^-1 bar^-1",
-     "Ea_kJ": 149.93428522436346,
-     "Ea_sd_kJ": 1.0997121675101402
+     "Ea_kJ": 149.93438742391467,
+     "Ea_sd_kJ": 1.0997134869750753
     },
     {
      "reaction": "B + C -> E",
      "rate_law": "r3 = k3 P_B P_C",
-     "k_ref": 2.974927599153381e-07,
-     "k_ref_low": 2.8638830169458993e-07,
-     "k_ref_high": 3.090277838807299e-07,
+     "k_ref": 2.974916441900078e-07,
+     "k_ref_low": 2.863871903213905e-07,
+     "k_ref_high": 3.090266651366493e-07,
      "k_units": "mol g^-1 s^-1 bar^-2",
-     "Ea_kJ": 121.05466480156193,
-     "Ea_sd_kJ": 2.208131634164898
+     "Ea_kJ": 121.0548769364628,
+     "Ea_sd_kJ": 2.2081392199210663
     }
    ],
    "inhibition": null,
    "scores": {
-    "plain": 113.94687431243858
+    "plain": 113.94684050824753
    },
    "theta": [
-    -17.317392762472718,
-    14.694446322640013,
-    -18.409349831722896,
-    31.464630546765584,
-    -19.633046134663985,
-    25.404064842433804
+    -17.31739270377778,
+    14.694448827024642,
+    -18.409351902722452,
+    31.46465199396905,
+    -19.633049885099535,
+    25.404109360245542
    ],
    "model_words": "plain rate laws",
    "verdict": "fits the data within the GC noise",
    "rank": 1,
    "delta_bic": 0.0,
-   "weight": 0.9996536746205439,
+   "weight": 0.9996387879679992,
    "tied_with_best": true
   },
   "runners_up": [
@@ -3584,13 +3581,13 @@
     "name": "runner-up 1",
     "reactions": [
      "A + B <=> C",
-     "A + 2 B -> E ; orders A=1, B=1",
+     "A + 2 B -> E",
      "A -> D",
      "B + C -> E"
     ],
     "equations": [
      "1.  A + B <=> C     r1 = k1 (P_A P_B - P_C / K1)",
-     "2.  A + 2 B -> E    r2 = k2 P_A P_B",
+     "2.  A + 2 B -> E    r2 = k2 P_A P_B^2",
      "3.  A -> D          r3 = k3 P_A",
      "4.  B + C -> E      r4 = k4 P_B P_C"
     ],
@@ -3598,325 +3595,350 @@
     "n_params": 8,
     "n_data": 150,
     "n_runs": 30,
-    "chi2": 89.79736283245266,
-    "chi2_per_point": 0.5986490855496844,
-    "x_noise": 0.7737241663213605,
-    "bic": 129.8824451852227,
+    "chi2": 89.7131264524858,
+    "chi2_per_point": 0.5980875096832386,
+    "x_noise": 0.7733611767364836,
+    "bic": 129.79820880525585,
     "model": "plain",
     "miss": {
      "A": {
-      "mol_pct": 0.15178221443322482,
-      "x_noise": 0.8101736034243656,
-      "bias_mol_pct": 0.02373882080190923
+      "mol_pct": 0.1511670768844532,
+      "x_noise": 0.8043738507562178,
+      "bias_mol_pct": 0.022801597485823076
      },
      "B": {
-      "mol_pct": 0.2052354413791484,
-      "x_noise": 0.7319378743500077,
-      "bias_mol_pct": 0.019017687110493505
+      "mol_pct": 0.2183245191434256,
+      "x_noise": 0.7726605787639039,
+      "bias_mol_pct": 0.02200963306297256
      },
      "C": {
-      "mol_pct": 0.10778417533675796,
-      "x_noise": 0.7044265055588625,
-      "bias_mol_pct": -0.043196652830887236
+      "mol_pct": 0.11399130069583675,
+      "x_noise": 0.7340871825817542,
+      "bias_mol_pct": -0.04500867629182474
      },
      "D": {
-      "mol_pct": 0.17713065265770975,
-      "x_noise": 0.7720836878617603,
-      "bias_mol_pct": 0.01915096327643241
+      "mol_pct": 0.17371752750234137,
+      "x_noise": 0.7563518239653356,
+      "bias_mol_pct": 0.018021674033583374
      },
      "E": {
-      "mol_pct": 0.13271292876230006,
-      "x_noise": 0.8419033111698202,
-      "bias_mol_pct": 0.010904886964012137
+      "mol_pct": 0.13555035008254382,
+      "x_noise": 0.7971598418219076,
+      "bias_mol_pct": 0.013938167996971527
      }
     },
     "unexplained": [],
     "not_made": [],
     "fits_noise": true,
-    "seconds": 1.2192107041676838,
+    "seconds": 0.20945397290316495,
     "a_spec": 100.0,
     "rate_constants": [
      {
       "reaction": "A + B <=> C",
       "rate_law": "r1 = k1 (P_A P_B - P_C / K1)",
-      "k_ref": 3.0066390034597236e-06,
-      "k_ref_low": 2.9773183052739996e-06,
-      "k_ref_high": 3.0362484525460735e-06,
+      "k_ref": 3.00774306433668e-06,
+      "k_ref_low": 2.9789804162094703e-06,
+      "k_ref_high": 3.0367834215494506e-06,
       "k_units": "mol g^-1 s^-1 bar^-2",
-      "Ea_kJ": 69.95539059572764,
-      "Ea_sd_kJ": 0.65118091255817
+      "Ea_kJ": 69.92628263040477,
+      "Ea_sd_kJ": 0.6613790271500529
      },
      {
-      "reaction": "A + 2 B -> E ; orders A=1, B=1",
-      "rate_law": "r2 = k2 P_A P_B",
-      "k_ref": 9.433113850441461e-09,
-      "k_ref_low": 2.593770228999425e-09,
-      "k_ref_high": 3.4306676790610296e-08,
-      "k_units": "mol g^-1 s^-1 bar^-2",
-      "Ea_kJ": 94.22532353751805,
-      "Ea_sd_kJ": 41.93913900369649
+      "reaction": "A + 2 B -> E",
+      "rate_law": "r2 = k2 P_A P_B^2",
+      "k_ref": 2.6938515412986248e-09,
+      "k_ref_low": 8.025653291398364e-10,
+      "k_ref_high": 9.042050364092626e-09,
+      "k_units": "mol g^-1 s^-1 bar^-3",
+      "Ea_kJ": 92.1162439058158,
+      "Ea_sd_kJ": 32.90555195064102
      },
      {
       "reaction": "A -> D",
       "rate_law": "r3 = k3 P_A",
-      "k_ref": 1.0104987465508092e-06,
-      "k_ref_low": 9.902938591385722e-07,
-      "k_ref_high": 1.031115872685496e-06,
+      "k_ref": 1.0078658145369022e-06,
+      "k_ref_low": 9.872460668685705e-07,
+      "k_ref_high": 1.0289162288932805e-06,
       "k_units": "mol g^-1 s^-1 bar^-1",
-      "Ea_kJ": 150.00959298069384,
-      "Ea_sd_kJ": 1.1059183327620348
+      "Ea_kJ": 150.26663676199166,
+      "Ea_sd_kJ": 1.1762647269563895
      },
      {
       "reaction": "B + C -> E",
       "rate_law": "r4 = k4 P_B P_C",
-      "k_ref": 2.886612527966644e-07,
-      "k_ref_low": 2.728840271170427e-07,
-      "k_ref_high": 3.053506639668606e-07,
+      "k_ref": 2.8812927687846983e-07,
+      "k_ref_low": 2.7220020600545264e-07,
+      "k_ref_high": 3.049905119941273e-07,
       "k_units": "mol g^-1 s^-1 bar^-2",
-      "Ea_kJ": 121.93611037326698,
-      "Ea_sd_kJ": 2.7239725600613194
+      "Ea_kJ": 122.39675864838608,
+      "Ea_sd_kJ": 2.9245402327415606
      }
     ],
     "inhibition": null,
     "scores": {
-     "plain": 129.8824451852227
+     "plain": 129.79820880525585
     },
     "theta": [
-     -17.31985789921142,
-     14.680568334023576,
-     -23.08420977396175,
-     19.773762810960488,
-     -18.410236726516327,
-     31.480434341919548,
-     -19.663182157962016,
-     25.58904160888372
+     -17.319490758954313,
+     14.674459848739634,
+     -24.337464053629365,
+     19.33115949774286,
+     -18.412845703663614,
+     31.534376558009587,
+     -19.665026765463928,
+     25.68571147839981
     ],
     "model_words": "plain rate laws",
     "verdict": "fits the data within the GC noise",
     "rank": 2,
-    "delta_bic": 15.935570872784126,
-    "weight": 0.0003463253794561563,
+    "delta_bic": 15.851368297008321,
+    "weight": 0.0003612120320008556,
     "tied_with_best": false,
-    "differs_by": "whether 'A + 2 B -> E ; orders A=1, B=1' happens at all"
+    "differs_by": "whether 'A + 2 B -> E' happens at all"
    },
    {
     "name": "runner-up 2",
     "reactions": [
      "A + B <=> C",
+     "A + 2 B -> E ; orders A=1, B=0",
      "A -> D",
      "B + C -> E ; orders B=2, C=1"
     ],
     "equations": [
-     "1.  A + B <=> C    r1 = k1 (P_A P_B - P_C / K1)",
-     "2.  A -> D         r2 = k2 P_A",
-     "3.  B + C -> E     r3 = k3 P_B^2 P_C"
+     "1.  A + B <=> C     r1 = k1 (P_A P_B - P_C / K1)",
+     "2.  A + 2 B -> E    r2 = k2 P_A   (zero order in B)",
+     "3.  A -> D          r3 = k3 P_A",
+     "4.  B + C -> E      r4 = k4 P_B^2 P_C"
     ],
-    "n_reactions": 3,
-    "n_params": 6,
+    "n_reactions": 4,
+    "n_params": 8,
     "n_data": 150,
     "n_runs": 30,
-    "chi2": 2016.8498607603708,
-    "chi2_per_point": 13.445665738402472,
-    "x_noise": 3.666833202969897,
-    "bic": 2046.9136725249484,
+    "chi2": 1250.9172008865257,
+    "chi2_per_point": 8.339448005910171,
+    "x_noise": 2.887810244096757,
+    "bic": 1291.0022832392958,
     "model": "plain",
     "miss": {
      "A": {
-      "mol_pct": 0.16558997699573536,
-      "x_noise": 1.1670013361113691,
-      "bias_mol_pct": 0.015521570704086525
+      "mol_pct": 0.18570480001054973,
+      "x_noise": 1.152017866969103,
+      "bias_mol_pct": 0.03930713561505917
      },
      "B": {
-      "mol_pct": 0.4753119799791508,
-      "x_noise": 5.205377019435773,
-      "bias_mol_pct": 0.16751620798209346
+      "mol_pct": 0.45209124883084945,
+      "x_noise": 4.623227009108742,
+      "bias_mol_pct": 0.05761123677053933
      },
      "C": {
-      "mol_pct": 0.5069609879847641,
-      "x_noise": 2.717056291995192,
-      "bias_mol_pct": 0.05468585883426009
+      "mol_pct": 0.3905708001731797,
+      "x_noise": 1.8520577747409148,
+      "bias_mol_pct": -0.026341691212823135
      },
      "D": {
-      "mol_pct": 0.285904173552637,
-      "x_noise": 1.5619985141615904,
-      "bias_mol_pct": -0.0014176223350448557
+      "mol_pct": 0.27106049864248993,
+      "x_noise": 1.4983765708907717,
+      "bias_mol_pct": 0.011522847855738852
      },
      "E": {
-      "mol_pct": 0.5124862472894185,
-      "x_noise": 5.380358018472648,
-      "bias_mol_pct": -0.15645019736740637
+      "mol_pct": 0.4702103005575158,
+      "x_noise": 3.649741982224166,
+      "bias_mol_pct": -0.04760072989398016
      }
     },
     "unexplained": [
-     "E",
      "B",
-     "C"
+     "E"
     ],
     "not_made": [],
     "fits_noise": false,
-    "seconds": 0.0,
+    "seconds": 0.44459064801534015,
     "a_spec": 100.0,
     "rate_constants": [
      {
       "reaction": "A + B <=> C",
       "rate_law": "r1 = k1 (P_A P_B - P_C / K1)",
-      "k_ref": 3.0128143712650573e-06,
-      "k_ref_low": 2.9810969989120034e-06,
-      "k_ref_high": 3.044869200503731e-06,
+      "k_ref": 2.975259909745586e-06,
+      "k_ref_low": 2.9473358181254594e-06,
+      "k_ref_high": 3.003448563988002e-06,
       "k_units": "mol g^-1 s^-1 bar^-2",
-      "Ea_kJ": 69.92564604423173,
-      "Ea_sd_kJ": 0.7269406655510275
+      "Ea_kJ": 69.37407557064422,
+      "Ea_sd_kJ": 0.6384496848854119
+     },
+     {
+      "reaction": "A + 2 B -> E ; orders A=1, B=0",
+      "rate_law": "r2 = k2 P_A   (zero order in B)",
+      "k_ref": 6.157950929032895e-08,
+      "k_ref_low": 4.894549398803432e-08,
+      "k_ref_high": 7.747466938151133e-08,
+      "k_units": "mol g^-1 s^-1 bar^-1",
+      "Ea_kJ": 105.86881473227014,
+      "Ea_sd_kJ": 12.560404447986372
      },
      {
       "reaction": "A -> D",
-      "rate_law": "r2 = k2 P_A",
-      "k_ref": 9.817577053475705e-07,
-      "k_ref_low": 9.585465399353634e-07,
-      "k_ref_high": 1.0055309281845838e-06,
+      "rate_law": "r3 = k3 P_A",
+      "k_ref": 9.843304942120675e-07,
+      "k_ref_low": 9.642101619599256e-07,
+      "k_ref_high": 1.0048706807510733e-06,
       "k_units": "mol g^-1 s^-1 bar^-1",
-      "Ea_kJ": 151.4832847256368,
-      "Ea_sd_kJ": 1.3259279558960626
+      "Ea_kJ": 150.8882787055596,
+      "Ea_sd_kJ": 1.1471115436167343
      },
      {
       "reaction": "B + C -> E ; orders B=2, C=1",
-      "rate_law": "r3 = k3 P_B^2 P_C",
-      "k_ref": 1.1086686803071472e-07,
-      "k_ref_low": 1.0562327219795235e-07,
-      "k_ref_high": 1.1637077862825576e-07,
+      "rate_law": "r4 = k4 P_B^2 P_C",
+      "k_ref": 1.0397858097322325e-07,
+      "k_ref_low": 9.916011694455616e-08,
+      "k_ref_high": 1.0903118748085231e-07,
       "k_units": "mol g^-1 s^-1 bar^-3",
-      "Ea_kJ": 154.25609267428686,
-      "Ea_sd_kJ": 3.0956445458900603
+      "Ea_kJ": 152.96745097779123,
+      "Ea_sd_kJ": 2.9657323954438195
      }
     ],
     "inhibition": null,
     "scores": {
-     "plain": 2046.9136725249484
+     "plain": 1291.0022832392958
     },
     "theta": [
-     -17.3178060949736,
-     14.67432625722175,
-     -18.43909148092295,
-     31.789697604988838,
-     -20.620105928573203,
-     32.37158838167713
+     -17.330349344150473,
+     14.558575805975957,
+     -21.20810684912321,
+     22.217220944429894,
+     -18.43647431417162,
+     31.66483193756117,
+     -20.684251097184738,
+     32.10115900772361
     ],
     "model_words": "plain rate laws",
-    "verdict": "cannot explain E, B, C: typical miss 5.4x, 5.2x, 2.7x the GC noise (0.51 mol-%, 0.48 mol-%, 0.51 mol-%)",
+    "verdict": "cannot explain B, E: typical miss 4.6x, 3.6x the GC noise (0.45 mol-%, 0.47 mol-%)",
     "rank": 3,
-    "delta_bic": 1932.9667982125097,
-    "weight": 9.856261887539438e-305,
+    "delta_bic": 1177.0554427310483,
+    "weight": 2.543907191965461e-256,
     "tied_with_best": false,
-    "differs_by": "the rate law of 'B + C -> E' (r = k P_B P_C  or  r = k P_B^2 P_C)"
+    "differs_by": "the rate law of 'B + C -> E' (r = k P_B P_C  or  r = k P_B^2 P_C); whether 'A + 2 B -> E ; orders A=1, B=0' happens at all"
    },
    {
     "name": "runner-up 3",
     "reactions": [
      "A + B <=> C",
+     "A + 2 B -> E ; orders A=1, B=1",
      "A -> D",
-     "B + C -> E ; orders B=1, C=2"
+     "B + C -> E ; orders B=2, C=1"
     ],
     "equations": [
-     "1.  A + B <=> C    r1 = k1 (P_A P_B - P_C / K1)",
-     "2.  A -> D         r2 = k2 P_A",
-     "3.  B + C -> E     r3 = k3 P_B P_C^2"
+     "1.  A + B <=> C     r1 = k1 (P_A P_B - P_C / K1)",
+     "2.  A + 2 B -> E    r2 = k2 P_A P_B",
+     "3.  A -> D          r3 = k3 P_A",
+     "4.  B + C -> E      r4 = k4 P_B^2 P_C"
     ],
-    "n_reactions": 3,
-    "n_params": 6,
+    "n_reactions": 4,
+    "n_params": 8,
     "n_data": 150,
     "n_runs": 30,
-    "chi2": 5399.34164238179,
-    "chi2_per_point": 35.99561094921193,
-    "x_noise": 5.999634234618968,
-    "bic": 5429.405454146367,
+    "chi2": 1334.7859401969085,
+    "chi2_per_point": 8.898572934646056,
+    "x_noise": 2.9830475917500974,
+    "bic": 1374.8710225496786,
     "model": "plain",
     "miss": {
      "A": {
-      "mol_pct": 0.20129887670361427,
-      "x_noise": 1.7312074568626594,
-      "bias_mol_pct": 0.00848724477821242
+      "mol_pct": 0.19159068157661427,
+      "x_noise": 1.1497598407936056,
+      "bias_mol_pct": 0.03328744770747587
      },
      "B": {
-      "mol_pct": 0.5390701884542554,
-      "x_noise": 3.308681638582423,
-      "bias_mol_pct": 0.2373899656643157
+      "mol_pct": 0.467274550428829,
+      "x_noise": 5.010425678751538,
+      "bias_mol_pct": 0.05346031146179403
      },
      "C": {
-      "mol_pct": 1.873064465048744,
-      "x_noise": 7.253308966957086,
-      "bias_mol_pct": 0.0853826331227447
+      "mol_pct": 0.37457024127434874,
+      "x_noise": 1.8392325069080702,
+      "bias_mol_pct": -0.04951431346734655
      },
      "D": {
-      "mol_pct": 0.8389406028819588,
-      "x_noise": 3.967490557777067,
-      "bias_mol_pct": 0.06322296183647085
+      "mol_pct": 0.26042017795301203,
+      "x_noise": 1.406546093989384,
+      "bias_mol_pct": 0.010623561402317459
      },
      "E": {
-      "mol_pct": 1.120878055236932,
-      "x_noise": 9.883426986915017,
-      "bias_mol_pct": -0.22299452827747443
+      "mol_pct": 0.4642127630588329,
+      "x_noise": 3.5644639667769966,
+      "bias_mol_pct": -0.019815914152292426
      }
     },
     "unexplained": [
-     "E",
-     "C",
-     "D",
-     "B"
+     "B",
+     "E"
     ],
     "not_made": [],
     "fits_noise": false,
-    "seconds": 0.4342153072357178,
+    "seconds": 0.4447912375132243,
     "a_spec": 100.0,
     "rate_constants": [
      {
       "reaction": "A + B <=> C",
       "rate_law": "r1 = k1 (P_A P_B - P_C / K1)",
-      "k_ref": 3.0589797699483847e-06,
-      "k_ref_low": 2.999553683612213e-06,
-      "k_ref_high": 3.119583184683954e-06,
+      "k_ref": 2.947135025199056e-06,
+      "k_ref_low": 2.9182905931320924e-06,
+      "k_ref_high": 2.9762645561054653e-06,
       "k_units": "mol g^-1 s^-1 bar^-2",
-      "Ea_kJ": 71.11274803446602,
-      "Ea_sd_kJ": 1.3458991660329742
+      "Ea_kJ": 68.9459249223192,
+      "Ea_sd_kJ": 0.6734791343996274
+     },
+     {
+      "reaction": "A + 2 B -> E ; orders A=1, B=1",
+      "rate_law": "r2 = k2 P_A P_B",
+      "k_ref": 7.299460457994646e-08,
+      "k_ref_low": 6.09828631925738e-08,
+      "k_ref_high": 8.737228819442481e-08,
+      "k_units": "mol g^-1 s^-1 bar^-2",
+      "Ea_kJ": 110.56310049883717,
+      "Ea_sd_kJ": 10.088926891800398
      },
      {
       "reaction": "A -> D",
-      "rate_law": "r2 = k2 P_A",
-      "k_ref": 9.807490125088793e-07,
-      "k_ref_low": 9.38914452086774e-07,
-      "k_ref_high": 1.024447566441598e-06,
+      "rate_law": "r3 = k3 P_A",
+      "k_ref": 9.79006088402094e-07,
+      "k_ref_low": 9.588199263755616e-07,
+      "k_ref_high": 9.996172323529192e-07,
       "k_units": "mol g^-1 s^-1 bar^-1",
-      "Ea_kJ": 151.06160282725267,
-      "Ea_sd_kJ": 2.4040177718052362
+      "Ea_kJ": 151.76831410489655,
+      "Ea_sd_kJ": 1.1677508468097682
      },
      {
-      "reaction": "B + C -> E ; orders B=1, C=2",
-      "rate_law": "r3 = k3 P_B P_C^2",
-      "k_ref": 8.149501541965316e-08,
-      "k_ref_low": 7.14723066970189e-08,
-      "k_ref_high": 9.292322922224252e-08,
+      "reaction": "B + C -> E ; orders B=2, C=1",
+      "rate_law": "r4 = k4 P_B^2 P_C",
+      "k_ref": 8.765251154112754e-08,
+      "k_ref_low": 8.132206405547146e-08,
+      "k_ref_high": 9.447574737191605e-08,
       "k_units": "mol g^-1 s^-1 bar^-3",
-      "Ea_kJ": 182.01295056218734,
-      "Ea_sd_kJ": 8.21122159295496
+      "Ea_kJ": 159.44497805444,
+      "Ea_sd_kJ": 4.3663489362767995
      }
     ],
     "inhibition": null,
     "scores": {
-     "plain": 5429.405454146367
+     "plain": 1374.8710225496786
     },
     "theta": [
-     -17.30259929209465,
-     14.923446900229843,
-     -18.440119444718782,
-     31.701205068935053,
-     -20.927894165053118,
-     38.19653547283083
+     -17.339847223398074,
+     14.468725763020496,
+     -21.038050494381327,
+     23.202345641592693,
+     -18.441898161422213,
+     31.849512770679333,
+     -20.855055757772107,
+     33.460507845238915
     ],
     "model_words": "plain rate laws",
-    "verdict": "cannot explain E, C, D, B: typical miss 9.9x, 7.3x, 4.0x, 3.3x the GC noise (1.12 mol-%, 1.87 mol-%, 0.84 mol-%, 0.54 mol-%)",
+    "verdict": "cannot explain B, E: typical miss 5.0x, 3.6x the GC noise (0.47 mol-%, 0.46 mol-%)",
     "rank": 4,
-    "delta_bic": 5315.4585798339285,
-    "weight": 9.856261887539438e-305,
+    "delta_bic": 1260.924182041431,
+    "weight": 1.5618377649707306e-274,
     "tied_with_best": false,
-    "differs_by": "the rate law of 'B + C -> E' (r = k P_B P_C  or  r = k P_B P_C^2)"
+    "differs_by": "the rate law of 'B + C -> E' (r = k P_B P_C  or  r = k P_B^2 P_C); whether 'A + 2 B -> E ; orders A=1, B=1' happens at all"
    }
   ],
   "tied": [],
@@ -3925,17 +3947,22 @@
   "path": [
    "The feed is A and B; the GC sees these products: C (up to 33.1 mol-%), D (up to 44.4 mol-%), E (up to 38.5 mol-%).",
    "Start: the network you gave (A + B -> C; A + 2 B -> E ; orders A=1, B=1; A -> D): cannot explain C, E, B, A, D: typical miss 40.1x, 29.5x, 19.9x, 13.7x, 11.7x the GC noise (4.81 mol-%, 3.00 mol-%, 2.76 mol-%, 2.01 mol-%, 2.33 mol-%) (BIC 96030).",
-   "Step 1: tried 16 additions and 3 removals. Best: add 'B + C -> E' (BIC 96030 -> 19580); now cannot explain E, C, B, A, D: typical miss 16.0x, 15.4x, 9.8x, 5.5x, 5.4x the GC noise (1.44 mol-%, 2.01 mol-%, 1.38 mol-%, 0.65 mol-%, 0.94 mol-%).",
-   "Step 2: tried 0 additions and 3 removals (no additions: 4 reactions is the largest network allowed), then 3 replacements. Best: replace 'A + B -> C' by 'A + B <=> C' (BIC 19580 -> 130); now fits the data within the GC noise.",
-   "Step 3: tried 0 additions and 3 removals (no additions: 4 reactions is the largest network allowed). Best: remove 'A + 2 B -> E ; orders A=1, B=1' (BIC 130 -> 114); now fits the data within the GC noise.",
-   "Step 4: tried 0 additions and 2 removals (no additions: every species is already explained within the GC noise), then 19 replacements; none lowers BIC by more than 2. The reactions are settled.",
-   "Order check: tried 7 other orders (each reactant at 0, 1, 2); none is better than the present rate laws.",
-   "Final check: the best network already fits within the GC noise with plain rate laws, so there is nothing left for site blocking (product C occupying the catalyst) to explain.",
+   "Step 1: tried 16 additions and 3 removals and 9 other reaction orders. Best: add 'B + C -> E' (BIC 96030 -> 19580); now cannot explain E, C, B, A, D: typical miss 16.0x, 15.4x, 9.8x, 5.5x, 5.4x the GC noise (1.44 mol-%, 2.01 mol-%, 1.38 mol-%, 0.65 mol-%, 0.94 mol-%).",
+   "Step 2: tried 0 additions and 3 removals (no additions: 4 reactions is the largest network allowed) and 13 other reaction orders. Best: change the rate law of 'B + C -> E' to r = k P_B P_C^2 (was r = k P_B P_C) (BIC 19580 -> 8437); now cannot explain C, E, B, D, A: typical miss 10.2x, 9.8x, 7.6x, 3.3x, 3.1x the GC noise (1.01 mol-%, 1.00 mol-%, 0.93 mol-%, 0.58 mol-%, 0.36 mol-%).",
+   "Step 3: tried 0 additions and 3 removals (no additions: 4 reactions is the largest network allowed) and 13 other reaction orders. Best: change the rate law of 'B + C -> E' to r = k P_B^2 P_C^2 (was r = k P_B P_C^2) (BIC 8437 -> 7543); now cannot explain C, E, B, D, A: typical miss 10.0x, 8.6x, 7.2x, 3.7x, 3.4x the GC noise (1.01 mol-%, 0.94 mol-%, 0.89 mol-%, 0.61 mol-%, 0.37 mol-%).",
+   "Step 4: tried 0 additions and 3 removals (no additions: 4 reactions is the largest network allowed) and 13 other reaction orders. Best: change the rate law of 'A + 2 B -> E' to r = k P_A P_B^2 (was r = k P_A P_B) (BIC 7543 -> 6921); now cannot explain C, E, B, A, D: typical miss 9.6x, 7.9x, 6.9x, 4.0x, 3.3x the GC noise (1.07 mol-%, 0.69 mol-%, 0.76 mol-%, 0.39 mol-%, 0.64 mol-%).",
+   "Step 5: tried 0 additions and 3 removals (no additions: 4 reactions is the largest network allowed) and 13 other reaction orders, then 3 replacements. Best: replace 'A + B -> C' by 'A + B <=> C' (BIC 6921 -> 3206); now cannot explain E, C, B, D, A: typical miss 7.3x, 4.4x, 3.8x, 3.7x, 2.2x the GC noise (0.79 mol-%, 1.18 mol-%, 0.65 mol-%, 0.67 mol-%, 0.32 mol-%).",
+   "Step 6: tried 0 additions and 3 removals (no additions: 4 reactions is the largest network allowed) and 13 other reaction orders. Best: change the rate law of 'B + C -> E' to r = k P_B^2 P_C (was r = k P_B^2 P_C^2) (BIC 3206 -> 1845); now cannot explain B, E, C: typical miss 5.1x, 4.8x, 2.5x the GC noise (0.51 mol-%, 0.46 mol-%, 0.47 mol-%).",
+   "Step 7: tried 0 additions and 3 removals (no additions: 4 reactions is the largest network allowed) and 13 other reaction orders. Best: change the rate law of 'B + C -> E' to r = k P_B P_C (was r = k P_B^2 P_C) (BIC 1845 -> 130); now fits the data within the GC noise.",
+   "Step 8: tried 0 additions and 3 removals (no additions: 4 reactions is the largest network allowed). Best: remove 'A + 2 B -> E' (BIC 130 -> 114); now fits the data within the GC noise.",
+   "Step 9: tried 0 additions and 2 removals (no additions: every species is already explained within the GC noise) and 9 other reaction orders, then 19 replacements; none lowers BIC by more than 2. The reactions are settled.",
+   "Order check: tried 9 other orders (each reactant at 0, 1, 2); none is better than the present rate laws.",
+   "Final check: the best network already fits within the GC noise with plain rate laws; letting product C block catalyst sites (one more fitted number) does not improve on that.",
    "Result: A + B <=> C; A -> D; B + C -> E with plain rate laws (BIC 114)."
   ],
   "complete": true,
-  "n_fits": 67,
-  "seconds": 40.31002879142761,
+  "n_fits": 171,
+  "seconds": 41.42108869552612,
   "library_size": 22,
   "detected": {
    "C": 33.08,
@@ -3958,104 +3985,104 @@
    "name": "best network",
    "reactions": [
     "A + B <=> C",
-    "B + C -> E",
+    "C + B -> E",
     "A -> D"
    ],
    "equations": [
     "1.  A + B <=> C    r1 = k1 (P_A P_B - P_C / K1)",
-    "2.  B + C -> E     r2 = k2 P_B P_C",
+    "2.  C + B -> E     r2 = k2 P_B P_C",
     "3.  A -> D         r3 = k3 P_A"
    ],
    "n_reactions": 3,
    "n_params": 6,
    "n_data": 150,
    "n_runs": 30,
-   "chi2": 83.88311597786561,
-   "chi2_per_point": 0.5592207731857708,
-   "x_noise": 0.7478106532978591,
-   "bic": 113.94692774244315,
+   "chi2": 83.88312428131294,
+   "chi2_per_point": 0.5592208285420863,
+   "x_noise": 0.747810690310112,
+   "bic": 113.94693604589048,
    "model": "plain",
    "miss": {
     "A": {
-     "mol_pct": 0.1487024354247231,
-     "x_noise": 0.8195078109935696,
-     "bias_mol_pct": 0.021958513643805116
+     "mol_pct": 0.14870233125676943,
+     "x_noise": 0.8195081060526381,
+     "bias_mol_pct": 0.021958521275055667
     },
     "B": {
-     "mol_pct": 0.2042722539290676,
-     "x_noise": 0.7337078508584157,
-     "bias_mol_pct": 0.027814503994799445
+     "mol_pct": 0.2042721988491185,
+     "x_noise": 0.7337079749557476,
+     "bias_mol_pct": 0.027814380925344214
     },
     "C": {
-     "mol_pct": 0.10271499179346788,
-     "x_noise": 0.6790413446542914,
-     "bias_mol_pct": -0.03534462668557004
+     "mol_pct": 0.10271536830789868,
+     "x_noise": 0.6790414223746918,
+     "bias_mol_pct": -0.03534535879747402
     },
     "D": {
-     "mol_pct": 0.17452165695099037,
-     "x_noise": 0.7644702681183322,
-     "bias_mol_pct": 0.018458271916048166
+     "mol_pct": 0.17452158198341022,
+     "x_noise": 0.7644700685546749,
+     "bias_mol_pct": 0.018458555204042434
     },
     "E": {
-     "mol_pct": 0.13158108603663615,
-     "x_noise": 0.7353037907227756,
-     "bias_mol_pct": 0.00042237547136659057
+     "mol_pct": 0.13158115999728576,
+     "x_noise": 0.7353036619616087,
+     "bias_mol_pct": 0.00042286977890839013
     }
    },
    "unexplained": [],
    "not_made": [],
    "fits_noise": true,
-   "seconds": 0.39451897144317627,
+   "seconds": 0.24815988540649414,
    "a_spec": 100.0,
    "rate_constants": [
     {
      "reaction": "A + B <=> C",
      "rate_law": "r1 = k1 (P_A P_B - P_C / K1)",
-     "k_ref": 3.0140595159199793e-06,
-     "k_ref_low": 2.9863045101538357e-06,
-     "k_ref_high": 3.0420724794203256e-06,
+     "k_ref": 3.0140593973720614e-06,
+     "k_ref_low": 2.986304392968727e-06,
+     "k_ref_high": 3.042072359494389e-06,
      "k_units": "mol g^-1 s^-1 bar^-2",
-     "Ea_kJ": 70.02148355637307,
-     "Ea_sd_kJ": 0.6349993199818034
+     "Ea_kJ": 70.02147776488405,
+     "Ea_sd_kJ": 0.6349993138137289
     },
     {
-     "reaction": "B + C -> E",
+     "reaction": "C + B -> E",
      "rate_law": "r2 = k2 P_B P_C",
-     "k_ref": 2.974983154036694e-07,
-     "k_ref_low": 2.863938307065729e-07,
-     "k_ref_high": 3.0903335958622633e-07,
+     "k_ref": 2.9749861317968825e-07,
+     "k_ref_low": 2.863941271148272e-07,
+     "k_ref_high": 3.0903365839046106e-07,
      "k_units": "mol g^-1 s^-1 bar^-2",
-     "Ea_kJ": 121.05371007245769,
-     "Ea_sd_kJ": 2.2080971038461663
+     "Ea_kJ": 121.05365675125404,
+     "Ea_sd_kJ": 2.2080952155348457
     },
     {
      "reaction": "A -> D",
      "rate_law": "r3 = k3 P_A",
-     "k_ref": 1.0113966980626134e-06,
-     "k_ref_low": 9.912163276892038e-07,
-     "k_ref_high": 1.0319879246104338e-06,
+     "k_ref": 1.0113969500316673e-06,
+     "k_ref_low": 9.912165784162283e-07,
+     "k_ref_high": 1.0319881777681649e-06,
      "k_units": "mol g^-1 s^-1 bar^-1",
-     "Ea_kJ": 149.93416732987646,
-     "Ea_sd_kJ": 1.099710326183698
+     "Ea_kJ": 149.9341492622168,
+     "Ea_sd_kJ": 1.0997100839956508
     }
    ],
    "inhibition": null,
    "scores": {
-    "plain": 113.94692774244315
+    "plain": 113.94693604589048
    },
    "theta": [
-    -17.317392897453313,
-    14.694438347712167,
-    -19.633027460473524,
-    25.403864486667995,
-    -18.409348499013532,
-    31.464605805883462
+    -17.31739293678496,
+    14.694437132332629,
+    -19.633026459540563,
+    25.40385329688595,
+    -18.409348249883767,
+    31.464602014274124
    ],
    "model_words": "plain rate laws",
    "verdict": "fits the data within the GC noise",
    "rank": 1,
    "delta_bic": 0.0,
-   "weight": 0.9994786445818529,
+   "weight": 1.0,
    "tied_with_best": true
   },
   "runners_up": [
@@ -4063,167 +4090,48 @@
     "name": "runner-up 1",
     "reactions": [
      "A + B <=> C",
-     "B + C -> E",
-     "A -> D",
-     "B + C + D <=> A + E"
-    ],
-    "equations": [
-     "1.  A + B <=> C            r1 = k1 (P_A P_B - P_C / K1)",
-     "2.  B + C -> E             r2 = k2 P_B P_C",
-     "3.  A -> D                 r3 = k3 P_A",
-     "4.  B + C + D <=> A + E    r4 = k4 (P_B P_C P_D - P_A P_E / K4)"
-    ],
-    "n_reactions": 4,
-    "n_params": 8,
-    "n_data": 150,
-    "n_runs": 30,
-    "chi2": 88.97895953542985,
-    "chi2_per_point": 0.5931930635695324,
-    "x_noise": 0.7701902775090922,
-    "bic": 129.06404188819988,
-    "model": "plain",
-    "miss": {
-     "A": {
-      "mol_pct": 0.14729633133227735,
-      "x_noise": 0.8183391749035793,
-      "bias_mol_pct": 0.022565524753196158
-     },
-     "B": {
-      "mol_pct": 0.2115637187641053,
-      "x_noise": 0.7889486639512082,
-      "bias_mol_pct": 0.024007685473090932
-     },
-     "C": {
-      "mol_pct": 0.10587137158603764,
-      "x_noise": 0.6988908039447115,
-      "bias_mol_pct": -0.03966888278066031
-     },
-     "D": {
-      "mol_pct": 0.17509101664302995,
-      "x_noise": 0.7759964151943576,
-      "bias_mol_pct": 0.017672734920002934
-     },
-     "E": {
-      "mol_pct": 0.1388956934164779,
-      "x_noise": 0.7636933455795036,
-      "bias_mol_pct": 0.0071468143796776015
-     }
-    },
-    "unexplained": [],
-    "not_made": [],
-    "fits_noise": true,
-    "seconds": 0.6014381647109985,
-    "a_spec": 100.0,
-    "rate_constants": [
-     {
-      "reaction": "A + B <=> C",
-      "rate_law": "r1 = k1 (P_A P_B - P_C / K1)",
-      "k_ref": 3.0121648367440613e-06,
-      "k_ref_low": 2.9841473201990604e-06,
-      "k_ref_high": 3.0404454037182536e-06,
-      "k_units": "mol g^-1 s^-1 bar^-2",
-      "Ea_kJ": 69.95184930365564,
-      "Ea_sd_kJ": 0.651967037611514
-     },
-     {
-      "reaction": "B + C -> E",
-      "rate_law": "r2 = k2 P_B P_C",
-      "k_ref": 2.96751750768895e-07,
-      "k_ref_low": 2.8549639556877326e-07,
-      "k_ref_high": 3.0845083493599205e-07,
-      "k_units": "mol g^-1 s^-1 bar^-2",
-      "Ea_kJ": 121.00090551866752,
-      "Ea_sd_kJ": 2.226959578368807
-     },
-     {
-      "reaction": "A -> D",
-      "rate_law": "r3 = k3 P_A",
-      "k_ref": 1.0116582146061063e-06,
-      "k_ref_low": 9.914086779018033e-07,
-      "k_ref_high": 1.0323213483929028e-06,
-      "k_units": "mol g^-1 s^-1 bar^-1",
-      "Ea_kJ": 150.01745151672964,
-      "Ea_sd_kJ": 1.1179136796950901
-     },
-     {
-      "reaction": "B + C + D <=> A + E",
-      "rate_law": "r4 = k4 (P_B P_C P_D - P_A P_E / K4)",
-      "k_ref": 2.8246363077418124e-09,
-      "k_ref_low": 4.4545970463463594e-10,
-      "k_ref_high": 1.7910868677913947e-08,
-      "k_units": "mol g^-1 s^-1 bar^-3",
-      "Ea_kJ": 72.53954663166927,
-      "Ea_sd_kJ": 45.15215364897851
-     }
-    ],
-    "inhibition": null,
-    "scores": {
-     "plain": 129.06404188819988
-    },
-    "theta": [
-     -17.318021708837513,
-     14.679825172134109,
-     -19.635540089651194,
-     25.39278312676617,
-     -18.409089962734253,
-     31.48208350396834,
-     -24.29005640724625,
-     15.22286934826075
-    ],
-    "model_words": "plain rate laws",
-    "verdict": "fits the data within the GC noise",
-    "rank": 2,
-    "delta_bic": 15.11711414575673,
-    "weight": 0.0005213554181471684,
-    "tied_with_best": false,
-    "differs_by": "whether 'B + C + D <=> A + E' happens at all"
-   },
-   {
-    "name": "runner-up 2",
-    "reactions": [
-     "A + B <=> C",
-     "B + C -> E ; orders B=2, C=1",
+     "C + B -> E ; orders C=1, B=2",
      "A -> D"
     ],
     "equations": [
      "1.  A + B <=> C    r1 = k1 (P_A P_B - P_C / K1)",
-     "2.  B + C -> E     r2 = k2 P_B^2 P_C",
+     "2.  C + B -> E     r2 = k2 P_B^2 P_C",
      "3.  A -> D         r3 = k3 P_A"
     ],
     "n_reactions": 3,
     "n_params": 6,
     "n_data": 150,
     "n_runs": 30,
-    "chi2": 2016.8498628086404,
-    "chi2_per_point": 13.445665752057602,
-    "x_noise": 3.6668332048318755,
-    "bic": 2046.913674573218,
+    "chi2": 2016.8280337012916,
+    "chi2_per_point": 13.445520224675278,
+    "x_noise": 3.6668133610364295,
+    "bic": 2046.8918454658692,
     "model": "plain",
     "miss": {
      "A": {
-      "mol_pct": 0.1655899765510585,
-      "x_noise": 1.1670013364573768,
-      "bias_mol_pct": 0.015521570338516514
+      "mol_pct": 0.16559543464667656,
+      "x_noise": 1.1669952282610119,
+      "bias_mol_pct": 0.015526790327214691
      },
      "B": {
-      "mol_pct": 0.4753119790868943,
-      "x_noise": 5.20537702639168,
-      "bias_mol_pct": 0.1675162070363851
+      "mol_pct": 0.47532154187546566,
+      "x_noise": 5.205302838540695,
+      "bias_mol_pct": 0.16752688896040516
      },
      "C": {
-      "mol_pct": 0.5069609876642289,
-      "x_noise": 2.7170562927316544,
-      "bias_mol_pct": 0.05468585940004865
+      "mol_pct": 0.5069637964153033,
+      "x_noise": 2.717046657561025,
+      "bias_mol_pct": 0.054680521881265966
      },
      "D": {
-      "mol_pct": 0.285904172588516,
-      "x_noise": 1.5619984955884594,
-      "bias_mol_pct": -0.0014176228887519359
+      "mol_pct": 0.28591478005223014,
+      "x_noise": 1.5622060275453515,
+      "bias_mol_pct": -0.0014131496316779554
      },
      "E": {
-      "mol_pct": 0.5124862466334124,
-      "x_noise": 5.380358023032961,
-      "bias_mol_pct": -0.1564501965938127
+      "mol_pct": 0.5124933857195613,
+      "x_noise": 5.380308114579502,
+      "bias_mol_pct": -0.15645937174652713
      }
     },
     "unexplained": [
@@ -4233,106 +4141,106 @@
     ],
     "not_made": [],
     "fits_noise": false,
-    "seconds": 0.0,
+    "seconds": 0.24838789304097494,
     "a_spec": 100.0,
     "rate_constants": [
      {
       "reaction": "A + B <=> C",
       "rate_law": "r1 = k1 (P_A P_B - P_C / K1)",
-      "k_ref": 3.0128143714782317e-06,
-      "k_ref_low": 2.981096999124483e-06,
-      "k_ref_high": 3.0448692007175906e-06,
+      "k_ref": 3.012811887840351e-06,
+      "k_ref_low": 2.981094528813245e-06,
+      "k_ref_high": 3.044866703749126e-06,
       "k_units": "mol g^-1 s^-1 bar^-2",
-      "Ea_kJ": 69.92564606906578,
-      "Ea_sd_kJ": 0.7269406654192684
+      "Ea_kJ": 69.92539631943582,
+      "Ea_sd_kJ": 0.7269424966062732
      },
      {
-      "reaction": "B + C -> E ; orders B=2, C=1",
+      "reaction": "C + B -> E ; orders C=1, B=2",
       "rate_law": "r2 = k2 P_B^2 P_C",
-      "k_ref": 1.1086686828220441e-07,
-      "k_ref_low": 1.0562327245456477e-07,
-      "k_ref_high": 1.1637077887348166e-07,
+      "k_ref": 1.1086402276561529e-07,
+      "k_ref_low": 1.0562037492654483e-07,
+      "k_ref_high": 1.1636799767395917e-07,
       "k_units": "mol g^-1 s^-1 bar^-3",
-      "Ea_kJ": 154.25609243358338,
-      "Ea_sd_kJ": 3.0956445333318507
+      "Ea_kJ": 154.25873634497654,
+      "Ea_sd_kJ": 3.095785483419051
      },
      {
       "reaction": "A -> D",
       "rate_law": "r3 = k3 P_A",
-      "k_ref": 9.817577064529606e-07,
-      "k_ref_low": 9.585465410273036e-07,
-      "k_ref_high": 1.005530929303435e-06,
+      "k_ref": 9.817448042794448e-07,
+      "k_ref_low": 9.585337766069522e-07,
+      "k_ref_high": 1.0055178901900105e-06,
       "k_units": "mol g^-1 s^-1 bar^-1",
-      "Ea_kJ": 151.4832846454087,
-      "Ea_sd_kJ": 1.3259279552096546
+      "Ea_kJ": 151.48420313010152,
+      "Ea_sd_kJ": 1.3259361400631102
      }
     ],
     "inhibition": null,
     "scores": {
-     "plain": 2046.913674573218
+     "plain": 2046.8918454658692
     },
     "theta": [
-     -17.317806094902846,
-     14.674326262433329,
-     -20.62010592630481,
-     32.37158833116403,
-     -18.43909147979702,
-     31.789697588152478
+     -17.31780691926127,
+     14.67427385093969,
+     -20.62013159270227,
+     32.372143172206954,
+     -18.43910462179551,
+     31.789890337805964
     ],
     "model_words": "plain rate laws",
     "verdict": "cannot explain E, B, C: typical miss 5.4x, 5.2x, 2.7x the GC noise (0.51 mol-%, 0.48 mol-%, 0.51 mol-%)",
-    "rank": 3,
-    "delta_bic": 1932.9667468307748,
-    "weight": 9.854536147972504e-305,
+    "rank": 2,
+    "delta_bic": 1932.9449094199788,
+    "weight": 9.85967654375977e-305,
     "tied_with_best": false,
-    "differs_by": "the rate law of 'B + C -> E' (r = k P_B P_C  or  r = k P_B^2 P_C)"
+    "differs_by": "the rate law of 'C + B -> E' (r = k P_B P_C  or  r = k P_B^2 P_C)"
    },
    {
-    "name": "runner-up 3",
+    "name": "runner-up 2",
     "reactions": [
      "A + B <=> C",
-     "B + C -> E ; orders B=1, C=2",
+     "C + B -> E ; orders C=2, B=1",
      "A -> D"
     ],
     "equations": [
      "1.  A + B <=> C    r1 = k1 (P_A P_B - P_C / K1)",
-     "2.  B + C -> E     r2 = k2 P_B P_C^2",
+     "2.  C + B -> E     r2 = k2 P_B P_C^2",
      "3.  A -> D         r3 = k3 P_A"
     ],
     "n_reactions": 3,
     "n_params": 6,
     "n_data": 150,
     "n_runs": 30,
-    "chi2": 5399.341272363645,
-    "chi2_per_point": 35.995608482424295,
-    "x_noise": 5.999634029040796,
-    "bic": 5429.405084128222,
+    "chi2": 5399.341252368479,
+    "chi2_per_point": 35.995608349123195,
+    "x_noise": 5.999634017931694,
+    "bic": 5429.405064133057,
     "model": "plain",
     "miss": {
      "A": {
-      "mol_pct": 0.201298837754453,
-      "x_noise": 1.7312073647495645,
-      "bias_mol_pct": 0.008487264296629498
+      "mol_pct": 0.2012988356482745,
+      "x_noise": 1.7312073597432747,
+      "bias_mol_pct": 0.008487265368444196
      },
      "B": {
-      "mol_pct": 0.5390700618994861,
-      "x_noise": 3.3086812165868644,
-      "bias_mol_pct": 0.23738980865739895
+      "mol_pct": 0.5390700550517488,
+      "x_noise": 3.3086811938099654,
+      "bias_mol_pct": 0.23738980016372924
      },
      "C": {
-      "mol_pct": 1.8730648910603636,
-      "x_noise": 7.25331100957398,
-      "bias_mol_pct": 0.08538234068009479
+      "mol_pct": 1.873064914122621,
+      "x_noise": 7.2533111204422855,
+      "bias_mol_pct": 0.08538232483764845
      },
      "D": {
-      "mol_pct": 0.8389408344043069,
-      "x_noise": 3.9674914684650435,
-      "bias_mol_pct": 0.06322300936446375
+      "mol_pct": 0.8389408469394314,
+      "x_noise": 3.9674915177794565,
+      "bias_mol_pct": 0.06322301192373722
      },
      "E": {
-      "mol_pct": 1.120878156817785,
-      "x_noise": 9.883424655726051,
-      "bias_mol_pct": -0.2229942354018729
+      "mol_pct": 1.120878162313708,
+      "x_noise": 9.883424529348686,
+      "bias_mol_pct": -0.2229942195433376
      }
     },
     "unexplained": [
@@ -4343,59 +4251,182 @@
     ],
     "not_made": [],
     "fits_noise": false,
-    "seconds": 0.45244264602661133,
+    "seconds": 0.17818709782191686,
     "a_spec": 100.0,
     "rate_constants": [
      {
       "reaction": "A + B <=> C",
       "rate_law": "r1 = k1 (P_A P_B - P_C / K1)",
-      "k_ref": 3.05897982306495e-06,
-      "k_ref_low": 2.9995537342951746e-06,
-      "k_ref_high": 3.1195832403106573e-06,
+      "k_ref": 3.058979825941701e-06,
+      "k_ref_low": 2.9995537370407514e-06,
+      "k_ref_high": 3.1195832433227022e-06,
       "k_units": "mol g^-1 s^-1 bar^-2",
-      "Ea_kJ": 71.1127480813429,
-      "Ea_sd_kJ": 1.3458992071077263
+      "Ea_kJ": 71.11274808472196,
+      "Ea_sd_kJ": 1.3458992092742488
      },
      {
-      "reaction": "B + C -> E ; orders B=1, C=2",
+      "reaction": "C + B -> E ; orders C=2, B=1",
       "rate_law": "r2 = k2 P_B P_C^2",
-      "k_ref": 8.149513350154885e-08,
-      "k_ref_low": 7.147241891013813e-08,
-      "k_ref_high": 9.292335261222285e-08,
+      "k_ref": 8.149513990290486e-08,
+      "k_ref_low": 7.147242499284728e-08,
+      "k_ref_high": 9.292335930197823e-08,
       "k_units": "mol g^-1 s^-1 bar^-3",
-      "Ea_kJ": 182.01286416624575,
-      "Ea_sd_kJ": 8.211214211757978
+      "Ea_kJ": 182.01285948023985,
+      "Ea_sd_kJ": 8.211213811722223
      },
      {
       "reaction": "A -> D",
       "rate_law": "r3 = k3 P_A",
-      "k_ref": 9.807490560465858e-07,
-      "k_ref_low": 9.389144940294246e-07,
-      "k_ref_high": 1.0244476116332326e-06,
+      "k_ref": 9.807490584011502e-07,
+      "k_ref_low": 9.389144962939522e-07,
+      "k_ref_high": 1.0244476140813616e-06,
       "k_units": "mol g^-1 s^-1 bar^-1",
-      "Ea_kJ": 151.06159933124582,
-      "Ea_sd_kJ": 2.4040177359449535
+      "Ea_kJ": 151.06159914223966,
+      "Ea_sd_kJ": 2.4040177338404822
      }
     ],
     "inhibition": null,
     "scores": {
-     "plain": 5429.405084128222
+     "plain": 5429.405064133057
     },
     "theta": [
-     -17.302599274730508,
-     14.923446910067243,
-     -20.927892716107934,
-     38.196517342111896,
-     -18.44011940032648,
-     31.701204335276547
+     -17.30259927379008,
+     14.923446910776358,
+     -20.927892637559,
+     38.196516358724786,
+     -18.4401193979257,
+     31.70120429561244
     ],
     "model_words": "plain rate laws",
     "verdict": "cannot explain E, C, D, B: typical miss 9.9x, 7.3x, 4.0x, 3.3x the GC noise (1.12 mol-%, 1.87 mol-%, 0.84 mol-%, 0.54 mol-%)",
-    "rank": 4,
-    "delta_bic": 5315.458156385779,
-    "weight": 9.854536147972504e-305,
+    "rank": 3,
+    "delta_bic": 5315.458128087166,
+    "weight": 9.85967654375977e-305,
     "tied_with_best": false,
-    "differs_by": "the rate law of 'B + C -> E' (r = k P_B P_C  or  r = k P_B P_C^2)"
+    "differs_by": "the rate law of 'C + B -> E' (r = k P_B P_C  or  r = k P_B P_C^2)"
+   },
+   {
+    "name": "runner-up 3",
+    "reactions": [
+     "A + B <=> C",
+     "C + B -> E ; orders C=1, B=0",
+     "A -> D",
+     "B + C + D <=> A + E"
+    ],
+    "equations": [
+     "1.  A + B <=> C            r1 = k1 (P_A P_B - P_C / K1)",
+     "2.  C + B -> E             r2 = k2 P_C   (zero order in B)",
+     "3.  A -> D                 r3 = k3 P_A",
+     "4.  B + C + D <=> A + E    r4 = k4 (P_B P_C P_D - P_A P_E / K4)"
+    ],
+    "n_reactions": 4,
+    "n_params": 8,
+    "n_data": 150,
+    "n_runs": 30,
+    "chi2": 6311.60017197786,
+    "chi2_per_point": 42.0773344798524,
+    "x_noise": 6.4867044390701505,
+    "bic": 6351.6852543306295,
+    "model": "plain",
+    "miss": {
+     "A": {
+      "mol_pct": 0.235869565133324,
+      "x_noise": 1.8939068816751616,
+      "bias_mol_pct": 0.09812201096974635
+     },
+     "B": {
+      "mol_pct": 0.6741607460486996,
+      "x_noise": 7.077731681849345,
+      "bias_mol_pct": -0.02733612183559805
+     },
+     "C": {
+      "mol_pct": 0.798022277628335,
+      "x_noise": 6.79560987158463,
+      "bias_mol_pct": -0.19552445207308305
+     },
+     "D": {
+      "mol_pct": 0.42210959718675095,
+      "x_noise": 1.9922517282046743,
+      "bias_mol_pct": 0.060700097586301086
+     },
+     "E": {
+      "mol_pct": 0.76281552918305,
+      "x_noise": 10.322602524908076,
+      "bias_mol_pct": 0.09765817735664414
+     }
+    },
+    "unexplained": [
+     "E",
+     "B",
+     "C"
+    ],
+    "not_made": [],
+    "fits_noise": false,
+    "seconds": 0.22251222008153013,
+    "a_spec": 100.0,
+    "rate_constants": [
+     {
+      "reaction": "A + B <=> C",
+      "rate_law": "r1 = k1 (P_A P_B - P_C / K1)",
+      "k_ref": 2.9513133399377767e-06,
+      "k_ref_low": 2.8962459087283454e-06,
+      "k_ref_high": 3.0074277892788057e-06,
+      "k_units": "mol g^-1 s^-1 bar^-2",
+      "Ea_kJ": 68.72646573516013,
+      "Ea_sd_kJ": 1.32978212005585
+     },
+     {
+      "reaction": "C + B -> E ; orders C=1, B=0",
+      "rate_law": "r2 = k2 P_C   (zero order in B)",
+      "k_ref": 4.390525589642725e-07,
+      "k_ref_low": 4.0070624067107033e-07,
+      "k_ref_high": 4.810684984846884e-07,
+      "k_units": "mol g^-1 s^-1 bar^-1",
+      "Ea_kJ": 118.88278867248475,
+      "Ea_sd_kJ": 4.758405945975552
+     },
+     {
+      "reaction": "A -> D",
+      "rate_law": "r3 = k3 P_A",
+      "k_ref": 1.0516789296090899e-06,
+      "k_ref_low": 1.0097663391025929e-06,
+      "k_ref_high": 1.0953311951026999e-06,
+      "k_units": "mol g^-1 s^-1 bar^-1",
+      "Ea_kJ": 146.5889236796901,
+      "Ea_sd_kJ": 2.139299788064052
+     },
+     {
+      "reaction": "B + C + D <=> A + E",
+      "rate_law": "r4 = k4 (P_B P_C P_D - P_A P_E / K4)",
+      "k_ref": 5.435227910959721e-08,
+      "k_ref_low": 2.7020624115231567e-08,
+      "k_ref_high": 1.0933020021333583e-07,
+      "k_units": "mol g^-1 s^-1 bar^-3",
+      "Ea_kJ": 3.172384115290991,
+      "Ea_sd_kJ": 25.610195266901385
+     }
+    ],
+    "inhibition": null,
+    "scores": {
+     "plain": 6351.6852543306295
+    },
+    "theta": [
+     -17.338430472693837,
+     14.422670904828989,
+     -19.24381689273352,
+     24.948283298589498,
+     -18.370292876211202,
+     30.762585881724558,
+     -21.332949476307256,
+     0.6657442891776897
+    ],
+    "model_words": "plain rate laws",
+    "verdict": "cannot explain E, B, C: typical miss 10.3x, 7.1x, 6.8x the GC noise (0.76 mol-%, 0.67 mol-%, 0.80 mol-%)",
+    "rank": 4,
+    "delta_bic": 6237.738318284739,
+    "weight": 9.85967654375977e-305,
+    "tied_with_best": false,
+    "differs_by": "the rate law of 'C + B -> E' (r = k P_B P_C  or  r = k P_C   (zero order in B)); whether 'B + C + D <=> A + E' happens at all"
    }
   ],
   "tied": [],
@@ -4404,17 +4435,15 @@
   "path": [
    "The feed is A and B; the GC sees these products: C (up to 33.1 mol-%), D (up to 44.4 mol-%), E (up to 38.5 mol-%).",
    "Start: the network you gave (A + B <=> C; C + B -> E ; orders C=1, B=0; A -> D): cannot explain E, B, C, D, A: typical miss 11.1x, 7.8x, 6.6x, 3.2x, 2.5x the GC noise (1.11 mol-%, 0.94 mol-%, 0.78 mol-%, 0.56 mol-%, 0.29 mol-%) (BIC 7312).",
-   "Step 1: tried 17 additions and 2 removals. Best: add 'B + C + D <=> A + E' (BIC 7312 -> 6352); now cannot explain E, B, C: typical miss 10.3x, 7.1x, 6.8x the GC noise (0.76 mol-%, 0.67 mol-%, 0.80 mol-%).",
-   "Step 2: tried 0 additions and 3 removals (no additions: 4 reactions is the largest network allowed), then 3 replacements. Best: replace 'C + B -> E ; orders C=1, B=0' by 'B + C -> E' (BIC 6352 -> 129); now fits the data within the GC noise.",
-   "Step 3: tried 0 additions and 3 removals (no additions: 4 reactions is the largest network allowed). Best: remove 'B + C + D <=> A + E' (BIC 129 -> 114); now fits the data within the GC noise.",
-   "Step 4: tried 0 additions and 2 removals (no additions: every species is already explained within the GC noise), then 19 replacements; none lowers BIC by more than 2. The reactions are settled.",
-   "Order check: tried 7 other orders (each reactant at 0, 1, 2); none is better than the present rate laws.",
-   "Final check: the best network already fits within the GC noise with plain rate laws, so there is nothing left for site blocking (product C occupying the catalyst) to explain.",
-   "Result: A + B <=> C; B + C -> E; A -> D with plain rate laws (BIC 114)."
+   "Step 1: tried 17 additions and 2 removals and 8 other reaction orders. Best: change the rate law of 'C + B -> E' to r = k P_B P_C (was r = k P_C   (zero order in B)) (BIC 7312 -> 114); now fits the data within the GC noise.",
+   "Step 2: tried 0 additions and 2 removals (no additions: every species is already explained within the GC noise) and 9 other reaction orders, then 19 replacements; none lowers BIC by more than 2. The reactions are settled.",
+   "Order check: tried 9 other orders (each reactant at 0, 1, 2); none is better than the present rate laws.",
+   "Final check: the best network already fits within the GC noise with plain rate laws; letting product C block catalyst sites (one more fitted number) does not improve on that.",
+   "Result: A + B <=> C; C + B -> E; A -> D with plain rate laws (BIC 114)."
   ],
   "complete": true,
-  "n_fits": 60,
-  "seconds": 33.67959475517273,
+  "n_fits": 65,
+  "seconds": 13.574418306350708,
   "library_size": 22,
   "detected": {
    "C": 33.08,
@@ -4426,10 +4455,10 @@
   "summary": [
    "The reactions that explain the data best:",
    "   1.  A + B <=> C    r1 = k1 (P_A P_B - P_C / K1)",
-   "   2.  B + C -> E     r2 = k2 P_B P_C",
+   "   2.  C + B -> E     r2 = k2 P_B P_C",
    "   3.  A -> D         r3 = k3 P_A",
    "This network fits the data within the GC noise (plain rate laws).",
-   "No other network tried comes close (next best: BIC difference 15)."
+   "No other network tried comes close (next best: BIC difference 1933)."
   ]
  },
  "discover:complex_short_campaign.csv": {
@@ -4446,95 +4475,103 @@
     "3.  B + C -> E     r3 = k3 P_B P_C"
    ],
    "n_reactions": 3,
-   "n_params": 6,
+   "n_params": 7,
    "n_data": 40,
    "n_runs": 8,
-   "chi2": 31.981845904947665,
-   "chi2_per_point": 0.7995461476236916,
-   "x_noise": 0.8941734438148404,
-   "bic": 54.11512262963129,
-   "model": "plain",
+   "chi2": 23.7189796829949,
+   "chi2_per_point": 0.5929744920748725,
+   "x_noise": 0.7700483699579349,
+   "bic": 49.541135861792455,
+   "model": "inhib",
    "miss": {
     "A": {
-     "mol_pct": 0.05204500597344535,
-     "x_noise": 0.9022819358427137,
-     "bias_mol_pct": -0.01166251587945728
+     "mol_pct": 0.04895311494604504,
+     "x_noise": 0.8805838975531355,
+     "bias_mol_pct": -0.016277331475715553
     },
     "B": {
-     "mol_pct": 0.0984431900335124,
-     "x_noise": 1.3102439237728216,
-     "bias_mol_pct": 0.01306434353511546
+     "mol_pct": 0.07836637092528821,
+     "x_noise": 1.133172258636192,
+     "bias_mol_pct": 0.013123776308972225
     },
     "C": {
-     "mol_pct": 0.10186261846731547,
-     "x_noise": 0.8424153607044959,
-     "bias_mol_pct": -0.002904772148492037
+     "mol_pct": 0.06858916649514256,
+     "x_noise": 0.4358146915559704,
+     "bias_mol_pct": 0.017455782540107746
     },
     "D": {
-     "mol_pct": 0.24245966020826443,
-     "x_noise": 0.7491347350881695,
-     "bias_mol_pct": -0.08446423908691422
+     "mol_pct": 0.23449521124414532,
+     "x_noise": 0.6763492516038502,
+     "bias_mol_pct": -0.08966287522006611
     },
     "E": {
-     "mol_pct": 0.15507443873516993,
-     "x_noise": 0.4427328938765182,
-     "bias_mol_pct": 0.06832618501907609
+     "mol_pct": 0.18059183938967138,
+     "x_noise": 0.5079196161605971,
+     "bias_mol_pct": 0.057219737991615144
     }
    },
    "unexplained": [],
    "not_made": [],
    "fits_noise": true,
-   "seconds": 0.2894010543823242,
+   "seconds": 0.310178279876709,
    "a_spec": 100.0,
    "rate_constants": [
     {
      "reaction": "A -> D",
      "rate_law": "r1 = k1 P_A",
-     "k_ref": 8.973234057102791e-07,
-     "k_ref_low": 8.59779548595118e-07,
-     "k_ref_high": 9.365066844764748e-07,
+     "k_ref": 9.757712767355361e-07,
+     "k_ref_low": 8.841925753477647e-07,
+     "k_ref_high": 1.076835082139898e-06,
      "k_units": "mol g^-1 s^-1 bar^-1",
-     "Ea_kJ": 154.17852980466864,
-     "Ea_sd_kJ": 2.904392130088954
+     "Ea_kJ": 151.49843938301572,
+     "Ea_sd_kJ": 4.007488685766354
     },
     {
      "reaction": "A + B <=> C",
      "rate_law": "r2 = k2 (P_A P_B - P_C / K2)",
-     "k_ref": 2.5232655694700283e-06,
-     "k_ref_low": 2.451437949704069e-06,
-     "k_ref_high": 2.597197752788929e-06,
+     "k_ref": 2.8821917424620556e-06,
+     "k_ref_low": 2.495329695570395e-06,
+     "k_ref_high": 3.3290307309141367e-06,
      "k_units": "mol g^-1 s^-1 bar^-2",
-     "Ea_kJ": 74.48669947870114,
-     "Ea_sd_kJ": 3.165374343850954
+     "Ea_kJ": 70.74046564475117,
+     "Ea_sd_kJ": 5.040405923889907
     },
     {
      "reaction": "B + C -> E",
      "rate_law": "r3 = k3 P_B P_C",
-     "k_ref": 2.53316983864768e-07,
-     "k_ref_low": 2.4185700501454007e-07,
-     "k_ref_high": 2.6531997413300213e-07,
+     "k_ref": 2.8830791183393704e-07,
+     "k_ref_low": 2.494850942532678e-07,
+     "k_ref_high": 3.331720168486838e-07,
      "k_units": "mol g^-1 s^-1 bar^-2",
-     "Ea_kJ": 125.58554262004643,
-     "Ea_sd_kJ": 3.076338314800241
+     "Ea_kJ": 121.55433039086934,
+     "Ea_sd_kJ": 5.170903638732473
     }
    ],
-   "inhibition": null,
+   "inhibition": {
+    "K_C": 0.02445750640178072,
+    "K_C_low": 0.008200405082364663,
+    "K_C_high": 0.07294391110989572,
+    "units": "1/bar at 300 C",
+    "adsorption_heat_kJ": -47.651691
+   },
    "scores": {
-    "plain": 54.11512262963129
+    "plain": 54.11512262963133,
+    "inhib": 49.541447274517154
    },
    "theta": [
-    -18.529019684372138,
-    32.355311337150376,
-    -17.49512682043131,
-    15.631491331273246,
-    -19.793794417780777,
-    26.354897378153154
+    -18.445207811592134,
+    31.792877902909204,
+    -17.36212971754647,
+    14.845321154447838,
+    -19.664406975607605,
+    25.508922734949603,
+    -3.710818099881494
    ],
-   "model_words": "plain rate laws",
+   "model_words": "rate laws with product C blocking catalyst sites, K_C = 0.0245 per bar at 300 C",
    "verdict": "fits the data within the GC noise",
    "rank": 1,
    "delta_bic": 0.0,
-   "weight": 0.9570752285879849,
+   "weight": 0.9827242225532152,
    "tied_with_best": true
   },
   "runners_up": [
@@ -4553,107 +4590,115 @@
      "4.  A + B + C -> D + E    r4 = k4 P_A P_B P_C"
     ],
     "n_reactions": 4,
-    "n_params": 8,
+    "n_params": 9,
     "n_data": 40,
     "n_runs": 8,
-    "chi2": 30.9032599648947,
-    "chi2_per_point": 0.7725814991223675,
-    "x_noise": 0.8789661535704134,
-    "bic": 60.41429559780619,
-    "model": "plain",
+    "chi2": 25.491942411564285,
+    "chi2_per_point": 0.6372985602891071,
+    "x_noise": 0.7983098147267809,
+    "bic": 58.69185749858971,
+    "model": "inhib",
     "miss": {
      "A": {
-      "mol_pct": 0.04851791907051736,
-      "x_noise": 0.8281908757012746,
-      "bias_mol_pct": -0.0007372786230621227
+      "mol_pct": 0.04347156468001956,
+      "x_noise": 0.7889620818457579,
+      "bias_mol_pct": -0.005713333894454003
      },
      "B": {
-      "mol_pct": 0.10079358713900319,
-      "x_noise": 1.4532814835350296,
-      "bias_mol_pct": 0.013004827011127342
+      "mol_pct": 0.08907007037676118,
+      "x_noise": 1.331555352135668,
+      "bias_mol_pct": 0.013080846930995964
      },
      "C": {
-      "mol_pct": 0.13978748417911055,
-      "x_noise": 0.6979366063487664,
-      "bias_mol_pct": -0.002213410507654233
+      "mol_pct": 0.11408152429886215,
+      "x_noise": 0.49933033636622376,
+      "bias_mol_pct": 0.015790720452709784
      },
      "D": {
-      "mol_pct": 0.21388539695040126,
-      "x_noise": 0.576448874673368,
-      "bias_mol_pct": -0.0920439756573346
+      "mol_pct": 0.21243424035876057,
+      "x_noise": 0.5637568900934314,
+      "bias_mol_pct": -0.09620547413104596
      },
      "E": {
-      "mol_pct": 0.15205589123972887,
-      "x_noise": 0.4955516996614901,
-      "bias_mol_pct": 0.06513489706230059
+      "mol_pct": 0.16677437964486772,
+      "x_noise": 0.47311664852399493,
+      "bias_mol_pct": 0.05566759388130277
      }
     },
     "unexplained": [],
     "not_made": [],
     "fits_noise": true,
-    "seconds": 1.036046028137207,
+    "seconds": 0.4104123115539551,
     "a_spec": 100.0,
     "rate_constants": [
      {
       "reaction": "A -> D",
       "rate_law": "r1 = k1 P_A",
-      "k_ref": 8.729881554026463e-07,
-      "k_ref_low": 8.263402998632752e-07,
-      "k_ref_high": 9.222693357680994e-07,
+      "k_ref": 9.411343016146122e-07,
+      "k_ref_low": 8.44752778964276e-07,
+      "k_ref_high": 1.0485124118343751e-06,
       "k_units": "mol g^-1 s^-1 bar^-1",
-      "Ea_kJ": 153.71944101536442,
-      "Ea_sd_kJ": 3.593583381035392
+      "Ea_kJ": 151.47099454723715,
+      "Ea_sd_kJ": 4.4247598604188685
      },
      {
       "reaction": "A + B <=> C",
       "rate_law": "r2 = k2 (P_A P_B - P_C / K2)",
-      "k_ref": 2.5170760506112717e-06,
-      "k_ref_low": 2.4451030039636805e-06,
-      "k_ref_high": 2.5911676662661145e-06,
+      "k_ref": 2.8257165762652813e-06,
+      "k_ref_low": 2.444958908328205e-06,
+      "k_ref_high": 3.265770292573171e-06,
       "k_units": "mol g^-1 s^-1 bar^-2",
-      "Ea_kJ": 74.42164876067567,
-      "Ea_sd_kJ": 3.2151090723612876
+      "Ea_kJ": 71.23823217250842,
+      "Ea_sd_kJ": 5.0345430707723455
      },
      {
       "reaction": "B + C -> E",
       "rate_law": "r3 = k3 P_B P_C",
-      "k_ref": 2.44226248610863e-07,
-      "k_ref_low": 2.2954155947555555e-07,
-      "k_ref_high": 2.598503758831828e-07,
+      "k_ref": 2.7409880530725575e-07,
+      "k_ref_low": 2.3457705687244932e-07,
+      "k_ref_high": 3.2027921260738097e-07,
       "k_units": "mol g^-1 s^-1 bar^-2",
-      "Ea_kJ": 126.97638674358662,
-      "Ea_sd_kJ": 3.6415499924000163
+      "Ea_kJ": 123.36819092076034,
+      "Ea_sd_kJ": 5.68075860119859
      },
      {
       "reaction": "A + B + C -> D + E",
       "rate_law": "r4 = k4 P_A P_B P_C",
-      "k_ref": 7.486133341421055e-09,
-      "k_ref_low": 2.570363401959348e-09,
-      "k_ref_high": 2.1803217538351145e-08,
+      "k_ref": 8.044646840844981e-09,
+      "k_ref_low": 2.5821304860823076e-09,
+      "k_ref_high": 2.506315739763674e-08,
       "k_units": "mol g^-1 s^-1 bar^-3",
-      "Ea_kJ": 92.72813296377791,
-      "Ea_sd_kJ": 44.1498431277239
+      "Ea_kJ": 88.14510333062088,
+      "Ea_sd_kJ": 44.76214096354325
      }
     ],
-    "inhibition": null,
+    "inhibition": {
+     "K_C": 0.02120740797473414,
+     "K_C_low": 0.006043232541500571,
+     "K_C_high": 0.07442277786238233,
+     "units": "1/bar at 300 C",
+     "adsorption_heat_kJ": -47.651691
+    },
     "scores": {
-     "plain": 60.41429559780619
+     "plain": 60.41353646053485,
+     "inhib": 58.6919452031462
     },
     "theta": [
-     -18.556514034881506,
-     32.25896873530982,
-     -17.497582813471666,
-     15.617840038599192,
-     -19.830340978865365,
-     26.64677455907842,
-     -23.315383601505495,
-     19.459568174354594
+     -18.481350171307028,
+     31.787118435573912,
+     -17.381918756203888,
+     14.949780517234617,
+     -19.714947378237028,
+     25.889572506621086,
+     -23.243429141422006,
+     18.497791260045922,
+     -3.853404725571104
     ],
-    "model_words": "plain rate laws",
+    "model_words": "rate laws with product C blocking catalyst sites, K_C = 0.0212 per bar at 300 C",
     "verdict": "fits the data within the GC noise",
     "rank": 2,
-    "delta_bic": 6.299172968174901,
-    "weight": 0.041029672031566246,
+    "delta_bic": 9.150721636797257,
+    "weight": 0.010124596047429591,
     "tied_with_best": false,
     "differs_by": "whether 'A + B + C -> D + E' happens at all"
    },
@@ -4672,107 +4717,115 @@
      "4.  B + C + D <=> A + E    r4 = k4 (P_B P_C P_D - P_A P_E / K4)"
     ],
     "n_reactions": 4,
-    "n_params": 8,
+    "n_params": 9,
     "n_data": 40,
     "n_runs": 8,
-    "chi2": 38.07020202607407,
-    "chi2_per_point": 0.9517550506518517,
-    "x_noise": 0.975579341033753,
-    "bic": 67.58123765898556,
-    "model": "plain",
+    "chi2": 26.457042824544416,
+    "chi2_per_point": 0.6614260706136104,
+    "x_noise": 0.8132810526586798,
+    "bic": 59.65695791156984,
+    "model": "inhib",
     "miss": {
      "A": {
-      "mol_pct": 0.04953651703953335,
-      "x_noise": 0.8879038609950571,
-      "bias_mol_pct": -0.010400824429718795
+      "mol_pct": 0.04571613638615807,
+      "x_noise": 0.8559012632932921,
+      "bias_mol_pct": -0.016381121862021845
      },
      "B": {
-      "mol_pct": 0.09582165541998615,
-      "x_noise": 1.2247222753923312,
-      "bias_mol_pct": 0.013744279275116851
+      "mol_pct": 0.0650927526913757,
+      "x_noise": 0.9339545469429681,
+      "bias_mol_pct": 0.015576238766263836
      },
      "C": {
-      "mol_pct": 0.14869801329754379,
-      "x_noise": 1.2204669588166284,
-      "bias_mol_pct": -0.011051608585301112
+      "mol_pct": 0.12356061773127353,
+      "x_noise": 0.819258552419535,
+      "bias_mol_pct": 0.015022973722593843
      },
      "D": {
-      "mol_pct": 0.2608437274105837,
-      "x_noise": 0.8623113020645525,
-      "bias_mol_pct": -0.08225044653837298
+      "mol_pct": 0.25470116928915687,
+      "x_noise": 0.7896699718529387,
+      "bias_mol_pct": -0.08864967371049574
      },
      "E": {
-      "mol_pct": 0.16501548881210618,
-      "x_noise": 0.4871724087176801,
-      "bias_mol_pct": 0.07230786294983348
+      "mol_pct": 0.20721765849501572,
+      "x_noise": 0.6383800158579385,
+      "bias_mol_pct": 0.05653855167835785
      }
     },
     "unexplained": [],
     "not_made": [],
     "fits_noise": true,
-    "seconds": 1.036666472752889,
+    "seconds": 1.3525619506835938,
     "a_spec": 100.0,
     "rate_constants": [
      {
       "reaction": "A -> D",
       "rate_law": "r1 = k1 P_A",
-      "k_ref": 9.021082767367914e-07,
-      "k_ref_low": 8.632367613787511e-07,
-      "k_ref_high": 9.427301748100175e-07,
+      "k_ref": 1.0182076959254986e-06,
+      "k_ref_low": 9.099477524657566e-07,
+      "k_ref_high": 1.1393477364305352e-06,
       "k_units": "mol g^-1 s^-1 bar^-1",
-      "Ea_kJ": 154.74779061601438,
-      "Ea_sd_kJ": 3.1131122971309937
+      "Ea_kJ": 151.2369049630016,
+      "Ea_sd_kJ": 4.078576330432635
      },
      {
       "reaction": "A + B <=> C",
       "rate_law": "r2 = k2 (P_A P_B - P_C / K2)",
-      "k_ref": 2.5283549892457665e-06,
-      "k_ref_low": 2.455735091058032e-06,
-      "k_ref_high": 2.6031223705362186e-06,
+      "k_ref": 3.068836661165142e-06,
+      "k_ref_low": 2.5943108940466116e-06,
+      "k_ref_high": 3.630158002467228e-06,
       "k_units": "mol g^-1 s^-1 bar^-2",
-      "Ea_kJ": 74.2448775006131,
-      "Ea_sd_kJ": 3.2218880389811564
+      "Ea_kJ": 68.67127594281622,
+      "Ea_sd_kJ": 5.8429666281570105
      },
      {
       "reaction": "B + C -> E",
       "rate_law": "r3 = k3 P_B P_C",
-      "k_ref": 2.504396965442498e-07,
-      "k_ref_low": 2.3806609955287698e-07,
-      "k_ref_high": 2.634564170328046e-07,
+      "k_ref": 3.0167011830201164e-07,
+      "k_ref_low": 2.564508633174032e-07,
+      "k_ref_high": 3.5486275654964405e-07,
       "k_units": "mol g^-1 s^-1 bar^-2",
-      "Ea_kJ": 125.62580251680525,
-      "Ea_sd_kJ": 3.1582811389887717
+      "Ea_kJ": 119.59186762731862,
+      "Ea_sd_kJ": 6.097454290190372
      },
      {
       "reaction": "B + C + D <=> A + E",
       "rate_law": "r4 = k4 (P_B P_C P_D - P_A P_E / K4)",
-      "k_ref": 4.460849418918188e-09,
-      "k_ref_low": 7.692669348504817e-10,
-      "k_ref_high": 2.586771462123279e-08,
+      "k_ref": 6.835644119086325e-09,
+      "k_ref_low": 1.3828421985717778e-09,
+      "k_ref_high": 3.3789850042946965e-08,
       "k_units": "mol g^-1 s^-1 bar^-3",
-      "Ea_kJ": 74.80086488387111,
-      "Ea_sd_kJ": 46.18169741682588
+      "Ea_kJ": 77.27577707949345,
+      "Ea_sd_kJ": 45.8686005199511
      }
     ],
-    "inhibition": null,
+    "inhibition": {
+     "K_C": 0.035937263967746276,
+     "K_C_low": 0.014859818020752171,
+     "K_C_high": 0.08691135649735923,
+     "units": "1/bar at 300 C",
+     "adsorption_heat_kJ": -47.651691
+    },
     "scores": {
-     "plain": 67.58123765898556
+     "plain": 67.58123765898556,
+     "inhib": 59.65910213220901
     },
     "theta": [
-     -18.52370146934804,
-     32.47477421441652,
-     -17.493111854564994,
-     15.580743504068536,
-     -19.805217863748553,
-     26.36334616473637,
-     -23.833096822364098,
-     15.697420870934277
+     -18.402636823131544,
+     31.737993298706147,
+     -17.29938219189953,
+     14.411088987968176,
+     -19.619101926083022,
+     25.097087871932732,
+     -23.406285318854,
+     16.216796394380516,
+     -3.325980528300153
     ],
-    "model_words": "plain rate laws",
+    "model_words": "rate laws with product C blocking catalyst sites, K_C = 0.0359 per bar at 300 C",
     "verdict": "fits the data within the GC noise",
     "rank": 3,
-    "delta_bic": 13.46611502935427,
-    "weight": 0.0011397677145194183,
+    "delta_bic": 10.115822049777385,
+    "weight": 0.006248975367799975,
     "tied_with_best": false,
     "differs_by": "whether 'B + C + D <=> A + E' happens at all"
    },
@@ -4791,107 +4844,115 @@
      "4.  A + 2 B <=> E    r4 = k4 (P_A P_B^2 - P_E / K4)"
     ],
     "n_reactions": 4,
-    "n_params": 8,
+    "n_params": 9,
     "n_data": 40,
     "n_runs": 8,
-    "chi2": 38.893047658120935,
-    "chi2_per_point": 0.9723261914530233,
-    "x_noise": 0.9860660177964877,
-    "bic": 68.40408329103242,
-    "model": "plain",
+    "chi2": 30.32770258014582,
+    "chi2_per_point": 0.7581925645036456,
+    "x_noise": 0.8707425362893705,
+    "bic": 63.52761766717124,
+    "model": "inhib",
     "miss": {
      "A": {
-      "mol_pct": 0.056554813770487336,
-      "x_noise": 0.930955106107614,
-      "bias_mol_pct": -0.009303174672439268
+      "mol_pct": 0.05903651021320909,
+      "x_noise": 0.9861959084350591,
+      "bias_mol_pct": -0.019294759401252456
      },
      "B": {
-      "mol_pct": 0.1096389857281368,
-      "x_noise": 1.3762931052169523,
-      "bias_mol_pct": -0.0010110777624821763
+      "mol_pct": 0.0873478436259937,
+      "x_noise": 1.302731020569979,
+      "bias_mol_pct": 0.013356827980261395
      },
      "C": {
-      "mol_pct": 0.12445445578848385,
-      "x_noise": 0.9918218663856925,
-      "bias_mol_pct": -0.021114518061443557
+      "mol_pct": 0.11026434916585823,
+      "x_noise": 0.5327455598478839,
+      "bias_mol_pct": 0.018360582617465534
      },
      "D": {
-      "mol_pct": 0.24746592836563594,
-      "x_noise": 0.7875823901402428,
-      "bias_mol_pct": -0.08066176008523461
+      "mol_pct": 0.23826662371048266,
+      "x_noise": 0.6886740364145816,
+      "bias_mol_pct": -0.08727038178061516
      },
      "E": {
-      "mol_pct": 0.16643029880952562,
-      "x_noise": 0.7048221054349402,
-      "bias_mol_pct": 0.08960940256888192
+      "mol_pct": 0.18967021557516114,
+      "x_noise": 0.6026463148312533,
+      "bias_mol_pct": 0.056783575538528995
      }
     },
     "unexplained": [],
     "not_made": [],
     "fits_noise": true,
-    "seconds": 0.2607268003317026,
+    "seconds": 1.738990068435669,
     "a_spec": 100.0,
     "rate_constants": [
      {
       "reaction": "A -> D",
       "rate_law": "r1 = k1 P_A",
-      "k_ref": 8.975340979569238e-07,
-      "k_ref_low": 8.596220027361095e-07,
-      "k_ref_high": 9.371182385179659e-07,
+      "k_ref": 1.0356533683721032e-06,
+      "k_ref_low": 9.066917655992818e-07,
+      "k_ref_high": 1.1829575828468657e-06,
       "k_units": "mol g^-1 s^-1 bar^-1",
-      "Ea_kJ": 154.3416788021814,
-      "Ea_sd_kJ": 3.1050732699346506
+      "Ea_kJ": 150.71916540582637,
+      "Ea_sd_kJ": 4.217444749929682
      },
      {
       "reaction": "A + B <=> C",
       "rate_law": "r2 = k2 (P_A P_B - P_C / K2)",
-      "k_ref": 2.521885241416845e-06,
-      "k_ref_low": 2.4485704247848413e-06,
-      "k_ref_high": 2.597395241933852e-06,
+      "k_ref": 3.185993511129521e-06,
+      "k_ref_low": 2.5773360557626535e-06,
+      "k_ref_high": 3.938390040469824e-06,
       "k_units": "mol g^-1 s^-1 bar^-2",
-      "Ea_kJ": 74.58283358721059,
-      "Ea_sd_kJ": 3.258311014432835
+      "Ea_kJ": 68.46450593196568,
+      "Ea_sd_kJ": 6.465951935091002
      },
      {
       "reaction": "B + C -> E",
       "rate_law": "r3 = k3 P_B P_C",
-      "k_ref": 2.5224844959833956e-07,
-      "k_ref_low": 2.3423151203467793e-07,
-      "k_ref_high": 2.716512384351843e-07,
+      "k_ref": 2.9982555574968533e-07,
+      "k_ref_low": 2.5338194973434457e-07,
+      "k_ref_high": 3.547820354798652e-07,
       "k_units": "mol g^-1 s^-1 bar^-2",
-      "Ea_kJ": 125.62713930251682,
-      "Ea_sd_kJ": 4.031211975528643
+      "Ea_kJ": 121.11204852553632,
+      "Ea_sd_kJ": 5.994971089528524
      },
      {
       "reaction": "A + 2 B <=> E",
       "rate_law": "r4 = k4 (P_A P_B^2 - P_E / K4)",
-      "k_ref": 3.4507466794503046e-09,
-      "k_ref_low": 3.157244217860333e-10,
-      "k_ref_high": 3.771533598312242e-08,
+      "k_ref": 1.1634557247106605e-08,
+      "k_ref_low": 1.815127132879724e-09,
+      "k_ref_high": 7.457489885099435e-08,
       "k_units": "mol g^-1 s^-1 bar^-3",
-      "Ea_kJ": 82.05249689446651,
-      "Ea_sd_kJ": 47.14962079973225
+      "Ea_kJ": 87.55334441678639,
+      "Ea_sd_kJ": 44.96216893863456
      }
     ],
-    "inhibition": null,
+    "inhibition": {
+     "K_C": 0.04486416608513693,
+     "K_C_low": 0.017339520362039798,
+     "K_C_high": 0.11608126156252963,
+     "units": "1/bar at 300 C",
+     "adsorption_heat_kJ": -47.651691
+    },
     "scores": {
-     "plain": 68.40408329103242
+     "plain": 70.29854894984274,
+     "inhib": 63.526651969821486
     },
     "theta": [
-     -18.52878491114119,
-     32.389549156226465,
-     -17.495674010451733,
-     15.651665664333,
-     -19.798021510009704,
-     26.363626697427552,
-     -24.0898453864824,
-     17.219220382854097
+     -18.385648242615044,
+     31.629342473035507,
+     -17.261916569149093,
+     14.367697031353133,
+     -19.62523519823823,
+     25.41610716932088,
+     -22.874456280440477,
+     18.373607017804762,
+     -3.1041158856078708
     ],
-    "model_words": "plain rate laws",
+    "model_words": "rate laws with product C blocking catalyst sites, K_C = 0.0449 per bar at 300 C",
     "verdict": "fits the data within the GC noise",
     "rank": 4,
-    "delta_bic": 14.288960661401134,
-    "weight": 0.0007553316659293246,
+    "delta_bic": 13.986481805378787,
+    "weight": 0.000902206031555226,
     "tied_with_best": false,
     "differs_by": "whether 'A + 2 B <=> E' happens at all"
    },
@@ -4954,7 +5015,7 @@
     ],
     "not_made": [],
     "fits_noise": false,
-    "seconds": 7.106187582015991,
+    "seconds": 3.8591103553771973,
     "a_spec": 100.0,
     "rate_constants": [
      {
@@ -5016,10 +5077,10 @@
     "model_words": "plain rate laws",
     "verdict": "cannot explain B, C, A, D, E: typical miss 7.4x, 7.3x, 3.3x, 3.0x, 2.1x the GC noise (0.54 mol-%, 1.10 mol-%, 0.19 mol-%, 0.62 mol-%, 0.54 mol-%)",
     "rank": 5,
-    "delta_bic": 1041.647437799246,
-    "weight": 6.167070502547085e-227,
+    "delta_bic": 1046.2214245670848,
+    "weight": 6.431849764940673e-228,
     "tied_with_best": false,
-    "differs_by": "whether 'A -> D' and 'A + B <=> C' or '2 A + B -> C + D ; orders A=2, B=0' and '2 B + D <=> E' and 'B + D -> C' happens"
+    "differs_by": "whether 'A -> D' and 'A + B <=> C' or '2 A + B -> C + D ; orders A=2, B=0' and '2 B + D <=> E' and 'B + D -> C' happens; and whether product C blocks catalyst sites"
    },
    {
     "name": "runner-up 5",
@@ -5080,7 +5141,7 @@
     ],
     "not_made": [],
     "fits_noise": false,
-    "seconds": 2.994036912918091,
+    "seconds": 2.1528730392456055,
     "a_spec": 100.0,
     "rate_constants": [
      {
@@ -5142,10 +5203,10 @@
     "model_words": "plain rate laws",
     "verdict": "cannot explain B, C, D, A, E: typical miss 7.6x, 7.5x, 3.3x, 2.7x, 2.1x the GC noise (0.57 mol-%, 1.19 mol-%, 0.67 mol-%, 0.15 mol-%, 0.53 mol-%)",
     "rank": 6,
-    "delta_bic": 1066.4764750054694,
-    "weight": 2.5033523910876444e-232,
+    "delta_bic": 1071.0504617733081,
+    "weight": 2.610832238991061e-233,
     "tied_with_best": false,
-    "differs_by": "whether 'A -> D' and 'A + B <=> C' or '2 A + B -> C + D' and '2 B + D <=> E' and 'B + D -> C' happens"
+    "differs_by": "whether 'A -> D' and 'A + B <=> C' or '2 A + B -> C + D' and '2 B + D <=> E' and 'B + D -> C' happens; and whether product C blocks catalyst sites"
    }
   ],
   "tied": [],
@@ -5156,25 +5217,25 @@
    "Start: no reactions (the outlet would equal the feed), BIC 6076089.",
    "Step 1: tried 6 additions and 0 removals. Best: add '2 A + B -> C + D' (BIC 6076089 -> 1970253); now cannot explain E: no reaction in this network makes it (the GC sees up to 47.8 mol-% E); it also misses B, C, D, A by more than 2x the GC noise.",
    "Step 2: tried 11 additions and 0 removals. Best: add 'B + C -> E' (BIC 1970253 -> 379438); now cannot explain B, C, D, E, A: typical miss 185.8x, 97.3x, 51.4x, 26.2x, 10.2x the GC noise (13.49 mol-%, 13.99 mol-%, 8.91 mol-%, 11.74 mol-%, 0.98 mol-%).",
-   "Step 3: tried 20 additions and 1 removal. Best: add '2 B + D <=> E' (BIC 379438 -> 14138); now cannot explain B, E, D, C, A: typical miss 27.3x, 20.7x, 19.3x, 13.4x, 6.3x the GC noise (2.27 mol-%, 2.84 mol-%, 2.44 mol-%, 5.84 mol-%, 0.71 mol-%).",
-   "Step 4: tried 18 additions and 2 removals. Best: add 'B + D -> C' (BIC 14138 -> 1121); now cannot explain B, C, D, A, E: typical miss 7.6x, 7.5x, 3.3x, 2.7x, 2.1x the GC noise (0.57 mol-%, 1.19 mol-%, 0.67 mol-%, 0.15 mol-%, 0.53 mol-%).",
-   "Step 5: tried 0 additions and 3 removals (no additions: 4 reactions is the largest network allowed), then 26 replacements; none lowers BIC by more than 2. The reactions are settled.",
-   "Order check: tried 13 other orders. Better: '2 A + B -> C + D': r = k P_A^2   (zero order in B) instead of r = k P_A^2 P_B (BIC 1121 -> 1096).",
-   "Order check: tried 12 other orders (each reactant at 0, 1, 2); none is better than the present rate laws.",
+   "Step 3: tried 20 additions and 1 removal and 8 other reaction orders. Best: add '2 B + D <=> E' (BIC 379438 -> 14138); now cannot explain B, E, D, C, A: typical miss 27.3x, 20.7x, 19.3x, 13.4x, 6.3x the GC noise (2.27 mol-%, 2.84 mol-%, 2.44 mol-%, 5.84 mol-%, 0.71 mol-%).",
+   "Step 4: tried 18 additions and 2 removals and 12 other reaction orders. Best: add 'B + D -> C' (BIC 14138 -> 1121); now cannot explain B, C, D, A, E: typical miss 7.6x, 7.5x, 3.3x, 2.7x, 2.1x the GC noise (0.57 mol-%, 1.19 mol-%, 0.67 mol-%, 0.15 mol-%, 0.53 mol-%).",
+   "Step 5: tried 0 additions and 3 removals (no additions: 4 reactions is the largest network allowed) and 16 other reaction orders. Best: change the rate law of '2 A + B -> C + D' to r = k P_A^2   (zero order in B) (was r = k P_A^2 P_B) (BIC 1121 -> 1096); now cannot explain B, C, A, D, E: typical miss 7.4x, 7.3x, 3.3x, 3.0x, 2.1x the GC noise (0.54 mol-%, 1.10 mol-%, 0.19 mol-%, 0.62 mol-%, 0.54 mol-%).",
+   "Step 6: tried 0 additions and 3 removals (no additions: 4 reactions is the largest network allowed) and 15 other reaction orders, then 27 replacements; none lowers BIC by more than 2. The reactions are settled.",
+   "Order check: tried 15 other orders (each reactant at 0, 1, 2); none is better than the present rate laws.",
    "Final check: plain rate laws leave misses larger than the GC noise, so the best networks were re-fitted allowing product C to block catalyst sites (the best one from several starting points). That does not help.",
    "The best network so far does not fit within the GC noise. The search changes one reaction at a time, so it may have taken a wrong turn early on: search again, starting from 'A + 2 B -> E' as the first reaction.",
    "Step 1: tried 8 additions and 0 removals. Best: add 'A -> D' (BIC 2346526 -> 83348); now cannot explain C: no reaction in this network makes it (the GC sees up to 40.7 mol-% C); it also misses E, D, A, B by more than 2x the GC noise.",
    "Step 2: tried 10 additions and 2 removals. Best: add 'A + B <=> C' (BIC 83348 -> 5783); now cannot explain B, C, E, A, D: typical miss 17.9x, 17.8x, 6.4x, 4.6x, 4.6x the GC noise (1.28 mol-%, 2.51 mol-%, 1.77 mol-%, 0.32 mol-%, 1.29 mol-%).",
    "Step 3: tried 16 additions and 3 removals. Best: add 'B + C -> E' (BIC 5783 -> 71); now fits the data within the GC noise.",
    "Step 4: tried 0 additions and 3 removals (no additions: 4 reactions is the largest network allowed). Best: remove 'A + 2 B -> E' (BIC 71 -> 54); now fits the data within the GC noise.",
-   "Step 5: tried 13 additions and 2 removals, then 19 replacements; none lowers BIC by more than 2. The reactions are settled.",
-   "Order check: tried 7 other orders (each reactant at 0, 1, 2); none is better than the present rate laws.",
-   "Final check: the best network already fits within the GC noise with plain rate laws, so there is nothing left for site blocking (product C occupying the catalyst) to explain.",
-   "Result: A -> D; A + B <=> C; B + C -> E with plain rate laws (BIC 54)."
+   "Step 5: tried 13 additions and 2 removals and 9 other reaction orders, then 19 replacements; none lowers BIC by more than 2. The reactions are settled.",
+   "Order check: tried 9 other orders (each reactant at 0, 1, 2); none is better than the present rate laws.",
+   "Final check: the best network fits within the GC noise with plain rate laws, and better still when product C is allowed to block catalyst sites (BIC 54 -> 50), so site blocking is kept. The next best networks were given the same chance.",
+   "Result: A -> D; A + B <=> C; B + C -> E with rate laws with product C blocking catalyst sites, K_C = 0.0245 per bar at 300 C (BIC 50)."
   ],
   "complete": true,
-  "n_fits": 202,
-  "seconds": 83.71682643890381,
+  "n_fits": 250,
+  "seconds": 43.12206983566284,
   "library_size": 22,
   "detected": {
    "C": 40.6816,
@@ -5188,8 +5249,8 @@
    "   1.  A -> D         r1 = k1 P_A",
    "   2.  A + B <=> C    r2 = k2 (P_A P_B - P_C / K2)",
    "   3.  B + C -> E     r3 = k3 P_B P_C",
-   "This network fits the data within the GC noise (plain rate laws).",
-   "No other network tried comes close (next best: BIC difference 6)."
+   "This network fits the data within the GC noise (rate laws with product C blocking catalyst sites, K_C = 0.0245 per bar at 300 C).",
+   "The next best network tried is ruled out, but only just (BIC difference 9.2; below 6 would count as a tie): a few more runs would make this firm."
   ]
  },
  "rank:complex_short_campaign.csv": {
@@ -5245,7 +5306,7 @@
     "unexplained": [],
     "not_made": [],
     "fits_noise": true,
-    "seconds": 6.678984880447388,
+    "seconds": 2.4263687133789062,
     "a_spec": 100.0,
     "rate_constants": [
      {
@@ -5362,7 +5423,7 @@
     ],
     "not_made": [],
     "fits_noise": false,
-    "seconds": 7.4919867515563965,
+    "seconds": 2.707247018814087,
     "a_spec": 100.0,
     "rate_constants": [
      {
@@ -5473,7 +5534,7 @@
     ],
     "not_made": [],
     "fits_noise": false,
-    "seconds": 8.195156812667847,
+    "seconds": 2.8647942543029785,
     "a_spec": 100.0,
     "rate_constants": [
      {
@@ -5591,7 +5652,7 @@
      "E"
     ],
     "fits_noise": false,
-    "seconds": 8.119575262069702,
+    "seconds": 2.398573637008667,
     "a_spec": 100.0,
     "rate_constants": [
      {
@@ -5651,7 +5712,7 @@
    "E": 47.8329
   },
   "n_runs": 8,
-  "seconds": 30.494399070739746,
+  "seconds": 10.399112224578857,
   "summary": [
    "1. truth: fits the data within the GC noise; best.",
    "2. close: cannot explain B, C, E, D: typical miss 13.8x, 6.9x, 4.7x, 2.9x the GC noise (1.08 mol-%, 1.01 mol-%, 1.21 mol-%, 0.66 mol-%); ruled out against the best (BIC difference 2142).",
@@ -5659,21 +5720,521 @@
    "4. far: cannot explain E: no reaction in this network makes it (the GC sees up to 47.8 mol-% E); it also misses B, C, D, A by more than 2x the GC noise; ruled out against the best (BIC difference 1486290)."
   ]
  },
+ "discover:zero_order_noisy.csv": {
+  "best": {
+   "name": "best network",
+   "reactions": [
+    "B + C -> E ; orders B=0, C=1",
+    "A + B <=> C",
+    "A -> D"
+   ],
+   "equations": [
+    "1.  B + C -> E     r1 = k1 P_C   (zero order in B)",
+    "2.  A + B <=> C    r2 = k2 (P_A P_B - P_C / K2)",
+    "3.  A -> D         r3 = k3 P_A"
+   ],
+   "n_reactions": 3,
+   "n_params": 6,
+   "n_data": 150,
+   "n_runs": 30,
+   "chi2": 109.2443393385935,
+   "chi2_per_point": 0.7282955955906234,
+   "x_noise": 0.8534023644158852,
+   "bic": 139.30815110317104,
+   "model": "plain",
+   "miss": {
+    "A": {
+     "mol_pct": 0.16138564631875826,
+     "x_noise": 0.9490411262746776,
+     "bias_mol_pct": -0.013117336667271511
+    },
+    "B": {
+     "mol_pct": 0.17760480716668772,
+     "x_noise": 0.7253970919723721,
+     "bias_mol_pct": -0.05195962445785936
+    },
+    "C": {
+     "mol_pct": 0.11578055108286071,
+     "x_noise": 0.7095018408853047,
+     "bias_mol_pct": 0.05066496759297298
+    },
+    "D": {
+     "mol_pct": 0.1646773804541548,
+     "x_noise": 0.9317569570674743,
+     "bias_mol_pct": 0.06590847478310011
+    },
+    "E": {
+     "mol_pct": 0.07823438657461014,
+     "x_noise": 0.9181688778689675,
+     "bias_mol_pct": 0.011977088870282092
+    }
+   },
+   "unexplained": [],
+   "not_made": [],
+   "fits_noise": true,
+   "seconds": 1.0354804992675781,
+   "a_spec": 100.0,
+   "rate_constants": [
+    {
+     "reaction": "B + C -> E ; orders B=0, C=1",
+     "rate_law": "r1 = k1 P_C   (zero order in B)",
+     "k_ref": 2.8873875495139345e-07,
+     "k_ref_low": 2.750534721802193e-07,
+     "k_ref_high": 3.031049488306604e-07,
+     "k_units": "mol g^-1 s^-1 bar^-1",
+     "Ea_kJ": 121.93139619992475,
+     "Ea_sd_kJ": 2.511088466882814
+    },
+    {
+     "reaction": "A + B <=> C",
+     "rate_law": "r2 = k2 (P_A P_B - P_C / K2)",
+     "k_ref": 3.016198814569002e-06,
+     "k_ref_low": 2.987948487432303e-06,
+     "k_ref_high": 3.044716241686403e-06,
+     "k_units": "mol g^-1 s^-1 bar^-2",
+     "Ea_kJ": 70.02891094129235,
+     "Ea_sd_kJ": 0.6640105316423642
+    },
+    {
+     "reaction": "A -> D",
+     "rate_law": "r3 = k3 P_A",
+     "k_ref": 9.949591831588638e-07,
+     "k_ref_low": 9.74626526415054e-07,
+     "k_ref_high": 1.0157160197490628e-06,
+     "k_units": "mol g^-1 s^-1 bar^-1",
+     "Ea_kJ": 150.63851690244877,
+     "Ea_sd_kJ": 1.1460181037158905
+    }
+   ],
+   "inhibition": null,
+   "scores": {
+    "plain": 139.3097713575243,
+    "inhib": 147.8864673357445
+   },
+   "theta": [
+    -19.66291370574811,
+    25.588052310656668,
+    -17.316683376029346,
+    14.695997030051327,
+    -18.425734308568224,
+    31.61241788931452
+   ],
+   "model_words": "plain rate laws",
+   "verdict": "fits the data within the GC noise",
+   "rank": 1,
+   "delta_bic": 0.0,
+   "weight": 0.999806214696172,
+   "tied_with_best": true
+  },
+  "runners_up": [
+   {
+    "name": "runner-up 1",
+    "reactions": [
+     "2 A + B -> C + D",
+     "B + C -> E ; orders B=0, C=1",
+     "A + B <=> C",
+     "A -> D"
+    ],
+    "equations": [
+     "1.  2 A + B -> C + D    r1 = k1 P_A^2 P_B",
+     "2.  B + C -> E          r2 = k2 P_C   (zero order in B)",
+     "3.  A + B <=> C         r3 = k3 (P_A P_B - P_C / K3)",
+     "4.  A -> D              r4 = k4 P_A"
+    ],
+    "n_reactions": 4,
+    "n_params": 8,
+    "n_data": 150,
+    "n_runs": 30,
+    "chi2": 116.32020052828344,
+    "chi2_per_point": 0.7754680035218896,
+    "x_noise": 0.8806066111050324,
+    "bic": 156.4052828810535,
+    "model": "plain",
+    "miss": {
+     "A": {
+      "mol_pct": 0.1652202012622905,
+      "x_noise": 0.9608898666935582,
+      "bias_mol_pct": -0.016133741468452152
+     },
+     "B": {
+      "mol_pct": 0.1693688059794956,
+      "x_noise": 0.7106727587694008,
+      "bias_mol_pct": -0.04734334301618929
+     },
+     "C": {
+      "mol_pct": 0.11724274679963965,
+      "x_noise": 0.7123810725917105,
+      "bias_mol_pct": 0.04852215549472196
+     },
+     "D": {
+      "mol_pct": 0.17228964694654272,
+      "x_noise": 1.032759213246428,
+      "bias_mol_pct": 0.07356031935207448
+     },
+     "E": {
+      "mol_pct": 0.0841048411171466,
+      "x_noise": 0.9353590361491552,
+      "bias_mol_pct": 0.007243600379809004
+     }
+    },
+    "unexplained": [],
+    "not_made": [],
+    "fits_noise": true,
+    "seconds": 0.2480950905726506,
+    "a_spec": 100.0,
+    "rate_constants": [
+     {
+      "reaction": "2 A + B -> C + D",
+      "rate_law": "r1 = k1 P_A^2 P_B",
+      "k_ref": 1.5114804392535422e-09,
+      "k_ref_low": 3.334978449823168e-10,
+      "k_ref_high": 6.85033847330323e-09,
+      "k_units": "mol g^-1 s^-1 bar^-3",
+      "Ea_kJ": 94.44726215160635,
+      "Ea_sd_kJ": 39.11991129515101
+     },
+     {
+      "reaction": "B + C -> E ; orders B=0, C=1",
+      "rate_law": "r2 = k2 P_C   (zero order in B)",
+      "k_ref": 2.8804667554082603e-07,
+      "k_ref_low": 2.7431105273955164e-07,
+      "k_ref_high": 3.024700844588269e-07,
+      "k_units": "mol g^-1 s^-1 bar^-1",
+      "Ea_kJ": 122.12818458753122,
+      "Ea_sd_kJ": 2.5453951711472746
+     },
+     {
+      "reaction": "A + B <=> C",
+      "rate_law": "r3 = k3 (P_A P_B - P_C / K3)",
+      "k_ref": 3.01494701196249e-06,
+      "k_ref_low": 2.9865768041953326e-06,
+      "k_ref_high": 3.0435867151223727e-06,
+      "k_units": "mol g^-1 s^-1 bar^-2",
+      "Ea_kJ": 70.06240791389986,
+      "Ea_sd_kJ": 0.6673893049159212
+     },
+     {
+      "reaction": "A -> D",
+      "rate_law": "r4 = k4 P_A",
+      "k_ref": 9.896520992909133e-07,
+      "k_ref_low": 9.672072622852607e-07,
+      "k_ref_high": 1.01261778712953e-06,
+      "k_units": "mol g^-1 s^-1 bar^-1",
+      "Ea_kJ": 150.85493843161834,
+      "Ea_sd_kJ": 1.2149896306567436
+     }
+    ],
+    "inhibition": null,
+    "scores": {
+     "plain": 156.4052828810535
+    },
+    "theta": [
+     -24.915346429062016,
+     19.820337992120017,
+     -19.66531348808004,
+     25.629349562333733,
+     -17.3170984887328,
+     14.703026575468197,
+     -18.4310825564242,
+     31.657835276321745
+    ],
+    "model_words": "plain rate laws",
+    "verdict": "fits the data within the GC noise",
+    "rank": 2,
+    "delta_bic": 17.097131777882453,
+    "weight": 0.00019378530382799749,
+    "tied_with_best": false,
+    "differs_by": "whether '2 A + B -> C + D' happens at all"
+   },
+   {
+    "name": "runner-up 2",
+    "reactions": [
+     "B + C -> E ; orders B=0, C=2",
+     "A + B <=> C",
+     "A -> D"
+    ],
+    "equations": [
+     "1.  B + C -> E     r1 = k1 P_C^2   (zero order in B)",
+     "2.  A + B <=> C    r2 = k2 (P_A P_B - P_C / K2)",
+     "3.  A -> D         r3 = k3 P_A"
+    ],
+    "n_reactions": 3,
+    "n_params": 6,
+    "n_data": 150,
+    "n_runs": 30,
+    "chi2": 5372.022645520685,
+    "chi2_per_point": 35.813484303471235,
+    "x_noise": 5.984436840962668,
+    "bic": 5402.086457285262,
+    "model": "plain",
+    "miss": {
+     "A": {
+      "mol_pct": 0.25473867738648376,
+      "x_noise": 2.305466316805267,
+      "bias_mol_pct": -0.012255854331251844
+     },
+     "B": {
+      "mol_pct": 0.995514605095201,
+      "x_noise": 4.954471565873685,
+      "bias_mol_pct": 0.16908097558471769
+     },
+     "C": {
+      "mol_pct": 1.380798218169698,
+      "x_noise": 6.1631602098928555,
+      "bias_mol_pct": 0.06069525665468497
+     },
+     "D": {
+      "mol_pct": 0.7269474690254115,
+      "x_noise": 4.070240748335234,
+      "bias_mol_pct": 0.09068862213342713
+     },
+     "E": {
+      "mol_pct": 1.1406417225213838,
+      "x_noise": 9.729031532489065,
+      "bias_mol_pct": -0.11021685915687224
+     }
+    },
+    "unexplained": [
+     "E",
+     "C",
+     "B",
+     "D",
+     "A"
+    ],
+    "not_made": [],
+    "fits_noise": false,
+    "seconds": 0.0,
+    "a_spec": 100.0,
+    "rate_constants": [
+     {
+      "reaction": "B + C -> E ; orders B=0, C=2",
+      "rate_law": "r1 = k1 P_C^2   (zero order in B)",
+      "k_ref": 5.281762793998304e-08,
+      "k_ref_low": 4.469964149226507e-08,
+      "k_ref_high": 6.240993726290207e-08,
+      "k_units": "mol g^-1 s^-1 bar^-2",
+      "Ea_kJ": 195.75188175690545,
+      "Ea_sd_kJ": 9.857335018237963
+     },
+     {
+      "reaction": "A + B <=> C",
+      "rate_law": "r2 = k2 (P_A P_B - P_C / K2)",
+      "k_ref": 2.993830776289054e-06,
+      "k_ref_low": 2.9358250729772543e-06,
+      "k_ref_high": 3.0529825497968157e-06,
+      "k_units": "mol g^-1 s^-1 bar^-2",
+      "Ea_kJ": 68.30707098798922,
+      "Ea_sd_kJ": 1.4004622559805582
+     },
+     {
+      "reaction": "A -> D",
+      "rate_law": "r3 = k3 P_A",
+      "k_ref": 8.988342281641058e-07,
+      "k_ref_low": 8.593896801503276e-07,
+      "k_ref_high": 9.400892149159186e-07,
+      "k_units": "mol g^-1 s^-1 bar^-1",
+      "Ea_kJ": 158.94431563577103,
+      "Ea_sd_kJ": 2.501535944241074
+     }
+    ],
+    "inhibition": null,
+    "scores": {
+     "plain": 5402.086457285262
+    },
+    "theta": [
+     -21.36159102544229,
+     41.07973455903284,
+     -17.324126980497837,
+     14.334658341503394,
+     -18.52733740127889,
+     33.35544076195975
+    ],
+    "model_words": "plain rate laws",
+    "verdict": "cannot explain E, C, B, D, A: typical miss 9.7x, 6.2x, 5.0x, 4.1x, 2.3x the GC noise (1.14 mol-%, 1.38 mol-%, 1.00 mol-%, 0.73 mol-%, 0.25 mol-%)",
+    "rank": 3,
+    "delta_bic": 5262.778306182091,
+    "weight": 9.857765883345094e-305,
+    "tied_with_best": false,
+    "differs_by": "the rate law of 'B + C -> E' (r = k P_C   (zero order in B)  or  r = k P_C^2   (zero order in B))"
+   },
+   {
+    "name": "runner-up 3",
+    "reactions": [
+     "2 A + B -> C + D ; orders A=1, B=1",
+     "B + C -> E",
+     "A + B <=> C",
+     "A -> D"
+    ],
+    "equations": [
+     "1.  2 A + B -> C + D    r1 = k1 P_A P_B",
+     "2.  B + C -> E          r2 = k2 P_B P_C",
+     "3.  A + B <=> C         r3 = k3 (P_A P_B - P_C / K3)",
+     "4.  A -> D              r4 = k4 P_A"
+    ],
+    "n_reactions": 4,
+    "n_params": 8,
+    "n_data": 150,
+    "n_runs": 30,
+    "chi2": 7709.61264857481,
+    "chi2_per_point": 51.3974176571654,
+    "x_noise": 7.169199234026447,
+    "bic": 7749.69773092758,
+    "model": "plain",
+    "miss": {
+     "A": {
+      "mol_pct": 0.3765096900181528,
+      "x_noise": 3.279626645517623,
+      "bias_mol_pct": -0.04410774857048704
+     },
+     "B": {
+      "mol_pct": 0.8099801627219146,
+      "x_noise": 9.76901174222768,
+      "bias_mol_pct": 0.1105318449934909
+     },
+     "C": {
+      "mol_pct": 0.9728555119557438,
+      "x_noise": 8.844648744175046,
+      "bias_mol_pct": -0.07023893562006514
+     },
+     "D": {
+      "mol_pct": 0.5907768446434691,
+      "x_noise": 3.675811792565312,
+      "bias_mol_pct": 0.15192909867472623
+     },
+     "E": {
+      "mol_pct": 0.8834762239037145,
+      "x_noise": 7.68492961515303,
+      "bias_mol_pct": -0.03402401705926691
+     }
+    },
+    "unexplained": [
+     "B",
+     "C",
+     "E",
+     "D",
+     "A"
+    ],
+    "not_made": [],
+    "fits_noise": false,
+    "seconds": 0.6355223655700684,
+    "a_spec": 100.0,
+    "rate_constants": [
+     {
+      "reaction": "2 A + B -> C + D ; orders A=1, B=1",
+      "rate_law": "r1 = k1 P_A P_B",
+      "k_ref": 8.15719750196968e-08,
+      "k_ref_low": 5.626177379677391e-08,
+      "k_ref_high": 1.182683491752189e-07,
+      "k_units": "mol g^-1 s^-1 bar^-2",
+      "Ea_kJ": 110.3433589236172,
+      "Ea_sd_kJ": 16.78575757611493
+     },
+     {
+      "reaction": "B + C -> E",
+      "rate_law": "r2 = k2 P_B P_C",
+      "k_ref": 1.3326483822411898e-07,
+      "k_ref_low": 1.1435077088680399e-07,
+      "k_ref_high": 1.5530736670311367e-07,
+      "k_units": "mol g^-1 s^-1 bar^-2",
+      "Ea_kJ": 149.52072062308378,
+      "Ea_sd_kJ": 9.024428724360753
+     },
+     {
+      "reaction": "A + B <=> C",
+      "rate_law": "r3 = k3 (P_A P_B - P_C / K3)",
+      "k_ref": 2.87101002562617e-06,
+      "k_ref_low": 2.8064312255359703e-06,
+      "k_ref_high": 2.937074848742034e-06,
+      "k_units": "mol g^-1 s^-1 bar^-2",
+      "Ea_kJ": 66.23483812528566,
+      "Ea_sd_kJ": 1.5261892706157674
+     },
+     {
+      "reaction": "A -> D",
+      "rate_law": "r4 = k4 P_A",
+      "k_ref": 8.045584120731674e-07,
+      "k_ref_low": 7.5009561730389e-07,
+      "k_ref_high": 8.629756307127533e-07,
+      "k_units": "mol g^-1 s^-1 bar^-1",
+      "Ea_kJ": 163.7620862639791,
+      "Ea_sd_kJ": 3.3930237427068297
+     }
+    ],
+    "inhibition": null,
+    "scores": {
+     "plain": 7749.69773092758
+    },
+    "theta": [
+     -20.926950263340697,
+     23.15623152253237,
+     -20.436097609809632,
+     31.377841475359975,
+     -17.366016850786735,
+     13.899787549047456,
+     -18.63814245245891,
+     34.36647951569633
+    ],
+    "model_words": "plain rate laws",
+    "verdict": "cannot explain B, C, E, D, A: typical miss 9.8x, 8.8x, 7.7x, 3.7x, 3.3x the GC noise (0.81 mol-%, 0.97 mol-%, 0.88 mol-%, 0.59 mol-%, 0.38 mol-%)",
+    "rank": 4,
+    "delta_bic": 7610.389579824408,
+    "weight": 9.857765883345094e-305,
+    "tied_with_best": false,
+    "differs_by": "the rate law of 'B + C -> E' (r = k P_C   (zero order in B)  or  r = k P_B P_C); whether '2 A + B -> C + D ; orders A=1, B=1' happens at all"
+   }
+  ],
+  "tied": [],
+  "decided": true,
+  "undecided": [],
+  "path": [
+   "The feed is A and B; the GC sees these products: C (up to 35.1 mol-%), D (up to 45.0 mol-%), E (up to 39.8 mol-%).",
+   "Start: no reactions (the outlet would equal the feed), BIC 6266938.",
+   "Step 1: tried 6 additions and 0 removals. Best: add '2 A + B -> C + D' (BIC 6266938 -> 1817950); now cannot explain E: no reaction in this network makes it (the GC sees up to 39.8 mol-% E); it also misses C, B, A, D by more than 2x the GC noise.",
+   "Step 2: tried 11 additions and 0 removals. Best: add 'B + C -> E' (BIC 1817950 -> 726167); now cannot explain A, C, D, B, E: typical miss 105.6x, 72.6x, 67.9x, 53.2x, 18.4x the GC noise (6.47 mol-%, 10.26 mol-%, 9.02 mol-%, 6.76 mol-%, 3.36 mol-%).",
+   "Step 3: tried 20 additions and 1 removal and 8 other reaction orders. Best: add 'A + B <=> C' (BIC 726167 -> 136572); now cannot explain C, B, A, D, E: typical miss 39.1x, 35.6x, 28.7x, 22.2x, 20.8x the GC noise (6.49 mol-%, 4.85 mol-%, 3.22 mol-%, 3.51 mol-%, 3.31 mol-%).",
+   "Step 4: tried 17 additions and 3 removals and 12 other reaction orders. Best: add 'A -> D' (BIC 136572 -> 7968); now cannot explain B, C, E, A, D: typical miss 10.5x, 8.6x, 7.8x, 3.2x, 3.0x the GC noise (0.87 mol-%, 0.92 mol-%, 0.92 mol-%, 0.35 mol-%, 0.52 mol-%).",
+   "Step 5: tried 0 additions and 4 removals (no additions: 4 reactions is the largest network allowed) and 13 other reaction orders. Best: change the rate law of 'B + C -> E' to r = k P_C   (zero order in B) (was r = k P_B P_C) (BIC 7968 -> 156); now fits the data within the GC noise.",
+   "Step 6: tried 0 additions and 4 removals (no additions: 4 reactions is the largest network allowed). Best: remove '2 A + B -> C + D' (BIC 156 -> 139); now fits the data within the GC noise.",
+   "Step 7: tried 0 additions and 2 removals (no additions: every species is already explained within the GC noise) and 8 other reaction orders, then 20 replacements; none lowers BIC by more than 2. The reactions are settled.",
+   "Order check: tried 8 other orders (each reactant at 0, 1, 2); none is better than the present rate laws.",
+   "Final check: the best network already fits within the GC noise with plain rate laws; letting product C block catalyst sites (one more fitted number) does not improve on that.",
+   "Result: B + C -> E ; orders B=0, C=1; A + B <=> C; A -> D with plain rate laws (BIC 139)."
+  ],
+  "complete": true,
+  "n_fits": 145,
+  "seconds": 34.448482275009155,
+  "library_size": 22,
+  "detected": {
+   "C": 35.14233514233515,
+   "D": 44.997755002245,
+   "E": 39.8043
+  },
+  "stopped_early": false,
+  "restarts": 0,
+  "summary": [
+   "The reactions that explain the data best:",
+   "   1.  B + C -> E     r1 = k1 P_C   (zero order in B)",
+   "   2.  A + B <=> C    r2 = k2 (P_A P_B - P_C / K2)",
+   "   3.  A -> D         r3 = k3 P_A",
+   "This network fits the data within the GC noise (plain rate laws).",
+   "No other network tried comes close (next best: BIC difference 17)."
+  ]
+ },
  "next:complex_free": {
   "run": {
-   "pressure_bar": 68.0,
-   "flow_A_mL_min": 17.0,
-   "flow_B_mL_min": 37.5,
-   "flow_I_mL_min": 3.5,
-   "temperature_C": 267.0,
+   "pressure_bar": 68.5,
+   "flow_A_mL_min": 16.0,
+   "flow_B_mL_min": 36.5,
+   "flow_I_mL_min": 4.5,
+   "temperature_C": 265.0,
    "catalyst_g": 1.0
   },
   "x": [
-   68.0,
-   17.0,
-   37.5,
-   3.5,
-   540.15
+   68.5,
+   16.0,
+   36.5,
+   4.5,
+   538.15
   ],
   "networks": [
    "truth",
@@ -5681,51 +6242,51 @@
   ],
   "predicted": {
    "truth": {
-    "A": 0.00037768413822183923,
-    "B": 16.8391524004206,
-    "C": 2.2137812201393903,
-    "D": 0.21321115969683696,
-    "E": 66.53528404299384,
-    "I": 14.198193492611125
+    "A": 0.00027322198620073575,
+    "B": 20.03058755584047,
+    "C": 2.1153852283122117,
+    "D": 0.18019730766287284,
+    "E": 60.11929541796811,
+    "I": 17.55426126823014
    },
    "close": {
-    "A": 0.0021798664258865317,
-    "B": 45.478406576522055,
-    "C": 35.860551554894506,
-    "D": 0.15246527896902154,
-    "E": 9.197831992350826,
-    "I": 9.308564730837702
+    "A": 0.0018345378362356042,
+    "B": 46.15041318745662,
+    "C": 34.06038167993068,
+    "D": 0.13286071211096803,
+    "E": 7.8338688750340095,
+    "I": 11.820641007631481
    }
   },
   "difference_x_noise": {
-   "A": -0.0360344297656764,
-   "B": -79.2041506412921,
-   "C": -139.9781063720916,
-   "D": 1.172058207435884,
-   "E": 133.75800321314546
+   "A": -0.031219736630043786,
+   "B": -68.57307038963872,
+   "C": -138.3626026833392,
+   "D": 0.9179933917009587,
+   "E": 134.1457451205166
   },
-  "separation": 209.18830317399357,
-  "separation_uncertain": 101.48848412033944,
-  "expected_bic_gap": 43759.74618481465,
+  "separation": 204.5541503476468,
+  "separation_uncertain": 66.88185216756904,
+  "expected_bic_gap": 4473.182149364559,
   "best_so_far": 40.973550281481415,
   "step_limited": false,
-  "message": "Run at 68 bar, 17 / 37.5 / 3.5 mL/min of A / B / inert and 267 C. There 'truth' and 'close' predict clearly different GC readings: C 2.21 against 35.86 mol-% (140x the GC noise); E 66.54 against 9.20 mol-% (134x the GC noise). Overall the two predictions are 209x the GC noise apart (the runs done so far reach at most 41x)."
+  "message": "Run at 68.5 bar, 16 / 36.5 / 4.5 mL/min of A / B / inert and 265 C (a free run: anywhere in the operating box, not held to one allowed step from the last run). There the fitted 'truth' and 'close' predict these GC readings: C 2.12 against 34.06 mol-% (138x the GC noise); E 60.12 against 7.83 mol-% (134x the GC noise). Overall the two predictions are 205x the GC noise apart (the runs done so far reach at most 41x). Each network's own prediction is still uncertain there, because its fitted rate constants are; counted against the GC noise and that uncertainty together, the two predictions are about 67x apart."
  },
  "next:complex_step": {
   "run": {
-   "pressure_bar": 13.0,
-   "flow_A_mL_min": 8.5,
-   "flow_B_mL_min": 25.5,
+   "pressure_bar": 12.5,
+   "flow_A_mL_min": 7.0,
+   "flow_B_mL_min": 26.0,
    "flow_I_mL_min": 3.0,
-   "temperature_C": 320.0,
+   "temperature_C": 314.0,
    "catalyst_g": 1.0
   },
   "x": [
-   13.0,
-   8.5,
-   25.5,
+   12.5,
+   7.0,
+   26.0,
    3.0,
-   593.15
+   587.15
   ],
   "networks": [
    "truth",
@@ -5733,50 +6294,50 @@
   ],
   "predicted": {
    "truth": {
-    "A": 0.005071091667544871,
-    "B": 46.403413097043554,
-    "C": 1.4293767677212217,
-    "D": 2.6745127827706074,
-    "E": 35.50590793828668,
-    "I": 13.981718322510375
+    "A": 0.0051550785186668885,
+    "B": 57.062862705291664,
+    "C": 2.1713953140651863,
+    "D": 1.6782962402695698,
+    "E": 26.2011494734424,
+    "I": 12.881141188412496
    },
    "close": {
-    "A": 0.04428361344119075,
-    "B": 54.54395436263878,
-    "C": 16.178364915762913,
-    "D": 2.339537722276293,
-    "E": 15.035760523960503,
-    "I": 11.858098861920318
+    "A": 0.029846340988614113,
+    "B": 62.877608321635435,
+    "C": 15.272599819577831,
+    "D": 1.4992229030214708,
+    "E": 9.184005111267272,
+    "I": 11.136717503509368
    }
   },
   "difference_x_noise": {
-   "A": -0.7803988002077711,
-   "B": -14.674600131550582,
-   "C": -106.8467556465513,
-   "D": 4.462154438360441,
-   "E": 67.62333425644202
+   "A": -0.49210281967572594,
+   "B": -8.949860763762825,
+   "C": -95.475927915846,
+   "D": 2.717861158855065,
+   "E": 74.98991473263916
   },
-  "separation": 127.37742445854515,
-  "separation_uncertain": 46.94082875495264,
-  "expected_bic_gap": 16225.008261692377,
+  "separation": 121.7656317076169,
+  "separation_uncertain": 44.01928651586968,
+  "expected_bic_gap": 1937.6975853662263,
   "best_so_far": 40.973550281481415,
   "step_limited": true,
-  "message": "Run at 13 bar, 8.5 / 25.5 / 3 mL/min of A / B / inert and 320 C (within one allowed step of the last run). There 'truth' and 'close' predict clearly different GC readings: C 1.43 against 16.18 mol-% (107x the GC noise); E 35.51 against 15.04 mol-% (68x the GC noise). Overall the two predictions are 127x the GC noise apart (the runs done so far reach at most 41x)."
+  "message": "Run at 12.5 bar, 7 / 26 / 3 mL/min of A / B / inert and 314 C (within one allowed step of the last run). There the fitted 'truth' and 'close' predict these GC readings: C 2.17 against 15.27 mol-% (95x the GC noise); E 26.20 against 9.18 mol-% (75x the GC noise). Overall the two predictions are 122x the GC noise apart (the runs done so far reach at most 41x). Each network's own prediction is still uncertain there, because its fitted rate constants are; counted against the GC noise and that uncertainty together, the two predictions are about 44x apart."
  },
  "next:mystery_free": {
   "run": {
    "pressure_bar": 100.0,
-   "flow_A_mL_min": 29.5,
-   "flow_B_mL_min": 12.5,
-   "flow_I_mL_min": 3.5,
+   "flow_A_mL_min": 31.5,
+   "flow_B_mL_min": 6.0,
+   "flow_I_mL_min": 6.0,
    "temperature_C": 576.0,
    "catalyst_g": 1.0
   },
   "x": [
    100.0,
-   29.5,
-   12.5,
-   3.5,
+   31.5,
+   6.0,
+   6.0,
    849.15
   ],
   "networks": [
@@ -5785,34 +6346,34 @@
   ],
   "predicted": {
    "best network": {
-    "A": 38.69180655895199,
-    "B": 0.000720303390810791,
-    "C": 0.0006529449048166583,
-    "D": 31.76226508835658,
-    "E": 18.938570894149375,
-    "I": 10.605984210246426
+    "A": 46.52659615716741,
+    "B": 0.0007038506063956562,
+    "C": 0.0007555202770476668,
+    "D": 29.472843081536386,
+    "E": 7.999214006509769,
+    "I": 15.99988738390298
    },
    "runner-up 1": {
-    "A": 0.0014627404781205426,
-    "B": 17.34300320121152,
-    "C": 0.0006029895271578633,
-    "D": 66.90534874632868,
-    "E": 6.982931146825434,
-    "I": 8.766651175629073
+    "A": 0.0014958130277135356,
+    "B": 9.658759588105148,
+    "C": 0.0003424657893892578,
+    "D": 73.48705546117024,
+    "E": 2.3977482060043203,
+    "I": 14.454598465903182
    }
   },
   "difference_x_noise": {
-   "A": 158.91454558351737,
-   "B": -126.84653496369475,
-   "C": 0.0009989820875758262,
-   "D": -64.67995830190006,
-   "E": 66.56536652440884
+   "A": 164.6087767075896,
+   "B": -98.25350287517033,
+   "C": 0.008260182796606489,
+   "D": -77.92891627464316,
+   "E": 54.92451024955861
   },
-  "separation": 223.51358181948146,
-  "separation_uncertain": 103.0766694978372,
-  "expected_bic_gap": 49958.321257774034,
-  "best_so_far": 0.003128175542559769,
+  "separation": 214.1014200852835,
+  "separation_uncertain": 80.51929378500297,
+  "expected_bic_gap": 6483.356671635618,
+  "best_so_far": 0.003128357518141412,
   "step_limited": false,
-  "message": "Run at 100 bar, 29.5 / 12.5 / 3.5 mL/min of A / B / inert and 576 C. There 'best network' and 'runner-up 1' predict clearly different GC readings: A 38.69 against 0.00 mol-% (159x the GC noise); B 0.00 against 17.34 mol-% (127x the GC noise). Overall the two predictions are 224x the GC noise apart (the runs done so far reach at most 0x)."
+  "message": "Run at 100 bar, 31.5 / 6 / 6 mL/min of A / B / inert and 576 C (a free run: anywhere in the operating box, not held to one allowed step from the last run). There the fitted 'best network' and 'runner-up 1' predict these GC readings: A 46.53 against 0.00 mol-% (165x the GC noise); B 0.00 against 9.66 mol-% (98x the GC noise). Overall the two predictions are 214x the GC noise apart (the runs done so far reach at most 0x). Each network's own prediction is still uncertain there, because its fitted rate constants are; counted against the GC noise and that uncertainty together, the two predictions are about 81x apart."
  }
 }

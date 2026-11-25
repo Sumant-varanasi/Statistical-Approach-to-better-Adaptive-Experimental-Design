@@ -35,7 +35,7 @@ Species: A and B are the feeds, I is the inert gas, C = AB, D = A rearranged (on
 | 2 | `C -> D + B` | `r2 = k2 P_C` | 1.00e-06 mol g^-1 s^-1 bar^-1 | 1.00e-08 | 110 |
 | 3 | `A + 2 B -> E` | `r3 = k3 P_A P_B^2` | 6.00e-08 mol g^-1 s^-1 bar^-3 | 6.00e-10 | 85 |
 
-Reaction 1 is reversible with dH = -120 kJ/mol and dS = -170 J/mol/K (it releases heat, so the equilibrium moves back to A + B when hotter). Reactions 2 and 3 run one way.
+Reaction 1 is reversible with dH = -120 kJ/mol and dS = -170 J/mol/K (it releases heat, so the equilibrium moves back to A + B when hotter). Reactions 2 and 3 run one way. (That they run one way is part of how this made-up example is defined. The program's own placeholder table of reaction enthalpies and entropies would let both run backwards to some extent at some conditions, so the search in part B is also offered their two-way forms and has to find out from the data which form was used.)
 
 The mole balances written out (the same for every run):
 
@@ -99,7 +99,7 @@ The total flow falls because A + B -> C and A + 2 B -> E join molecules. C is ma
 | row 1 of `mystery_exact.csv` | 0.126122 | 0.231407 | 0.217544 | 0.024280 | 0.026598 | 0.374048 |
 | row 1 of `mystery_noisy.csv` (with GC noise) | 0.125232 | 0.229546 | 0.218347 | 0.024149 | 0.026469 | 0.376258 |
 
-The hand calculation and the file agree: the largest difference is 4.3e-07, which is the rounding of the file to 6 decimals (the file itself was made with the project's simulator, a different integrator from the one used in step 4).
+The hand calculation and the file agree: the largest difference is 4.3e-07, which is the rounding of the file to 6 decimals. (The file was made by the project's simulator, which integrates all 30 runs in one call with a relative tolerance of 1e-8; step 4 integrates this one run on its own with 1e-10. `test_discovery.py` also recalculates rows of both exact files from the rate laws written out by hand, without using the project's simulator at all.)
 
 **Check: atom balance.** A units in = 28.6296, out (A + C + D + E) = 28.6296 micromol/s; B units in = 36.4376, out (B + C + 2 E) = 36.4376 micromol/s. Conversion of A = 1 - 9.1519 / 28.6296 = 68.0 %.
 
@@ -119,7 +119,7 @@ The hand calculation and the file agree: the largest difference is 4.3e-07, whic
 
 A designed kinetic study: 30 operating points spread evenly over 2-40 bar, 5-50 mL/min of each gas and 230-410 C, the same for every file, with 1 g of catalyst. They are **not** step-limited like an optimisation campaign: a kinetic study deliberately jumps between very different conditions. Conversion of A in the mystery file ranges from 2 % to 100 %.
 
-One more file, `complex_short_campaign.csv`, is deliberately different: 8 step-limited runs from the start of an optimisation campaign on the virtual "real" reactor (see B5).
+Two more files: `complex_short_campaign.csv` is deliberately different, 8 step-limited runs from the start of an optimisation campaign on the virtual "real" reactor (see B5); `zero_order_noisy.csv` holds the same 30 runs calculated from a network with a rate law that does not follow its equation (see B6).
 
 ## Part B. What the reaction finder returns
 
@@ -129,10 +129,10 @@ How it decides, in short: every network tried is fitted to all GC readings (rate
 
     python discover_reactions.py examples/discovery/mystery_noisy.csv
 
-The search starts with no reactions and may use any reaction from a library that is **enumerated from the atom balance** (12 reactions among A, B, C, D, E with at most 3 molecules reacting and 2 formed, each one-way in either direction or reversible), not written around the answer.
+The search starts with no reactions and may use any reaction from a library that is **enumerated from the atom balance** (12 reactions among A, B, C, D, E with at most 3 molecules reacting and 2 formed; 22 forms in all: one-way in either direction and reversible, except where the placeholder thermodynamics says a direction runs to completion everywhere in the operating box, and then only that direction is offered), not written around the answer. Each step of the search tries adding a reaction, removing one, changing one reaction order and, if none of these helps, replacing a reaction.
 
 ```
-Reaction search on mystery_noisy.csv: 132 network fits in 43 s
+Reaction search on mystery_noisy.csv: 203 network fits in 40 s
 
 How the search went:
   The feed is A and B; the GC sees these products: C (up to 21.8 mol-%), D (up to 46.7 mol-%), E (up to 20.0 mol-%).
@@ -140,14 +140,15 @@ How the search went:
   Step 1: tried 6 additions and 0 removals. Best: add 'A -> D' (BIC 3315322 -> 586049); now cannot explain C and E: no reaction in this network makes them (the GC sees up to 21.8 mol-% C and 20.0 mol-% E); it also misses A, B, D by more than 2x the GC noise.
   Step 2: tried 11 additions and 0 removals. Best: add 'A + B -> C' (BIC 586049 -> 285800); now cannot explain E: no reaction in this network makes it (the GC sees up to 20.0 mol-% E); it also misses C, A, D, B by more than 2x the GC noise.
   Step 3: tried 11 additions and 2 removals. Best: add '2 C -> D + E' (BIC 285800 -> 77778); now cannot explain E, D, A, C, B: typical miss 27.0x, 26.1x, 20.9x, 20.1x, 18.4x the GC noise (3.56 mol-%, 3.36 mol-%, 2.67 mol-%, 2.76 mol-%, 4.68 mol-%).
-  Step 4: tried 17 additions and 2 removals. Best: add 'B + D <=> C' (BIC 77778 -> 13295); now cannot explain E, C, B, D, A: typical miss 18.5x, 5.7x, 5.6x, 5.4x, 2.8x the GC noise (2.40 mol-%, 1.03 mol-%, 2.05 mol-%, 1.11 mol-%, 0.45 mol-%).
-  Step 5: tried 0 additions and 4 removals (no additions: 4 reactions is the largest network allowed), then 4 replacements. Best: replace 'A + B -> C' by 'A + B <=> C' (BIC 13295 -> 13235); now cannot explain E, C, B, D, A: typical miss 18.4x, 5.7x, 5.6x, 5.4x, 2.8x the GC noise (2.39 mol-%, 1.02 mol-%, 2.03 mol-%, 1.11 mol-%, 0.45 mol-%).
-  Step 6: tried 0 additions and 4 removals (no additions: 4 reactions is the largest network allowed), then 26 replacements. Best: replace '2 C -> D + E' by 'A + 2 B <=> E' (BIC 13235 -> 140); now fits the data within the GC noise.
-  Step 7: tried 0 additions and 4 removals (no additions: 4 reactions is the largest network allowed). Best: remove 'A -> D' (BIC 140 -> 126); now fits the data within the GC noise.
-  Step 8: tried 0 additions and 2 removals (no additions: every species is already explained within the GC noise), then 3 replacements. Best: replace 'B + D <=> C' by 'C -> B + D' (BIC 126 -> 113); now fits the data within the GC noise.
-  Step 9: tried 0 additions and 2 removals (no additions: every species is already explained within the GC noise), then 18 replacements; none lowers BIC by more than 2. The reactions are settled.
-  Order check: tried 4 other orders (each reactant at 0, 1, 2); none is better than the present rate laws.
-  Final check: the best network already fits within the GC noise with plain rate laws, so there is nothing left for site blocking (product C occupying the catalyst) to explain.
+  Step 4: tried 17 additions and 2 removals and 6 other reaction orders. Best: add 'B + D <=> C' (BIC 77778 -> 13295); now cannot explain E, C, B, D, A: typical miss 18.5x, 5.7x, 5.6x, 5.4x, 2.8x the GC noise (2.40 mol-%, 1.03 mol-%, 2.05 mol-%, 1.11 mol-%, 0.45 mol-%).
+  Step 5: tried 0 additions and 4 removals (no additions: 4 reactions is the largest network allowed) and 10 other reaction orders. Best: change the rate law of 'A -> D' to r = k P_A^2 (was r = k P_A) (BIC 13295 -> 13291); now cannot explain E, C, B, D, A: typical miss 18.4x, 6.0x, 5.6x, 5.4x, 2.6x the GC noise (2.40 mol-%, 1.07 mol-%, 2.03 mol-%, 1.14 mol-%, 0.40 mol-%).
+  Step 6: tried 0 additions and 4 removals (no additions: 4 reactions is the largest network allowed) and 10 other reaction orders, then 5 replacements. Best: replace 'A + B -> C' by 'A + B <=> C' (BIC 13291 -> 13231); now cannot explain E, C, B, D, A: typical miss 18.4x, 6.0x, 5.5x, 5.3x, 2.8x the GC noise (2.38 mol-%, 1.07 mol-%, 2.01 mol-%, 1.12 mol-%, 0.38 mol-%).
+  Step 7: tried 0 additions and 4 removals (no additions: 4 reactions is the largest network allowed) and 10 other reaction orders, then 27 replacements. Best: replace '2 C -> D + E' by 'A + 2 B <=> E' (BIC 13231 -> 144); now fits the data within the GC noise.
+  Step 8: tried 0 additions and 4 removals (no additions: 4 reactions is the largest network allowed). Best: remove 'A -> D ; orders A=2' (BIC 144 -> 126); now fits the data within the GC noise.
+  Step 9: tried 0 additions and 2 removals (no additions: every species is already explained within the GC noise) and 12 other reaction orders, then 3 replacements. Best: replace 'B + D <=> C' by 'C -> B + D' (BIC 126 -> 113); now fits the data within the GC noise.
+  Step 10: tried 0 additions and 2 removals (no additions: every species is already explained within the GC noise) and 9 other reaction orders, then 18 replacements; none lowers BIC by more than 2. The reactions are settled.
+  Order check: tried 9 other orders (each reactant at 0, 1, 2); none is better than the present rate laws.
+  Final check: the best network already fits within the GC noise with plain rate laws; letting product C block catalyst sites (one more fitted number) does not improve on that.
   Result: A + B <=> C; A + 2 B -> E; C -> B + D with plain rate laws (BIC 113).
 
 The reactions that explain the data best:
@@ -184,18 +185,19 @@ Fitted against true kinetics:
 | `C -> D + B` | 1.00e-06 | 9.94e-07 | 110 | 110.2 +- 1.6 |
 | `A + 2 B -> E` | 6.00e-08 | 6.01e-08 | 85 | 85.3 +- 1.2 |
 
-On the noise-free file `mystery_exact.csv` the search returns: A + B <=> C; A + 2 B -> E; C -> B + D (fits the data within the GC noise; the true network; left open: The data cannot decide whether 'A + 2 B -> E' runs one way or both ways (BIC difference 0.0, below 6).). 130 fits, 50 s.
+On the noise-free file `mystery_exact.csv` the search returns: A + B <=> C; A + 2 B -> E; C -> B + D (fits the data within the GC noise; the true network; left open: The data cannot decide whether 'A + 2 B -> E' runs one way or both ways (BIC difference 0.0, below 6).). 201 fits, 41 s.
 
 The run that would settle what is left open (`--next-run`):
 
 ```
 The run that would best tell the top two networks apart:
-  Run at 100 bar, 29.5 / 12.5 / 3.5 mL/min of A / B / inert and 576 C. There 'best network' and 'runner-up 1' predict clearly different GC readings: A 38.69 against 0.00 mol-% (159x the GC noise); B 0.00 against 17.34 mol-% (127x the GC noise). Overall the two predictions are 224x the GC noise apart (the runs done so far reach at most 0x).
+  Run at 100 bar, 31.5 / 6 / 6 mL/min of A / B / inert and 576 C (a free run: anywhere in the operating box, not held to one allowed step from the last run). There the fitted 'best network' and 'runner-up 1' predict these GC readings: A 46.53 against 0.00 mol-% (165x the GC noise); B 0.00 against 9.66 mol-% (98x the GC noise). Overall the two predictions are 214x the GC noise apart (the runs done so far reach at most 0x). Each network's own prediction is still uncertain there, because its fitted rate constants are; counted against the GC noise and that uncertainty together, the two predictions are about 81x apart.
 
   predicted GC reading (mol-%):          A       B       C       D       E       I
-  best network                       38.69    0.00    0.00   31.76   18.94   10.61
-  runner-up 1                         0.00   17.34    0.00   66.91    6.98    8.77
-  one such run would add about 49958 to the BIC difference (6 is enough to decide).
+  best network                       46.53    0.00    0.00   29.47    8.00   16.00
+  runner-up 1                         0.00    9.66    0.00   73.49    2.40   14.45
+  allowing for the uncertainty of both fits, one such run would add about 6483 to the BIC difference (6 is enough to decide).
+  This is a free run, as in a kinetic study, and may be far from the last run in the log. If the reactor must move one allowed step at a time, ask for the run within one step of the last run (--from-last-run).
 ```
 
 ### B2. Ranking the three candidates on the complex data
@@ -283,27 +285,30 @@ The best candidate, 'truth':
   typical miss per species: A 0.14 mol-% (0.8x noise),  B 0.23 mol-% (0.9x noise),  C 0.15 mol-% (0.7x noise),  D 0.12 mol-% (0.7x noise),  E 0.08 mol-% (0.8x noise)
 ```
 
-On the realistic file the best candidate is 'truth', fitted with rate laws with product C blocking catalyst sites, K_C = 0.0328 per bar at 300 C. The program is allowed one extra number for product C blocking catalyst sites and keeps it only when the data ask for it (they do here, and not on the two files made with plain rate laws). The reactant term K_A of the virtual reactor is not in the model at all; its effect is absorbed by the fitted constants.
+On the realistic file the best candidate is 'truth', fitted with rate laws with product C blocking catalyst sites, K_C = 0.0328 per bar at 300 C. The program is allowed one extra number for product C blocking catalyst sites and keeps it only when the data ask for it (they do here, and not on the two files made with plain rate laws). The reactant term K_A of the virtual reactor is not in the model at all; its effect is absorbed by the fitted constants. One thing makes this file a favourable case: how K_C falls with temperature is not fitted but assumed (a typical heat of adsorption, -48 kJ/mol), and the virtual reactor happens to use the same value.
 
 The run that would best tell the first two candidates apart, anywhere in the operating box and within one allowed step of the last run of the log:
 
 ```
 The run that would best tell the top two networks apart:
-  Run at 68 bar, 17 / 37.5 / 3.5 mL/min of A / B / inert and 267 C. There 'truth' and 'close' predict clearly different GC readings: C 2.21 against 35.86 mol-% (140x the GC noise); E 66.54 against 9.20 mol-% (134x the GC noise). Overall the two predictions are 209x the GC noise apart (the runs done so far reach at most 41x).
+  Run at 68.5 bar, 16 / 36.5 / 4.5 mL/min of A / B / inert and 265 C (a free run: anywhere in the operating box, not held to one allowed step from the last run). There the fitted 'truth' and 'close' predict these GC readings: C 2.12 against 34.06 mol-% (138x the GC noise); E 60.12 against 7.83 mol-% (134x the GC noise). Overall the two predictions are 205x the GC noise apart (the runs done so far reach at most 41x). Each network's own prediction is still uncertain there, because its fitted rate constants are; counted against the GC noise and that uncertainty together, the two predictions are about 67x apart.
 
   predicted GC reading (mol-%):          A       B       C       D       E       I
-  truth                               0.00   16.84    2.21    0.21   66.54   14.20
-  close                               0.00   45.48   35.86    0.15    9.20    9.31
-  one such run would add about 43760 to the BIC difference (6 is enough to decide).
+  truth                               0.00   20.03    2.12    0.18   60.12   17.55
+  close                               0.00   46.15   34.06    0.13    7.83   11.82
+  allowing for the uncertainty of both fits, one such run would add about 4473 to the BIC difference (6 is enough to decide).
+  This is a free run, as in a kinetic study, and may be far from the last run in the log. If the reactor must move one allowed step at a time, ask for the run within one step of the last run (--from-last-run).
 
 The run that would best tell the top two networks apart:
-  Run at 13 bar, 8.5 / 25.5 / 3 mL/min of A / B / inert and 320 C (within one allowed step of the last run). There 'truth' and 'close' predict clearly different GC readings: C 1.43 against 16.18 mol-% (107x the GC noise); E 35.51 against 15.04 mol-% (68x the GC noise). Overall the two predictions are 127x the GC noise apart (the runs done so far reach at most 41x).
+  Run at 12.5 bar, 7 / 26 / 3 mL/min of A / B / inert and 314 C (within one allowed step of the last run). There the fitted 'truth' and 'close' predict these GC readings: C 2.17 against 15.27 mol-% (95x the GC noise); E 26.20 against 9.18 mol-% (75x the GC noise). Overall the two predictions are 122x the GC noise apart (the runs done so far reach at most 41x). Each network's own prediction is still uncertain there, because its fitted rate constants are; counted against the GC noise and that uncertainty together, the two predictions are about 44x apart.
 
   predicted GC reading (mol-%):          A       B       C       D       E       I
-  truth                               0.01   46.40    1.43    2.67   35.51   13.98
-  close                               0.04   54.54   16.18    2.34   15.04   11.86
-  one such run would add about 16225 to the BIC difference (6 is enough to decide).
+  truth                               0.01   57.06    2.17    1.68   26.20   12.88
+  close                               0.03   62.88   15.27    1.50    9.18   11.14
+  allowing for the uncertainty of both fits, one such run would add about 1938 to the BIC difference (6 is enough to decide).
 ```
+
+The difference between the two predictions is given twice: against the GC noise alone, and against the GC noise plus the uncertainty of each network's own prediction (its fitted rate constants are not exact, least of all far from the runs done). The second, smaller number is the one to plan with; the expected gain in BIC is based on it.
 
 ### B3. Repairing a wrong candidate
 
@@ -311,63 +316,21 @@ The run that would best tell the top two networks apart:
 
 Starting from each wrong candidate, the search adds, removes and replaces reactions and re-checks the orders:
 
-**From `far`** (very different (two reactions, other orders, nothing makes E)): ends at the true network (125 fits, 84 s).
+**From `far`** (very different (two reactions, other orders, nothing makes E)): ends at the true network (177 fits, 43 s).
 
 ```
 The feed is A and B; the GC sees these products: C (up to 33.1 mol-%), D (up to 44.4 mol-%), E (up to 38.5 mol-%).
 Start: the network you gave (A + B -> C ; orders A=1, B=0; C -> D + B): cannot explain E: no reaction in this network makes it (the GC sees up to 38.5 mol-% E); it also misses B, D, C, A by more than 2x the GC noise (BIC 715679).
 Step 1: tried 11 additions and 1 removal. Best: add '2 B + D <=> E' (BIC 715679 -> 103169); now cannot explain C, A, D, B, E: typical miss 37.7x, 25.8x, 25.3x, 22.6x, 14.1x the GC noise (5.67 mol-%, 2.81 mol-%, 3.74 mol-%, 3.77 mol-%, 2.54 mol-%).
-Step 2: tried 14 additions and 1 removal. Best: add 'A -> D' (BIC 103169 -> 70038); now cannot explain C, B, A, D, E: typical miss 34.6x, 22.7x, 21.2x, 11.3x, 7.1x the GC noise (4.37 mol-%, 3.53 mol-%, 2.71 mol-%, 1.46 mol-%, 2.15 mol-%).
-Step 3: tried 0 additions and 3 removals (no additions: 4 reactions is the largest network allowed), then 5 replacements. Best: replace 'A + B -> C ; orders A=1, B=0' by 'A + B -> C' (BIC 70038 -> 13055); now cannot explain B, D, C, E, A: typical miss 11.6x, 11.1x, 10.1x, 7.1x, 4.9x the GC noise (1.97 mol-%, 1.53 mol-%, 1.43 mol-%, 2.16 mol-%, 0.39 mol-%).
-Step 4: tried 0 additions and 3 removals (no additions: 4 reactions is the largest network allowed), then 4 replacements. Best: replace 'C -> D + B' by 'B + D <=> C' (BIC 13055 -> 13048); now cannot explain B, D, C, E, A: typical miss 11.6x, 11.1x, 10.0x, 7.1x, 4.9x the GC noise (1.97 mol-%, 1.52 mol-%, 1.42 mol-%, 2.16 mol-%, 0.40 mol-%).
-Step 5: tried 0 additions and 4 removals (no additions: 4 reactions is the largest network allowed), then 26 replacements. Best: replace '2 B + D <=> E' by 'B + C -> E' (BIC 13048 -> 651); now cannot explain A: typical miss 3.5x the GC noise (0.28 mol-%).
-Step 6: tried 0 additions and 4 removals (no additions: 4 reactions is the largest network allowed), then 4 replacements. Best: replace 'A + B -> C' by 'A + B <=> C' (BIC 651 -> 142); now fits the data within the GC noise.
-Step 7: tried 0 additions and 4 removals (no additions: 4 reactions is the largest network allowed). Best: remove 'B + D <=> C' (BIC 142 -> 114); now fits the data within the GC noise.
-Step 8: tried 0 additions and 2 removals (no additions: every species is already explained within the GC noise), then 19 replacements; none lowers BIC by more than 2. The reactions are settled.
-Order check: tried 7 other orders (each reactant at 0, 1, 2); none is better than the present rate laws.
-Final check: the best network already fits within the GC noise with plain rate laws, so there is nothing left for site blocking (product C occupying the catalyst) to explain.
-Result: A + B <=> C; B + C -> E; A -> D with plain rate laws (BIC 114).
-
-The reactions that explain the data best:
-   1.  A + B <=> C    r1 = k1 (P_A P_B - P_C / K1)
-   2.  B + C -> E     r2 = k2 P_B P_C
-   3.  A -> D         r3 = k3 P_A
-This network fits the data within the GC noise (plain rate laws).
-No other network tried comes close (next best: BIC difference 28).
-```
-
-**From `similar`** (relatively the same (different pathway, no equilibrium)): ends at the true network (67 fits, 40 s).
-
-```
-The feed is A and B; the GC sees these products: C (up to 33.1 mol-%), D (up to 44.4 mol-%), E (up to 38.5 mol-%).
-Start: the network you gave (A + B -> C; A + 2 B -> E ; orders A=1, B=1; A -> D): cannot explain C, E, B, A, D: typical miss 40.1x, 29.5x, 19.9x, 13.7x, 11.7x the GC noise (4.81 mol-%, 3.00 mol-%, 2.76 mol-%, 2.01 mol-%, 2.33 mol-%) (BIC 96030).
-Step 1: tried 16 additions and 3 removals. Best: add 'B + C -> E' (BIC 96030 -> 19580); now cannot explain E, C, B, A, D: typical miss 16.0x, 15.4x, 9.8x, 5.5x, 5.4x the GC noise (1.44 mol-%, 2.01 mol-%, 1.38 mol-%, 0.65 mol-%, 0.94 mol-%).
-Step 2: tried 0 additions and 3 removals (no additions: 4 reactions is the largest network allowed), then 3 replacements. Best: replace 'A + B -> C' by 'A + B <=> C' (BIC 19580 -> 130); now fits the data within the GC noise.
-Step 3: tried 0 additions and 3 removals (no additions: 4 reactions is the largest network allowed). Best: remove 'A + 2 B -> E ; orders A=1, B=1' (BIC 130 -> 114); now fits the data within the GC noise.
-Step 4: tried 0 additions and 2 removals (no additions: every species is already explained within the GC noise), then 19 replacements; none lowers BIC by more than 2. The reactions are settled.
-Order check: tried 7 other orders (each reactant at 0, 1, 2); none is better than the present rate laws.
-Final check: the best network already fits within the GC noise with plain rate laws, so there is nothing left for site blocking (product C occupying the catalyst) to explain.
-Result: A + B <=> C; A -> D; B + C -> E with plain rate laws (BIC 114).
-
-The reactions that explain the data best:
-   1.  A + B <=> C    r1 = k1 (P_A P_B - P_C / K1)
-   2.  A -> D         r2 = k2 P_A
-   3.  B + C -> E     r3 = k3 P_B P_C
-This network fits the data within the GC noise (plain rate laws).
-No other network tried comes close (next best: BIC difference 16).
-```
-
-**From `close`** (quite close (one order wrong)): ends at the true network (60 fits, 34 s).
-
-```
-The feed is A and B; the GC sees these products: C (up to 33.1 mol-%), D (up to 44.4 mol-%), E (up to 38.5 mol-%).
-Start: the network you gave (A + B <=> C; C + B -> E ; orders C=1, B=0; A -> D): cannot explain E, B, C, D, A: typical miss 11.1x, 7.8x, 6.6x, 3.2x, 2.5x the GC noise (1.11 mol-%, 0.94 mol-%, 0.78 mol-%, 0.56 mol-%, 0.29 mol-%) (BIC 7312).
-Step 1: tried 17 additions and 2 removals. Best: add 'B + C + D <=> A + E' (BIC 7312 -> 6352); now cannot explain E, B, C: typical miss 10.3x, 7.1x, 6.8x the GC noise (0.76 mol-%, 0.67 mol-%, 0.80 mol-%).
-Step 2: tried 0 additions and 3 removals (no additions: 4 reactions is the largest network allowed), then 3 replacements. Best: replace 'C + B -> E ; orders C=1, B=0' by 'B + C -> E' (BIC 6352 -> 129); now fits the data within the GC noise.
-Step 3: tried 0 additions and 3 removals (no additions: 4 reactions is the largest network allowed). Best: remove 'B + C + D <=> A + E' (BIC 129 -> 114); now fits the data within the GC noise.
-Step 4: tried 0 additions and 2 removals (no additions: every species is already explained within the GC noise), then 19 replacements; none lowers BIC by more than 2. The reactions are settled.
-Order check: tried 7 other orders (each reactant at 0, 1, 2); none is better than the present rate laws.
-Final check: the best network already fits within the GC noise with plain rate laws, so there is nothing left for site blocking (product C occupying the catalyst) to explain.
+Step 2: tried 14 additions and 1 removal and 8 other reaction orders. Best: change the rate law of 'A + B -> C' to r = k P_A P_B (was r = k P_A   (zero order in B)) (BIC 103169 -> 65293); now cannot explain D, C, A, B, E: typical miss 27.2x, 22.7x, 20.4x, 17.7x, 13.8x the GC noise (4.16 mol-%, 4.52 mol-%, 3.05 mol-%, 2.76 mol-%, 2.45 mol-%).
+Step 3: tried 14 additions and 1 removal and 9 other reaction orders. Best: add 'A -> D' (BIC 65293 -> 13056); now cannot explain B, D, C, E, A: typical miss 11.6x, 11.1x, 10.1x, 7.1x, 4.9x the GC noise (1.97 mol-%, 1.53 mol-%, 1.43 mol-%, 2.16 mol-%, 0.39 mol-%).
+Step 4: tried 0 additions and 3 removals (no additions: 4 reactions is the largest network allowed) and 10 other reaction orders. Best: change the rate law of '2 B + D <=> E' to r = k (P_B^2 P_D^2 - P_D P_E / K) (was r = k (P_B^2 P_D - P_E / K)) (BIC 13056 -> 11631); now cannot explain C, D, E, B, A: typical miss 10.7x, 9.8x, 9.8x, 7.8x, 4.3x the GC noise (1.53 mol-%, 1.45 mol-%, 2.22 mol-%, 1.89 mol-%, 0.35 mol-%).
+Step 5: tried 0 additions and 3 removals (no additions: 4 reactions is the largest network allowed) and 10 other reaction orders, then 24 replacements. Best: replace '2 B + D <=> E ; orders B=2, D=2' by 'B + C -> E' (BIC 11631 -> 661); now cannot explain A: typical miss 3.5x the GC noise (0.28 mol-%).
+Step 6: tried 0 additions and 3 removals (no additions: 4 reactions is the largest network allowed) and 10 other reaction orders, then 3 replacements. Best: replace 'A + B -> C' by 'A + B <=> C' (BIC 661 -> 129); now fits the data within the GC noise.
+Step 7: tried 0 additions and 3 removals (no additions: 4 reactions is the largest network allowed). Best: remove 'C -> D + B' (BIC 129 -> 114); now fits the data within the GC noise.
+Step 8: tried 0 additions and 2 removals (no additions: every species is already explained within the GC noise) and 9 other reaction orders, then 19 replacements; none lowers BIC by more than 2. The reactions are settled.
+Order check: tried 9 other orders (each reactant at 0, 1, 2); none is better than the present rate laws.
+Final check: the best network already fits within the GC noise with plain rate laws; letting product C block catalyst sites (one more fitted number) does not improve on that.
 Result: A + B <=> C; B + C -> E; A -> D with plain rate laws (BIC 114).
 
 The reactions that explain the data best:
@@ -378,12 +341,57 @@ This network fits the data within the GC noise (plain rate laws).
 No other network tried comes close (next best: BIC difference 15).
 ```
 
+**From `similar`** (relatively the same (different pathway, no equilibrium)): ends at the true network (171 fits, 41 s).
+
+```
+The feed is A and B; the GC sees these products: C (up to 33.1 mol-%), D (up to 44.4 mol-%), E (up to 38.5 mol-%).
+Start: the network you gave (A + B -> C; A + 2 B -> E ; orders A=1, B=1; A -> D): cannot explain C, E, B, A, D: typical miss 40.1x, 29.5x, 19.9x, 13.7x, 11.7x the GC noise (4.81 mol-%, 3.00 mol-%, 2.76 mol-%, 2.01 mol-%, 2.33 mol-%) (BIC 96030).
+Step 1: tried 16 additions and 3 removals and 9 other reaction orders. Best: add 'B + C -> E' (BIC 96030 -> 19580); now cannot explain E, C, B, A, D: typical miss 16.0x, 15.4x, 9.8x, 5.5x, 5.4x the GC noise (1.44 mol-%, 2.01 mol-%, 1.38 mol-%, 0.65 mol-%, 0.94 mol-%).
+Step 2: tried 0 additions and 3 removals (no additions: 4 reactions is the largest network allowed) and 13 other reaction orders. Best: change the rate law of 'B + C -> E' to r = k P_B P_C^2 (was r = k P_B P_C) (BIC 19580 -> 8437); now cannot explain C, E, B, D, A: typical miss 10.2x, 9.8x, 7.6x, 3.3x, 3.1x the GC noise (1.01 mol-%, 1.00 mol-%, 0.93 mol-%, 0.58 mol-%, 0.36 mol-%).
+Step 3: tried 0 additions and 3 removals (no additions: 4 reactions is the largest network allowed) and 13 other reaction orders. Best: change the rate law of 'B + C -> E' to r = k P_B^2 P_C^2 (was r = k P_B P_C^2) (BIC 8437 -> 7543); now cannot explain C, E, B, D, A: typical miss 10.0x, 8.6x, 7.2x, 3.7x, 3.4x the GC noise (1.01 mol-%, 0.94 mol-%, 0.89 mol-%, 0.61 mol-%, 0.37 mol-%).
+Step 4: tried 0 additions and 3 removals (no additions: 4 reactions is the largest network allowed) and 13 other reaction orders. Best: change the rate law of 'A + 2 B -> E' to r = k P_A P_B^2 (was r = k P_A P_B) (BIC 7543 -> 6921); now cannot explain C, E, B, A, D: typical miss 9.6x, 7.9x, 6.9x, 4.0x, 3.3x the GC noise (1.07 mol-%, 0.69 mol-%, 0.76 mol-%, 0.39 mol-%, 0.64 mol-%).
+Step 5: tried 0 additions and 3 removals (no additions: 4 reactions is the largest network allowed) and 13 other reaction orders, then 3 replacements. Best: replace 'A + B -> C' by 'A + B <=> C' (BIC 6921 -> 3206); now cannot explain E, C, B, D, A: typical miss 7.3x, 4.4x, 3.8x, 3.7x, 2.2x the GC noise (0.79 mol-%, 1.18 mol-%, 0.65 mol-%, 0.67 mol-%, 0.32 mol-%).
+Step 6: tried 0 additions and 3 removals (no additions: 4 reactions is the largest network allowed) and 13 other reaction orders. Best: change the rate law of 'B + C -> E' to r = k P_B^2 P_C (was r = k P_B^2 P_C^2) (BIC 3206 -> 1845); now cannot explain B, E, C: typical miss 5.1x, 4.8x, 2.5x the GC noise (0.51 mol-%, 0.46 mol-%, 0.47 mol-%).
+Step 7: tried 0 additions and 3 removals (no additions: 4 reactions is the largest network allowed) and 13 other reaction orders. Best: change the rate law of 'B + C -> E' to r = k P_B P_C (was r = k P_B^2 P_C) (BIC 1845 -> 130); now fits the data within the GC noise.
+Step 8: tried 0 additions and 3 removals (no additions: 4 reactions is the largest network allowed). Best: remove 'A + 2 B -> E' (BIC 130 -> 114); now fits the data within the GC noise.
+Step 9: tried 0 additions and 2 removals (no additions: every species is already explained within the GC noise) and 9 other reaction orders, then 19 replacements; none lowers BIC by more than 2. The reactions are settled.
+Order check: tried 9 other orders (each reactant at 0, 1, 2); none is better than the present rate laws.
+Final check: the best network already fits within the GC noise with plain rate laws; letting product C block catalyst sites (one more fitted number) does not improve on that.
+Result: A + B <=> C; A -> D; B + C -> E with plain rate laws (BIC 114).
+
+The reactions that explain the data best:
+   1.  A + B <=> C    r1 = k1 (P_A P_B - P_C / K1)
+   2.  A -> D         r2 = k2 P_A
+   3.  B + C -> E     r3 = k3 P_B P_C
+This network fits the data within the GC noise (plain rate laws).
+No other network tried comes close (next best: BIC difference 16).
+```
+
+**From `close`** (quite close (one order wrong)): ends at the true network (65 fits, 14 s).
+
+```
+The feed is A and B; the GC sees these products: C (up to 33.1 mol-%), D (up to 44.4 mol-%), E (up to 38.5 mol-%).
+Start: the network you gave (A + B <=> C; C + B -> E ; orders C=1, B=0; A -> D): cannot explain E, B, C, D, A: typical miss 11.1x, 7.8x, 6.6x, 3.2x, 2.5x the GC noise (1.11 mol-%, 0.94 mol-%, 0.78 mol-%, 0.56 mol-%, 0.29 mol-%) (BIC 7312).
+Step 1: tried 17 additions and 2 removals and 8 other reaction orders. Best: change the rate law of 'C + B -> E' to r = k P_B P_C (was r = k P_C   (zero order in B)) (BIC 7312 -> 114); now fits the data within the GC noise.
+Step 2: tried 0 additions and 2 removals (no additions: every species is already explained within the GC noise) and 9 other reaction orders, then 19 replacements; none lowers BIC by more than 2. The reactions are settled.
+Order check: tried 9 other orders (each reactant at 0, 1, 2); none is better than the present rate laws.
+Final check: the best network already fits within the GC noise with plain rate laws; letting product C block catalyst sites (one more fitted number) does not improve on that.
+Result: A + B <=> C; C + B -> E; A -> D with plain rate laws (BIC 114).
+
+The reactions that explain the data best:
+   1.  A + B <=> C    r1 = k1 (P_A P_B - P_C / K1)
+   2.  C + B -> E     r2 = k2 P_B P_C
+   3.  A -> D         r3 = k3 P_A
+This network fits the data within the GC noise (plain rate laws).
+No other network tried comes close (next best: BIC difference 1933).
+```
+
 ### B4. Automatic search on the realistic file
 
     python discover_reactions.py examples/discovery/complex_real.csv
 
 ```
-Reaction search on complex_real.csv: 143 network fits in 91 s
+Reaction search on complex_real.csv: 190 network fits in 52 s
 
 How the search went:
   The feed is A and B; the GC sees these products: C (up to 33.5 mol-%), D (up to 44.7 mol-%), E (up to 38.0 mol-%).
@@ -391,14 +399,14 @@ How the search went:
   Step 1: tried 6 additions and 0 removals. Best: add 'A -> D' (BIC 5607908 -> 1425784); now cannot explain C and E: no reaction in this network makes them (the GC sees up to 33.5 mol-% C and 38.0 mol-% E); it also misses B, A, D by more than 2x the GC noise.
   Step 2: tried 11 additions and 0 removals. Best: add 'A + 2 B <=> E' (BIC 1425784 -> 296422); now cannot explain C: no reaction in this network makes it (the GC sees up to 33.5 mol-% C); it also misses E, A, B, D by more than 2x the GC noise.
   Step 3: tried 10 additions and 2 removals. Best: add 'A + B <=> C' (BIC 296422 -> 36247); now cannot explain C, E, B, D, A: typical miss 22.6x, 16.3x, 16.2x, 11.5x, 6.1x the GC noise (2.29 mol-%, 3.30 mol-%, 2.73 mol-%, 1.78 mol-%, 0.75 mol-%).
-  Step 4: tried 16 additions and 3 removals. Best: add 'B + C -> E' (BIC 36247 -> 1158); now cannot explain B, C, A: typical miss 3.9x, 3.6x, 2.6x the GC noise (0.63 mol-%, 0.66 mol-%, 0.41 mol-%).
-  Step 5: tried 0 additions and 3 removals (no additions: 4 reactions is the largest network allowed). Best: remove 'A + 2 B <=> E' (BIC 1158 -> 1143); now cannot explain B, C, A: typical miss 3.8x, 3.6x, 2.6x the GC noise (0.62 mol-%, 0.67 mol-%, 0.41 mol-%).
-  Step 6: tried 17 additions and 2 removals. Best: add '2 A + B -> C + D' (BIC 1143 -> 1111); now cannot explain B, C, A: typical miss 3.7x, 3.7x, 2.5x the GC noise (0.59 mol-%, 0.67 mol-%, 0.41 mol-%).
-  Step 7: tried 0 additions and 4 removals (no additions: 4 reactions is the largest network allowed), then 29 replacements; none lowers BIC by more than 2. The reactions are settled.
-  Order check: tried 11 other orders. Better: '2 A + B -> C + D': r = k P_A^2 P_B^2 instead of r = k P_A^2 P_B (BIC 1111 -> 1103).
-  Order check: tried 11 other orders. Better: '2 A + B -> C + D': r = k P_A P_B^2 instead of r = k P_A^2 P_B^2 (BIC 1103 -> 1094).
-  Order check: tried 11 other orders (each reactant at 0, 1, 2); none is better than the present rate laws.
-  Final check: plain rate laws leave misses larger than the GC noise, so the best networks were re-fitted allowing product C to block catalyst sites (the best one from several starting points). The data support site blocking.
+  Step 4: tried 16 additions and 3 removals and 9 other reaction orders. Best: add 'B + C -> E' (BIC 36247 -> 1158); now cannot explain B, C, A: typical miss 3.9x, 3.6x, 2.6x the GC noise (0.63 mol-%, 0.66 mol-%, 0.41 mol-%).
+  Step 5: tried 0 additions and 3 removals (no additions: 4 reactions is the largest network allowed) and 13 other reaction orders. Best: remove 'A + 2 B <=> E' (BIC 1158 -> 1143); now cannot explain B, C, A: typical miss 3.8x, 3.6x, 2.6x the GC noise (0.62 mol-%, 0.67 mol-%, 0.41 mol-%).
+  Step 6: tried 17 additions and 2 removals and 9 other reaction orders. Best: add '2 A + B -> C + D' (BIC 1143 -> 1111); now cannot explain B, C, A: typical miss 3.7x, 3.7x, 2.5x the GC noise (0.59 mol-%, 0.67 mol-%, 0.41 mol-%).
+  Step 7: tried 0 additions and 4 removals (no additions: 4 reactions is the largest network allowed) and 13 other reaction orders. Best: change the rate law of '2 A + B -> C + D' to r = k P_A^2 P_B^2 (was r = k P_A^2 P_B) (BIC 1111 -> 1103); now cannot explain B, C, A: typical miss 3.7x, 3.6x, 2.4x the GC noise (0.59 mol-%, 0.67 mol-%, 0.40 mol-%).
+  Step 8: tried 0 additions and 4 removals (no additions: 4 reactions is the largest network allowed) and 13 other reaction orders. Best: change the rate law of '2 A + B -> C + D' to r = k P_A P_B^2 (was r = k P_A^2 P_B^2) (BIC 1103 -> 1094); now cannot explain C, B, A: typical miss 3.7x, 3.7x, 2.4x the GC noise (0.67 mol-%, 0.59 mol-%, 0.40 mol-%).
+  Step 9: tried 0 additions and 4 removals (no additions: 4 reactions is the largest network allowed) and 13 other reaction orders, then 30 replacements; none lowers BIC by more than 2. The reactions are settled.
+  Order check: tried 13 other orders (each reactant at 0, 1, 2); none is better than the present rate laws.
+  Final check: plain rate laws leave misses larger than the GC noise, so the best networks were re-fitted allowing product C to block catalyst sites (the best one from several starting points). That lowers BIC from 1094 to 139: the best network now fits within the GC noise, so the data support site blocking.
   With site blocking allowed, '2 A + B -> C + D ; orders A=1, B=2' is no longer needed (BIC 139 -> 125): the plain search had added it to imitate the site blocking.
   Result: A -> D; A + B <=> C; B + C -> E with rate laws with product C blocking catalyst sites, K_C = 0.0328 per bar at 300 C (BIC 125).
 
@@ -435,55 +443,55 @@ With plain rate laws alone no network of the library fits this file within the G
 `complex_short_campaign.csv` is not a kinetic study. It holds the first 8 runs of an optimisation campaign on the virtual "real" reactor: the 5 shared screening runs from the base case (10 bar, 20 / 20 / 10 mL/min, 600 K: a temperature ladder, then more pressure, then more B) and 3 more steps to hotter and higher pressure, each within the allowed step (10 bar, 10 mL/min, 30 K) of the run before. This campaign was chosen because the search needs more than one pass on it (not every short campaign does): the search changes one reaction at a time, and here its first choice leads to a dead end. It notices that its result does not fit within the GC noise and starts again from another first reaction.
 
 ```
-Reaction search on complex_short_campaign.csv: 202 network fits in 84 s
+Reaction search on complex_short_campaign.csv: 250 network fits in 43 s
 
 How the search went:
   The feed is A and B; the GC sees these products: C (up to 40.7 mol-%), D (up to 44.5 mol-%), E (up to 47.8 mol-%).
   Start: no reactions (the outlet would equal the feed), BIC 6076089.
   Step 1: tried 6 additions and 0 removals. Best: add '2 A + B -> C + D' (BIC 6076089 -> 1970253); now cannot explain E: no reaction in this network makes it (the GC sees up to 47.8 mol-% E); it also misses B, C, D, A by more than 2x the GC noise.
   Step 2: tried 11 additions and 0 removals. Best: add 'B + C -> E' (BIC 1970253 -> 379438); now cannot explain B, C, D, E, A: typical miss 185.8x, 97.3x, 51.4x, 26.2x, 10.2x the GC noise (13.49 mol-%, 13.99 mol-%, 8.91 mol-%, 11.74 mol-%, 0.98 mol-%).
-  Step 3: tried 20 additions and 1 removal. Best: add '2 B + D <=> E' (BIC 379438 -> 14138); now cannot explain B, E, D, C, A: typical miss 27.3x, 20.7x, 19.3x, 13.4x, 6.3x the GC noise (2.27 mol-%, 2.84 mol-%, 2.44 mol-%, 5.84 mol-%, 0.71 mol-%).
-  Step 4: tried 18 additions and 2 removals. Best: add 'B + D -> C' (BIC 14138 -> 1121); now cannot explain B, C, D, A, E: typical miss 7.6x, 7.5x, 3.3x, 2.7x, 2.1x the GC noise (0.57 mol-%, 1.19 mol-%, 0.67 mol-%, 0.15 mol-%, 0.53 mol-%).
-  Step 5: tried 0 additions and 3 removals (no additions: 4 reactions is the largest network allowed), then 26 replacements; none lowers BIC by more than 2. The reactions are settled.
-  Order check: tried 13 other orders. Better: '2 A + B -> C + D': r = k P_A^2   (zero order in B) instead of r = k P_A^2 P_B (BIC 1121 -> 1096).
-  Order check: tried 12 other orders (each reactant at 0, 1, 2); none is better than the present rate laws.
+  Step 3: tried 20 additions and 1 removal and 8 other reaction orders. Best: add '2 B + D <=> E' (BIC 379438 -> 14138); now cannot explain B, E, D, C, A: typical miss 27.3x, 20.7x, 19.3x, 13.4x, 6.3x the GC noise (2.27 mol-%, 2.84 mol-%, 2.44 mol-%, 5.84 mol-%, 0.71 mol-%).
+  Step 4: tried 18 additions and 2 removals and 12 other reaction orders. Best: add 'B + D -> C' (BIC 14138 -> 1121); now cannot explain B, C, D, A, E: typical miss 7.6x, 7.5x, 3.3x, 2.7x, 2.1x the GC noise (0.57 mol-%, 1.19 mol-%, 0.67 mol-%, 0.15 mol-%, 0.53 mol-%).
+  Step 5: tried 0 additions and 3 removals (no additions: 4 reactions is the largest network allowed) and 16 other reaction orders. Best: change the rate law of '2 A + B -> C + D' to r = k P_A^2   (zero order in B) (was r = k P_A^2 P_B) (BIC 1121 -> 1096); now cannot explain B, C, A, D, E: typical miss 7.4x, 7.3x, 3.3x, 3.0x, 2.1x the GC noise (0.54 mol-%, 1.10 mol-%, 0.19 mol-%, 0.62 mol-%, 0.54 mol-%).
+  Step 6: tried 0 additions and 3 removals (no additions: 4 reactions is the largest network allowed) and 15 other reaction orders, then 27 replacements; none lowers BIC by more than 2. The reactions are settled.
+  Order check: tried 15 other orders (each reactant at 0, 1, 2); none is better than the present rate laws.
   Final check: plain rate laws leave misses larger than the GC noise, so the best networks were re-fitted allowing product C to block catalyst sites (the best one from several starting points). That does not help.
   The best network so far does not fit within the GC noise. The search changes one reaction at a time, so it may have taken a wrong turn early on: search again, starting from 'A + 2 B -> E' as the first reaction.
   Step 1: tried 8 additions and 0 removals. Best: add 'A -> D' (BIC 2346526 -> 83348); now cannot explain C: no reaction in this network makes it (the GC sees up to 40.7 mol-% C); it also misses E, D, A, B by more than 2x the GC noise.
   Step 2: tried 10 additions and 2 removals. Best: add 'A + B <=> C' (BIC 83348 -> 5783); now cannot explain B, C, E, A, D: typical miss 17.9x, 17.8x, 6.4x, 4.6x, 4.6x the GC noise (1.28 mol-%, 2.51 mol-%, 1.77 mol-%, 0.32 mol-%, 1.29 mol-%).
   Step 3: tried 16 additions and 3 removals. Best: add 'B + C -> E' (BIC 5783 -> 71); now fits the data within the GC noise.
   Step 4: tried 0 additions and 3 removals (no additions: 4 reactions is the largest network allowed). Best: remove 'A + 2 B -> E' (BIC 71 -> 54); now fits the data within the GC noise.
-  Step 5: tried 13 additions and 2 removals, then 19 replacements; none lowers BIC by more than 2. The reactions are settled.
-  Order check: tried 7 other orders (each reactant at 0, 1, 2); none is better than the present rate laws.
-  Final check: the best network already fits within the GC noise with plain rate laws, so there is nothing left for site blocking (product C occupying the catalyst) to explain.
-  Result: A -> D; A + B <=> C; B + C -> E with plain rate laws (BIC 54).
+  Step 5: tried 13 additions and 2 removals and 9 other reaction orders, then 19 replacements; none lowers BIC by more than 2. The reactions are settled.
+  Order check: tried 9 other orders (each reactant at 0, 1, 2); none is better than the present rate laws.
+  Final check: the best network fits within the GC noise with plain rate laws, and better still when product C is allowed to block catalyst sites (BIC 54 -> 50), so site blocking is kept. The next best networks were given the same chance.
+  Result: A -> D; A + B <=> C; B + C -> E with rate laws with product C blocking catalyst sites, K_C = 0.0245 per bar at 300 C (BIC 50).
 
 The reactions that explain the data best:
    1.  A -> D         r1 = k1 P_A
    2.  A + B <=> C    r2 = k2 (P_A P_B - P_C / K2)
    3.  B + C -> E     r3 = k3 P_B P_C
-This network fits the data within the GC noise (plain rate laws).
-No other network tried comes close (next best: BIC difference 6).
+This network fits the data within the GC noise (rate laws with product C blocking catalyst sites, K_C = 0.0245 per bar at 300 C).
+The next best network tried is ruled out, but only just (BIC difference 9.2; below 6 would count as a tie): a few more runs would make this firm.
 
 Fitted numbers of the best network:
   1.  A -> D         r1 = k1 P_A
   2.  A + B <=> C    r2 = k2 (P_A P_B - P_C / K2)
   3.  B + C -> E     r3 = k3 P_B P_C
-  fitted with plain rate laws; 6 fitted numbers, 8 runs
-  k1 at 300 C = 8.97e-07 (8.6e-07 to 9.37e-07) mol g^-1 s^-1 bar^-1,   Ea1 = 154 +- 3 kJ/mol
-  k2 at 300 C = 2.52e-06 (2.45e-06 to 2.6e-06) mol g^-1 s^-1 bar^-2,   Ea2 = 74 +- 3 kJ/mol
-  k3 at 300 C = 2.53e-07 (2.42e-07 to 2.65e-07) mol g^-1 s^-1 bar^-2,   Ea3 = 126 +- 3 kJ/mol
-  typical miss per species: A 0.05 mol-% (0.9x noise),  B 0.10 mol-% (1.3x noise),  C 0.10 mol-% (0.8x noise),  D 0.24 mol-% (0.7x noise),  E 0.16 mol-% (0.4x noise)
+  fitted with rate laws with product C blocking catalyst sites, K_C = 0.0245 per bar at 300 C; 7 fitted numbers, 8 runs
+  k1 at 300 C = 9.76e-07 (8.84e-07 to 1.08e-06) mol g^-1 s^-1 bar^-1,   Ea1 = 151 +- 4 kJ/mol
+  k2 at 300 C = 2.88e-06 (2.5e-06 to 3.33e-06) mol g^-1 s^-1 bar^-2,   Ea2 = 71 +- 5 kJ/mol
+  k3 at 300 C = 2.88e-07 (2.49e-07 to 3.33e-07) mol g^-1 s^-1 bar^-2,   Ea3 = 122 +- 5 kJ/mol
+  typical miss per species: A 0.05 mol-% (0.9x noise),  B 0.08 mol-% (1.1x noise),  C 0.07 mol-% (0.4x noise),  D 0.23 mol-% (0.7x noise),  E 0.18 mol-% (0.5x noise)
 
 The next best networks:
-  BIC difference 6.3 (ruled out against the best):  A -> D;  A + B <=> C;  B + C -> E;  A + B + C -> D + E
-  BIC difference 13.5 (ruled out against the best):  A -> D;  A + B <=> C;  B + C -> E;  B + C + D <=> A + E
-  BIC difference 14.3 (ruled out against the best):  A -> D;  A + B <=> C;  B + C -> E;  A + 2 B <=> E
-  BIC difference 1041.6 (ruled out against the best):  2 A + B -> C + D ; orders A=2, B=0;  B + C -> E;  2 B + D <=> E;  B + D -> C
-  BIC difference 1066.5 (ruled out against the best):  2 A + B -> C + D;  B + C -> E;  2 B + D <=> E;  B + D -> C
+  BIC difference 9.2 (ruled out against the best):  A -> D;  A + B <=> C;  B + C -> E;  A + B + C -> D + E
+  BIC difference 10.1 (ruled out against the best):  A -> D;  A + B <=> C;  B + C -> E;  B + C + D <=> A + E
+  BIC difference 14.0 (ruled out against the best):  A -> D;  A + B <=> C;  B + C -> E;  A + 2 B <=> E
+  BIC difference 1046.2 (ruled out against the best):  2 A + B -> C + D ; orders A=2, B=0;  B + C -> E;  2 B + D <=> E;  B + D -> C
+  BIC difference 1071.1 (ruled out against the best):  2 A + B -> C + D;  B + C -> E;  2 B + D <=> E;  B + D -> C
 ```
 
-The search ends at the true reactions after starting again 1 time. With 8 runs the fit is less sharp than with the 30-run study: compare the uncertainties of the fitted numbers above with those in B2.
+The search ends at the true reactions after starting again 1 time. With 8 runs the fit is less sharp than with the 30-run study: compare the uncertainties of the fitted numbers above with those in B2. The next best networks are ruled out, but by much smaller BIC differences than in the 30-run study.
 
 Ranking the four typed candidates on the same runs:
 
@@ -509,29 +517,91 @@ The best candidate, 'truth':
   typical miss per species: A 0.05 mol-% (0.9x noise),  B 0.08 mol-% (1.1x noise),  C 0.07 mol-% (0.4x noise),  D 0.23 mol-% (0.7x noise),  E 0.18 mol-% (0.5x noise)
 ```
 
-### B6. Summary
+### B6. A rate law that does not follow the equation (order of reaction)
+
+    python discover_reactions.py examples/discovery/zero_order_noisy.csv
+
+`zero_order_noisy.csv` holds the same 30 runs calculated from the network of `candidates_close.txt` taken as the TRUE one:
+
+```
+1.  A + B <=> C    r1 = k1 (P_A P_B - P_C / K1)
+2.  C + B -> E     r2 = k2 P_C   (zero order in B)
+3.  A -> D         r3 = k3 P_A
+```
+
+Reaction 2 uses up B but its rate does not depend on the pressure of B (zero order in B: the catalyst surface is saturated with B). So that B cannot go below zero, the data were calculated with the rate multiplied by y_B / (y_B + 0.001), y_B being the mole fraction of B: 1 for all practical purposes, falling to zero when B has run out. Kinetic numbers as for the complex network (A4); GC noise as in the other noisy files. The search is not told that any order is unusual:
+
+```
+Reaction search on zero_order_noisy.csv: 145 network fits in 34 s
+
+How the search went:
+  The feed is A and B; the GC sees these products: C (up to 35.1 mol-%), D (up to 45.0 mol-%), E (up to 39.8 mol-%).
+  Start: no reactions (the outlet would equal the feed), BIC 6266938.
+  Step 1: tried 6 additions and 0 removals. Best: add '2 A + B -> C + D' (BIC 6266938 -> 1817950); now cannot explain E: no reaction in this network makes it (the GC sees up to 39.8 mol-% E); it also misses C, B, A, D by more than 2x the GC noise.
+  Step 2: tried 11 additions and 0 removals. Best: add 'B + C -> E' (BIC 1817950 -> 726167); now cannot explain A, C, D, B, E: typical miss 105.6x, 72.6x, 67.9x, 53.2x, 18.4x the GC noise (6.47 mol-%, 10.26 mol-%, 9.02 mol-%, 6.76 mol-%, 3.36 mol-%).
+  Step 3: tried 20 additions and 1 removal and 8 other reaction orders. Best: add 'A + B <=> C' (BIC 726167 -> 136572); now cannot explain C, B, A, D, E: typical miss 39.1x, 35.6x, 28.7x, 22.2x, 20.8x the GC noise (6.49 mol-%, 4.85 mol-%, 3.22 mol-%, 3.51 mol-%, 3.31 mol-%).
+  Step 4: tried 17 additions and 3 removals and 12 other reaction orders. Best: add 'A -> D' (BIC 136572 -> 7968); now cannot explain B, C, E, A, D: typical miss 10.5x, 8.6x, 7.8x, 3.2x, 3.0x the GC noise (0.87 mol-%, 0.92 mol-%, 0.92 mol-%, 0.35 mol-%, 0.52 mol-%).
+  Step 5: tried 0 additions and 4 removals (no additions: 4 reactions is the largest network allowed) and 13 other reaction orders. Best: change the rate law of 'B + C -> E' to r = k P_C   (zero order in B) (was r = k P_B P_C) (BIC 7968 -> 156); now fits the data within the GC noise.
+  Step 6: tried 0 additions and 4 removals (no additions: 4 reactions is the largest network allowed). Best: remove '2 A + B -> C + D' (BIC 156 -> 139); now fits the data within the GC noise.
+  Step 7: tried 0 additions and 2 removals (no additions: every species is already explained within the GC noise) and 8 other reaction orders, then 20 replacements; none lowers BIC by more than 2. The reactions are settled.
+  Order check: tried 8 other orders (each reactant at 0, 1, 2); none is better than the present rate laws.
+  Final check: the best network already fits within the GC noise with plain rate laws; letting product C block catalyst sites (one more fitted number) does not improve on that.
+  Result: B + C -> E ; orders B=0, C=1; A + B <=> C; A -> D with plain rate laws (BIC 139).
+
+The reactions that explain the data best:
+   1.  B + C -> E     r1 = k1 P_C   (zero order in B)
+   2.  A + B <=> C    r2 = k2 (P_A P_B - P_C / K2)
+   3.  A -> D         r3 = k3 P_A
+This network fits the data within the GC noise (plain rate laws).
+No other network tried comes close (next best: BIC difference 17).
+
+Fitted numbers of the best network:
+  1.  B + C -> E     r1 = k1 P_C   (zero order in B)
+  2.  A + B <=> C    r2 = k2 (P_A P_B - P_C / K2)
+  3.  A -> D         r3 = k3 P_A
+  fitted with plain rate laws; 6 fitted numbers, 30 runs
+  k1 at 300 C = 2.89e-07 (2.75e-07 to 3.03e-07) mol g^-1 s^-1 bar^-1,   Ea1 = 122 +- 3 kJ/mol
+  k2 at 300 C = 3.02e-06 (2.99e-06 to 3.04e-06) mol g^-1 s^-1 bar^-2,   Ea2 = 70 +- 1 kJ/mol
+  k3 at 300 C = 9.95e-07 (9.75e-07 to 1.02e-06) mol g^-1 s^-1 bar^-1,   Ea3 = 151 +- 1 kJ/mol
+  typical miss per species: A 0.16 mol-% (0.9x noise),  B 0.18 mol-% (0.7x noise),  C 0.12 mol-% (0.7x noise),  D 0.16 mol-% (0.9x noise),  E 0.08 mol-% (0.9x noise)
+
+The next best networks:
+  BIC difference 17.1 (ruled out against the best):  2 A + B -> C + D;  B + C -> E ; orders B=0, C=1;  A + B <=> C;  A -> D
+  BIC difference 5262.8 (ruled out against the best):  B + C -> E ; orders B=0, C=2;  A + B <=> C;  A -> D
+  BIC difference 7610.4 (ruled out against the best):  2 A + B -> C + D ; orders A=1, B=1;  B + C -> E;  A + B <=> C;  A -> D
+```
+
+The search returns exactly the true reactions and rate laws, including the zero order in B. A rate law that does not follow its equation is the hardest case for the search: it takes every rate to follow its equation until the reactions are settled, and first tries to make up for the unusual order with extra reactions. This file is a favourable case (one pass). In six further trials, not shipped as files, the same network was used with other noise on these 30 runs (2 trials: found in one pass, as here) and with four other run designs. On those four the first pass and one new start found it once and missed it three times, each miss ending with *does not fit within the GC noise* rather than with a wrong answer presented as right. From its second new start on, the search therefore also tries every reaction it may add with one of its orders changed; with that it found the true network in all four, after one or two new starts and 2 to 3 minutes instead of about 1 (see B8).
+
+### B7. Summary
 
 | file | task | result | true network found | time |
 |---|---|---|---|---|
-| mystery_noisy.csv | automatic search | A + B <=> C; A + 2 B -> E; C -> B + D | yes | 43 s |
-| mystery_exact.csv | automatic search | A + B <=> C; A + 2 B -> E; C -> B + D | yes | 50 s |
-| complex_real.csv | automatic search | A -> D; A + B <=> C; B + C -> E (inhib) | yes | 91 s |
-| complex_exact.csv | rank 4 candidates | truth > close > similar > far | yes | 41 s |
-| complex_noisy.csv | rank 4 candidates | truth > close > similar > far | yes | 38 s |
-| complex_real.csv | rank 4 candidates | truth > close > similar > far | yes | 36 s |
-| complex_noisy.csv | repair 'far' | A + B <=> C; B + C -> E; A -> D | yes | 84 s |
-| complex_noisy.csv | repair 'similar' | A + B <=> C; A -> D; B + C -> E | yes | 40 s |
-| complex_noisy.csv | repair 'close' | A + B <=> C; B + C -> E; A -> D | yes | 34 s |
-| complex_short_campaign.csv | automatic search (1 restart) | A -> D; A + B <=> C; B + C -> E (plain) | yes | 84 s |
-| complex_short_campaign.csv | rank 4 candidates | truth > close > similar > far | yes | 30 s |
+| mystery_noisy.csv | automatic search | A + B <=> C; A + 2 B -> E; C -> B + D | yes | 40 s |
+| mystery_exact.csv | automatic search | A + B <=> C; A + 2 B -> E; C -> B + D | yes | 41 s |
+| complex_real.csv | automatic search | A -> D; A + B <=> C; B + C -> E (inhib) | yes | 52 s |
+| complex_exact.csv | rank 4 candidates | truth > close > similar > far | yes | 15 s |
+| complex_noisy.csv | rank 4 candidates | truth > close > similar > far | yes | 15 s |
+| complex_real.csv | rank 4 candidates | truth > close > similar > far | yes | 13 s |
+| complex_noisy.csv | repair 'far' | A + B <=> C; B + C -> E; A -> D | yes | 43 s |
+| complex_noisy.csv | repair 'similar' | A + B <=> C; A -> D; B + C -> E | yes | 41 s |
+| complex_noisy.csv | repair 'close' | A + B <=> C; C + B -> E; A -> D | yes | 14 s |
+| complex_short_campaign.csv | automatic search (1 restart) | A -> D; A + B <=> C; B + C -> E (inhib) | yes | 43 s |
+| complex_short_campaign.csv | rank 4 candidates | truth > close > similar > far | yes | 10 s |
+| zero_order_noisy.csv | automatic search (0 restarts) | B + C -> E ; orders B=0, C=1; A + B <=> C; A -> D | yes | 34 s |
 
 Times are for one laptop core and vary by a factor of about two with what else the computer is doing and with its power mode.
 
-### B7. Limits (honest list)
+### B8. Limits (honest list)
 
 - The search can only return reactions that are in its library and rate laws of the power-law form (orders 0, 1, 2), with at most one adsorption term (product C). A real effect outside that (another species adsorbing, diffusion limits, a species the GC does not see) shows up as *does not fit within the GC noise*, not as a wrong answer presented as right.
-- The search changes one reaction at a time and keeps the best change. It is not guaranteed to find the best network there is. It starts again from another first reaction when its result does not fit within the GC noise (B5), but a network that fits and is still not the best possible would not be noticed. Ranking typed candidates (B2) compares exactly the networks you give and has no such limit.
+- The search changes one thing at a time (a reaction or one reaction order) and keeps the best change. It is not guaranteed to find the best network there is. It starts again from another first reaction when its result does not fit within the GC noise (B5), but a network that fits and is still not the best possible would not be noticed. Ranking typed candidates (B2) compares exactly the networks you give and has no such limit.
+- The search is quickest and most reliable when the true rates follow the equations (mass action), as in the mystery and the complex example. A true rate with an unusual order (B6) is harder. The search finds it when the first pass happens to build the right reactions (as on the file of B6), or else from its second new start on, when it also tries every reaction it may add with one of its orders changed; that took 2 to 3 minutes in the trials. Those trials were few (seven in all) and of one kind (one reactant of order zero): two unusual orders at once, or an order other than 0, 1 or 2, may well be missed. A miss is reported as *does not fit within the GC noise*; the way forward is then to type the suspected network as a candidate and rank it (B2).
+- When nothing the search can build fits the data, it starts again up to three times before it gives up, and the later starts are the slow ones. Such a search can take several minutes (the command line has no time limit; `discover(..., max_seconds=...)` and `n_restarts` set one).
+- *Fits within the GC noise* is judged against the advisor's noise model (1 % of the reading plus 0.05 mol-%). The noise in the example files is drawn with the two parts independent, which makes the real scatter up to 1.4 times smaller than that sum; this is why a correct network shows typical misses of 0.5 to 0.8 times the noise rather than 1, and it makes the test for *fits* lenient by about that factor.
 - Two rate laws that predict the same compositions over the runs done cannot be told apart by any method; the program says so and proposes the run that would decide.
+- The run proposed to tell two networks apart is worked out from their fitted numbers. Far from the runs done those numbers are uncertain, and two fits can then predict very different readings for that reason alone. The program therefore also gives the difference counted against the GC noise plus that uncertainty, and says so when one run would not be enough. The uncertainty itself is a rough estimate (a few dozen random draws from each fit).
+- All fits use the project's fast bed solver, which agrees with the accurate solver to about 0.1 mol-% of a reading. That can shift a BIC by a few units (about 3 for the true complex network on `complex_noisy.csv`), one more reason why BIC differences below 6 are not called decisions.
 - The 30-run files are designed kinetic studies with a wide range of conditions. The step-limited runs of an optimisation campaign cover a much smaller region; B5 shows one such case that works, but fewer or less varied runs will leave more undecided.
 - Equilibrium constants come from the placeholder species table in `smart/discovery.py`; all kinetics are placeholders.
 
