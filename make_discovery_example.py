@@ -80,12 +80,12 @@ ZERO = "zero_order_noisy.csv"
 # starts that were not used to develop the search.
 SHORT_TRIALS = dict(n=10, found=6, one_pass=3, after_restart=3, found_s=(61, 250), missed_s=(249, 348),
                     missed_x_noise=(3.2, 6.6))
-# The same day, the search with the UNPRUNED library (reaction_library(thermo_prune=False): 30 forms instead of 22)
-UNPRUNED = {"mystery_noisy.csv": "the true network (299 s), not deciding whether A + 2 B -> E runs one way or both ways",
-            "complex_noisy.csv": "the true network (61 s), not deciding whether A -> D and B + C -> E run one way or both ways",
-            "complex_real.csv": "the true reactions with A -> D written as two-way, D <=> A (197 s), which inside the box "
+# The same day (times not kept: measured with other jobs running), the search with the UNPRUNED library (reaction_library(thermo_prune=False): 30 forms instead of 22)
+UNPRUNED = {"mystery_noisy.csv": "the true network, not deciding whether A + 2 B -> E runs one way or both ways",
+            "complex_noisy.csv": "the true network, not deciding whether A -> D and B + C -> E run one way or both ways",
+            "complex_real.csv": "the true reactions with A -> D written as two-way, D <=> A, which inside the box "
                                 "predicts the same as the one-way form",
-            SHORT: "the true reactions with B + C -> E written as two-way (109 s), not deciding whether A -> D and "
+            SHORT: "the true reactions with B + C -> E written as two-way, not deciding whether A -> D and "
                    "B + C -> E run one way or both ways"}
 ZERO_TEXT = D.CANDIDATES["close"]         # A + B <=> C;  C + B -> E with r = k P_C (zero order in B);  A -> D
 ZERO_K, ZERO_EA = COMPLEX_K, COMPLEX_EA   # the same placeholder numbers as the complex network
@@ -537,7 +537,7 @@ def finder_md(res):
           f"on the first 8 runs of {SHORT_TRIALS['n']} step-limited campaigns of the v5 advisor on the same virtual reactor "
           "(the shared screening runs, then 3 steps the advisor chose; seeds 0 to 9) it found the true network in "
           f"{SHORT_TRIALS['found']} of {SHORT_TRIALS['n']} ({SHORT_TRIALS['one_pass']} in one pass, {SHORT_TRIALS['after_restart']} "
-          f"after starting again; {SHORT_TRIALS['found_s'][0]} to {SHORT_TRIALS['found_s'][1]} s). In the other "
+          f"after starting again; {SHORT_TRIALS['found_s'][0]} to {SHORT_TRIALS['found_s'][1]} s with the ten searches running side by side). In the other "
           f"{SHORT_TRIALS['n'] - SHORT_TRIALS['found']} it ended, after three new starts and {SHORT_TRIALS['missed_s'][0]} to "
           f"{SHORT_TRIALS['missed_s'][1]} s, at a wrong network that it reported as not fitting within the GC noise (typical "
           f"miss {SHORT_TRIALS['missed_x_noise'][0]:g} to {SHORT_TRIALS['missed_x_noise'][1]:g} times the noise), never as an "

@@ -131,10 +131,10 @@ How it decides, in short: every network tried is fitted to all GC readings (rate
 
 The search starts with no reactions and may use any reaction from a library that is **enumerated from the atom balance** (12 reactions among A, B, C, D, E with at most 3 molecules reacting and 2 formed; 22 forms in all: one-way in either direction and reversible, except where the placeholder thermodynamics says a direction runs to completion everywhere in the operating box, and then only that direction is offered), not written around the answer. Each step of the search tries adding a reaction, removing one, changing one reaction order and, if none of these helps, replacing a reaction.
 
-One caution about that pruning. The placeholder thermodynamics (the species table in `smart/discovery.py`) were chosen to reproduce the complex network, with its two one-way steps (A -> D and C + B -> E) complete everywhere in the box; for that chemistry the pruning therefore removes exactly the other forms of those two reactions. It encodes the directions of the complex example's answer, and making A -> D complete needs an entropy for D that an isomerisation would hardly have. Without pruning (30 forms) the search returns on this file the true network (299 s), not deciding whether A + 2 B -> E runs one way or both ways; on the complex files see B8.
+One caution about that pruning. The placeholder thermodynamics (the species table in `smart/discovery.py`) were chosen to reproduce the complex network, with its two one-way steps (A -> D and C + B -> E) complete everywhere in the box; for that chemistry the pruning therefore removes exactly the other forms of those two reactions. It encodes the directions of the complex example's answer, and making A -> D complete needs an entropy for D that an isomerisation would hardly have. Without pruning (30 forms) the search returns on this file the true network, not deciding whether A + 2 B -> E runs one way or both ways; on the complex files see B8.
 
 ```
-Reaction search on mystery_noisy.csv: 203 network fits in 114 s
+Reaction search on mystery_noisy.csv: 203 network fits in 26 s
 
 How the search went:
   The feed is A and B; the GC sees these products: C (up to 21.8 mol-%), D (up to 46.7 mol-%), E (up to 20.0 mol-%).
@@ -187,7 +187,7 @@ Fitted against true kinetics:
 | `C -> D + B` | 1.00e-06 | 9.94e-07 | 110 | 110.2 +- 1.6 |
 | `A + 2 B -> E` | 6.00e-08 | 6.01e-08 | 85 | 85.3 +- 1.2 |
 
-On the noise-free file `mystery_exact.csv` the search returns: A + B <=> C; A + 2 B -> E; C -> B + D (fits the data within the GC noise; the true network; left open: The data cannot decide whether 'A + 2 B -> E' runs one way or both ways (BIC difference 0.0, below 6).). 201 fits, 99 s.
+On the noise-free file `mystery_exact.csv` the search returns: A + B <=> C; A + 2 B -> E; C -> B + D (fits the data within the GC noise; the true network; left open: The data cannot decide whether 'A + 2 B -> E' runs one way or both ways (BIC difference 0.0, below 6).). 201 fits, 34 s.
 
 The run that would settle what is left open (`--next-run`):
 
@@ -318,7 +318,7 @@ The difference between the two predictions is given twice: against the GC noise 
 
 Starting from each wrong candidate, the search adds, removes and replaces reactions and re-checks the orders:
 
-**From `far`** (very different (two reactions, other orders, nothing makes E)): ends at the true network (177 fits, 114 s).
+**From `far`** (very different (two reactions, other orders, nothing makes E)): ends at the true network (177 fits, 34 s).
 
 ```
 The feed is A and B; the GC sees these products: C (up to 33.1 mol-%), D (up to 44.4 mol-%), E (up to 38.5 mol-%).
@@ -343,7 +343,7 @@ This network fits the data within the GC noise (plain rate laws).
 No other network tried comes close (next best: BIC difference 15).
 ```
 
-**From `similar`** (relatively the same (different pathway, no equilibrium)): ends at the true network (171 fits, 82 s).
+**From `similar`** (relatively the same (different pathway, no equilibrium)): ends at the true network (171 fits, 32 s).
 
 ```
 The feed is A and B; the GC sees these products: C (up to 33.1 mol-%), D (up to 44.4 mol-%), E (up to 38.5 mol-%).
@@ -369,7 +369,7 @@ This network fits the data within the GC noise (plain rate laws).
 No other network tried comes close (next best: BIC difference 16).
 ```
 
-**From `close`** (quite close (one order wrong)): ends at the true network (65 fits, 32 s).
+**From `close`** (quite close (one order wrong)): ends at the true network (65 fits, 11 s).
 
 ```
 The feed is A and B; the GC sees these products: C (up to 33.1 mol-%), D (up to 44.4 mol-%), E (up to 38.5 mol-%).
@@ -393,7 +393,7 @@ No other network tried comes close (next best: BIC difference 1933).
     python discover_reactions.py examples/discovery/complex_real.csv
 
 ```
-Reaction search on complex_real.csv: 190 network fits in 139 s
+Reaction search on complex_real.csv: 190 network fits in 39 s
 
 How the search went:
   The feed is A and B; the GC sees these products: C (up to 33.5 mol-%), D (up to 44.7 mol-%), E (up to 38.0 mol-%).
@@ -444,10 +444,10 @@ With plain rate laws alone no network of the library fits this file within the G
 
 `complex_short_campaign.csv` is not a kinetic study, and its steps were not chosen by an optimiser. It holds 8 runs on the virtual "real" reactor, like the start of an optimisation campaign: the 5 shared screening runs from the base case (10 bar, 20 / 20 / 10 mL/min, 600 K: a temperature ladder, then more pressure, then more B) and 3 more steps to hotter and higher pressure CHOSEN BY HAND, each within the allowed step (10 bar, 10 mL/min, 30 K) of the run before. It is the case on which the search's ability to start again was developed: the search changes one reaction at a time, and here its first choice leads to a dead end. It notices that its result does not fit within the GC noise and starts again from another first reaction. So this is a hand-picked, favourable example, not a typical one.
 
-How the search does on campaign starts it was not developed on was measured separately (not shipped as files): on the first 8 runs of 10 step-limited campaigns of the v5 advisor on the same virtual reactor (the shared screening runs, then 3 steps the advisor chose; seeds 0 to 9) it found the true network in 6 of 10 (3 in one pass, 3 after starting again; 61 to 250 s). In the other 4 it ended, after three new starts and 249 to 348 s, at a wrong network that it reported as not fitting within the GC noise (typical miss 3.2 to 6.6 times the noise), never as an answer. Ten campaign starts are a small sample.
+How the search does on campaign starts it was not developed on was measured separately (not shipped as files): on the first 8 runs of 10 step-limited campaigns of the v5 advisor on the same virtual reactor (the shared screening runs, then 3 steps the advisor chose; seeds 0 to 9) it found the true network in 6 of 10 (3 in one pass, 3 after starting again; 61 to 250 s with the ten searches running side by side). In the other 4 it ended, after three new starts and 249 to 348 s, at a wrong network that it reported as not fitting within the GC noise (typical miss 3.2 to 6.6 times the noise), never as an answer. Ten campaign starts are a small sample.
 
 ```
-Reaction search on complex_short_campaign.csv: 250 network fits in 87 s
+Reaction search on complex_short_campaign.csv: 250 network fits in 29 s
 
 How the search went:
   The feed is A and B; the GC sees these products: C (up to 40.7 mol-%), D (up to 44.5 mol-%), E (up to 47.8 mol-%).
@@ -536,7 +536,7 @@ The best candidate, 'truth':
 Reaction 2 uses up B but its rate does not depend on the pressure of B (zero order in B: the catalyst surface is saturated with B). So that B cannot go below zero, the data were calculated with the rate multiplied by y_B / (y_B + 0.001), y_B being the mole fraction of B: 1 for all practical purposes, falling to zero when B has run out. Kinetic numbers as for the complex network (A4); GC noise as in the other noisy files. The search is not told that any order is unusual:
 
 ```
-Reaction search on zero_order_noisy.csv: 145 network fits in 63 s
+Reaction search on zero_order_noisy.csv: 145 network fits in 25 s
 
 How the search went:
   The feed is A and B; the GC sees these products: C (up to 35.1 mol-%), D (up to 45.0 mol-%), E (up to 39.8 mol-%).
@@ -581,18 +581,18 @@ The search returns exactly the true reactions and rate laws, including the zero 
 
 | file | task | result | true network found | time |
 |---|---|---|---|---|
-| mystery_noisy.csv | automatic search | A + B <=> C; A + 2 B -> E; C -> B + D | yes | 114 s |
-| mystery_exact.csv | automatic search | A + B <=> C; A + 2 B -> E; C -> B + D | yes | 99 s |
-| complex_real.csv | automatic search | A -> D; A + B <=> C; B + C -> E (inhib) | yes | 139 s |
-| complex_exact.csv | rank 4 candidates | truth > close > similar > far | yes | 45 s |
-| complex_noisy.csv | rank 4 candidates | truth > close > similar > far | yes | 41 s |
-| complex_real.csv | rank 4 candidates | truth > close > similar > far | yes | 39 s |
-| complex_noisy.csv | repair 'far' | A + B <=> C; B + C -> E; A -> D | yes | 114 s |
-| complex_noisy.csv | repair 'similar' | A + B <=> C; A -> D; B + C -> E | yes | 82 s |
-| complex_noisy.csv | repair 'close' | A + B <=> C; C + B -> E; A -> D | yes | 32 s |
-| complex_short_campaign.csv | automatic search (1 restart) | A -> D; A + B <=> C; B + C -> E (inhib) | yes | 87 s |
-| complex_short_campaign.csv | rank 4 candidates | truth > close > similar > far | yes | 24 s |
-| zero_order_noisy.csv | automatic search (0 restarts) | B + C -> E ; orders B=0, C=1; A + B <=> C; A -> D | yes | 63 s |
+| mystery_noisy.csv | automatic search | A + B <=> C; A + 2 B -> E; C -> B + D | yes | 26 s |
+| mystery_exact.csv | automatic search | A + B <=> C; A + 2 B -> E; C -> B + D | yes | 34 s |
+| complex_real.csv | automatic search | A -> D; A + B <=> C; B + C -> E (inhib) | yes | 39 s |
+| complex_exact.csv | rank 4 candidates | truth > close > similar > far | yes | 13 s |
+| complex_noisy.csv | rank 4 candidates | truth > close > similar > far | yes | 12 s |
+| complex_real.csv | rank 4 candidates | truth > close > similar > far | yes | 10 s |
+| complex_noisy.csv | repair 'far' | A + B <=> C; B + C -> E; A -> D | yes | 34 s |
+| complex_noisy.csv | repair 'similar' | A + B <=> C; A -> D; B + C -> E | yes | 32 s |
+| complex_noisy.csv | repair 'close' | A + B <=> C; C + B -> E; A -> D | yes | 11 s |
+| complex_short_campaign.csv | automatic search (1 restart) | A -> D; A + B <=> C; B + C -> E (inhib) | yes | 29 s |
+| complex_short_campaign.csv | rank 4 candidates | truth > close > similar > far | yes | 8 s |
+| zero_order_noisy.csv | automatic search (0 restarts) | B + C -> E ; orders B=0, C=1; A + B <=> C; A -> D | yes | 25 s |
 
 Times are for one laptop core and vary by a factor of about two with what else the computer is doing and with its power mode.
 
@@ -607,5 +607,5 @@ Times are for one laptop core and vary by a factor of about two with what else t
 - The run proposed to tell two networks apart is worked out from their fitted numbers. Far from the runs done those numbers are uncertain, and two fits can then predict very different readings for that reason alone. The program therefore also gives the difference counted against the GC noise plus that uncertainty, and says so when one run would not be enough. The uncertainty itself is a rough estimate (a few dozen random draws from each fit).
 - All fits use the project's fast bed solver, which agrees with the accurate solver to about 0.1 mol-% of a reading inside the study window. That can shift a BIC by a few units (about 3 for the true complex network on `complex_noisy.csv`), one more reason why BIC differences below 6 are not called decisions. Far outside the runs done the two differ more: at the run proposed in B1 (100 bar, 576 C) the readings the two fitted networks predict differ between the solvers by up to 3.2 mol-% (A 46.5 against 49.7 mol-% for 'A + B <=> C; A + 2 B -> E; C -> B + D'), so the readings printed for such a run are approximate (the conclusion that the run separates the networks does not depend on it).
 - The 30-run files are designed kinetic studies with a wide range of conditions. The step-limited runs of an optimisation campaign cover a much smaller region: on the first 8 runs of 10 such campaigns the search found the true network in 6 (B5); in the others it said that its best network does not fit. Fewer or less varied runs will leave more undecided.
-- Equilibrium constants come from the placeholder species table in `smart/discovery.py`; all kinetics are placeholders. The table was chosen to reproduce the complex network, so the pruning of the library removes exactly the other forms of its two one-way steps (B1). Without pruning the search returns: on `complex_noisy.csv` the true network (61 s), not deciding whether A -> D and B + C -> E run one way or both ways; on `complex_real.csv` the true reactions with A -> D written as two-way, D <=> A (197 s), which inside the box predicts the same as the one-way form; on `complex_short_campaign.csv` the true reactions with B + C -> E written as two-way (109 s), not deciding whether A -> D and B + C -> E run one way or both ways. With real species the table must come from tabulated thermodynamics.
+- Equilibrium constants come from the placeholder species table in `smart/discovery.py`; all kinetics are placeholders. The table was chosen to reproduce the complex network, so the pruning of the library removes exactly the other forms of its two one-way steps (B1). Without pruning the search returns: on `complex_noisy.csv` the true network, not deciding whether A -> D and B + C -> E run one way or both ways; on `complex_real.csv` the true reactions with A -> D written as two-way, D <=> A, which inside the box predicts the same as the one-way form; on `complex_short_campaign.csv` the true reactions with B + C -> E written as two-way, not deciding whether A -> D and B + C -> E run one way or both ways. With real species the table must come from tabulated thermodynamics.
 

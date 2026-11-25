@@ -58,6 +58,9 @@ Advisor version
     --advisor v5               correct the physics with one Gaussian process (v5) instead of the v6
                                committee (Gaussian process + neural-network ensemble, weighted by
                                held-out prediction; the default)
+    --advisor v7               v6 + a neural network that predicts profit from the knobs alone, and
+                               after every run the advisor checks its reactions against the GC
+                               readings and repairs them one change at a time (slower)
 
 Safety: the advisor only SUGGESTS.  Check every suggestion against your plant's safety limits
 (use --limit to keep it inside them) before running it.  Prices are placeholders: replace them.
@@ -78,6 +81,7 @@ except Exception:
 
 from smart.systems import (SYSTEMS, LOW, HIGH, MAX_STEP, MIN_TOTAL_FLOW, WCAT, A_SPEC, R, unscale, scale,
                            physical, base_case, screening_runs)
+from smart import discovery as D
 from smart.advisor import SmartAdvisor, VirtualReactor, profit_from_gc, kpis_from_gc, dT_ad_from_gc
 from smart.kinetics import HOURS_PER_RUN
 
@@ -157,14 +161,17 @@ def explain_chemistry(adv, S, x_ref):
     th = adv.kin.split(adv.kin.samples(400, np.random.default_rng(1)))["kin"]
     Ea = th[:, 1::2] * R * 573.15 / 1000.0                       # kJ/mol for every draw
     P, VA, VB, VI, T = unscale(x_ref)[0]
-    names = REACTION_NAMES.get(S.name, [f"reaction {j + 1}" for j in range(S.nr)])
-    for j, name in enumerate(names[:S.nr]):
+    net = getattr(adv, "S", S)
+    changed = getattr(adv, "S_start", net) is not net          # v7 changed the reaction network
+    names = (REACTION_NAMES.get(S.name, [f"reaction {j + 1}" for j in range(S.nr)]) if not changed else
+             [f"{r.equation()}" for r in D.reactions_from_system(net)])
+    for j, name in enumerate(names[:net.nr]):
         e_med, e_lo, e_hi = np.median(Ea[:, j]), *np.percentile(Ea[:, j], [10, 90])
         f10 = np.exp(e_med * 1000 / R * (1 / T - 1 / (T + 10)))
         out.append(f"   - {name}: activation energy about {e_med:.0f} kJ/mol "
                    f"(likely {e_lo:.0f}-{e_hi:.0f}); near {T - 273.15:.0f} °C every +10 °C "
                    f"makes it {f10:.2f}x faster.")
-    if S.nr >= 2:
+    if S.nr >= 2 and not changed:
         e = np.median(Ea, 0)
         worse = [names[j].split("  ")[0] for j in range(1, S.nr) if e[j] > e[0]]
         if worse:
@@ -196,9 +203,22 @@ def explain_chemistry(adv, S, x_ref):
                    f"(likely {100 * d['loss_lo']:.1f}-{100 * d['loss_hi']:.1f} %); the advice allows for it.")
     if getattr(adv, "committee", None) is not None:
         w = adv.committee.weights
-        out.append("   - Correction to the physics (v6 committee): " + ", ".join(
-            f"{ {'none': 'none', 'gp': 'Gaussian process', 'nn': 'neural networks'}[k]} {100 * v:.0f} %" for k, v in w.items())
+        label = {"none": "none", "gp": "Gaussian process", "nn": "neural networks",
+                 "direct": "neural network alone (no physics)"}
+        out.append(f"   - Correction to the physics ({'v7' if 'direct' in w else 'v6'} committee): " + ", ".join(
+            f"{label.get(k, k)} {100 * v:.0f} %" for k, v in w.items())
             + " (weights from how well each predicts runs it was not trained on).")
+    if getattr(adv, "revise", False):
+        out.append("   - Reaction network in use (v7 checks it after every run):")
+        out += [f"       {ln}" for ln in D.format_network(D.reactions_from_system(net))]
+        for r in adv.revisions:
+            out.append(f"   - {r['words']}")
+        if not adv.revisions:
+            out.append("   - No change made: the reactions you started from explain the GC readings, or the evidence "
+                       "against them is not yet strong enough.")
+        m = getattr(adv, "misfit", None) or {}
+        if m.get("words"):
+            out.append(f"   - Last check: {m['words']}.")
     resid = (adv.kin.predict_gc(physical(adv.X, adv.W), t=adv.t_rows) - adv.gc)[:, :-1]
     out.append(f"   - How well this chemistry explains your GC readings: typical miss "
                f"{100 * np.median(np.abs(resid)):.2f} percentage points of composition.")
@@ -254,7 +274,8 @@ def advise(args, user, gc, S, hours=None):
     spec = {k: v for k, v in dict(S_C=args.min_selectivity, dT_ad=args.max_dT).items() if v is not None}
     adv = SmartAdvisor(S, wcat=wcat_rows[-1], a_spec=args.surface_area, seed=args.seed,
                        lo=lo, hi=hi, fixed=fixed, max_step=step, spec=spec, remaining=args.remaining,
-                       correction="committee" if args.advisor == "v6" else "gp")
+                       correction={"v5": "gp", "v6": "committee", "v7": "hybrid"}[args.advisor],
+                       revise=args.advisor == "v7")
     adv.update(X, gc, profit, wcat_rows=wcat_rows, hours=hours)
     x_next, info = adv.suggest(X[-1], np.random.default_rng(args.seed))
     ib = adv.recommend()
@@ -423,8 +444,9 @@ def main():
     ap.add_argument("--remaining", type=int, default=10, help="runs you can still afford (default 10)")
     ap.add_argument("--deactivation", type=float, default=0.0, help="virtual reactor only: activity lost per day, %% (default 0)")
     ap.add_argument("--check-every", type=int, default=0, help="--simulate-days only: repeat the base case every N days")
-    ap.add_argument("--advisor", choices=("v5", "v6"), default="v6",
-                    help="v6: committee of GP + neural networks (default); v5: one GP correction")
+    ap.add_argument("--advisor", choices=("v5", "v6", "v7"), default="v6",
+                    help="v6: committee of GP + neural networks (default); v5: one GP correction; v7: v6 + a "
+                         "neural network alone, and the reaction network is checked and repaired")
     ap.add_argument("--seed", type=int, default=0)
     args = ap.parse_args()
     if args.log is None:                       # never overwrite a real log with demo data
