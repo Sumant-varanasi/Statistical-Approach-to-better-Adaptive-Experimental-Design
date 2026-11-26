@@ -1,0 +1,11 @@
+# A catalyst that ages during the study: the reactions ageing.csv was calculated from (the answer).
+# The catalyst loses half its activity over the 30 runs (720 h). The finder assumes nothing changes with time.
+# Rate constants at 300 C per gram of catalyst (100 m2/g) and activation energies:
+#   k1 = 2.5e-06, Ea1 = 70 kJ/mol
+#   k2 = 6e-07, Ea2 = 110 kJ/mol
+#   k3 = 3e-07, Ea3 = 120 kJ/mol
+#   every rate constant falls with time on stream: x 0.5 ** (hours / 720); activity 0.99 in run 1, 0.51 in run 30
+#   GC noise: 1 x (1 % of the reading + 0.05 mol-%)
+A + B <=> C
+C -> D + B
+C + B -> E

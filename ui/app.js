@@ -601,7 +601,7 @@ function fShowExample() {
   if (!e) return;
   $("f-example-text").textContent = e.text + (e.mode === "discover" ? " Suggested: Find the reactions automatically." : " Suggested: Rank candidate networks.");
   $("f-example-dl").href = "/examples/discovery/" + e.file;
-  $("f-example-dl").setAttribute("download", e.file);
+  $("f-example-dl").setAttribute("download", e.file.split("/").pop());
 }
 document.querySelectorAll(".f-src .seg-btn").forEach((b) => b.addEventListener("click", () => {
   F.src = b.dataset.src;

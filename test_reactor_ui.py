@@ -209,7 +209,12 @@ C.settings(dict(spec={}, version="v6"))
 import time
 F = UI.Finder(C)
 ex = F.examples()
-check("finder: 7 example files and the 4 example candidates", len(ex["examples"]) == 7 and [c["key"] for c in ex["candidates"]] == ["truth", "close", "similar", "far"])
+check("finder: 15 example files (7 + 8 showcase cases) and the 4 example candidates",
+      len(ex["examples"]) == 15 and [c["key"] for c in ex["candidates"]] == ["truth", "close", "similar", "far"])
+check("finder: a showcase file and its answer can be downloaded, with or without the folder",
+      "pressure_bar" in F.example_file("showcase/clean.csv") and F.example_file("clean.csv") == F.example_file("showcase/clean.csv")
+      and "A + B <=> C" in F.example_file("showcase/half_order_answer.txt"))
+expect_error("finder refuses a showcase file in the wrong folder", F.example_file, "other/clean.csv")
 check("finder: example files can be downloaded", "pressure_bar" in F.example_file("mystery_noisy.csv") and "A + B" in F.example_file("candidates_truth.txt"))
 expect_error("finder refuses a file outside the examples", F.example_file, "../../reactor_ui.py")
 expect_error("finder names the candidate with a typing error", F.start,
@@ -242,5 +247,12 @@ t0 = time.time()
 while F.status()["job"]["status"] == "running" and time.time() - t0 < 30:
     time.sleep(0.2)
 check("a running search can be stopped at once", F.status()["job"]["status"] == "stopped")
+F.start(dict(mode="discover", source="example", example="showcase/two_routes.csv"))
+t0 = time.time()
+while F.status()["job"]["status"] == "running" and time.time() - t0 < 300:
+    time.sleep(0.5)
+j = F.status()["job"]
+check("showcase case 8 on the page: the search finds both routes to D and says it matches the answer file",
+      j["status"] == "done" and j["result"]["answer"]["match"] and j["result"]["answer"]["file"] == "showcase/two_routes_answer.txt")
 
 print("\nAll web-interface checks passed.")

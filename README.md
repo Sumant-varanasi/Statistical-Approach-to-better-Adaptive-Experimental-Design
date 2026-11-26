@@ -528,7 +528,7 @@ ranked, the automatic search on each file, learned against true kinetics on the 
 this comparison.
 
 **How to use it.** On the web page, the *Reaction finder* section (section 4.1): choose the data
-(one of the 7 example files, each downloadable; an uploaded CSV; or the runs in the table), then
+(one of the 7 example files or the 8 showcase files, each downloadable; an uploaded CSV; or the runs in the table), then
 *Find the reactions* (automatic, optionally starting from a network to repair; 1–3 minutes, with
 progress shown and a Stop button) or *Rank candidate networks* (type them in text boxes; *Load the 4
 example candidates* fills them in). Nothing in the finder changes the campaign. On the command line:
@@ -544,6 +544,25 @@ python make_discovery_example.py                                                
 The log is the same CSV the web page and `reactor_advisor.py` use; a candidate file holds one
 reaction per line. Other options: `--max-reactions`, `--surface-area`, `--no-site-blocking`,
 `--json FILE`, `--quiet`.
+
+**Showcase: what the finder does when the job gets harder** (`examples/discovery/showcase/`,
+built by `python make_finder_showcase.py`, about 45 minutes). One network (A + B ⇌ C, C → D + B,
+C + B → E) and eight data sets calculated from it, each making one thing harder, handed to the
+automatic search with the web page's time limit; the true network is then fitted to the same data so
+a wrong answer can be judged. The data sheet `finder_showcase.xlsx` has every run, the reactions
+found, true against fitted rate constants and the search log; the eight CSV files are also in the
+web page's example list (*Showcase 1–8*), each with its answer file.
+
+| Case | Found | Fits within GC noise | What it shows |
+|---|---|---|---|
+| 1. Designed study, 30 runs | the true network | yes | constants within 2 %, Ea within 1 kJ/mol (93 s) |
+| 2. Start of a campaign, 8 runs | the true network | yes | a favourable start: on the complex network, 6 of 10 such starts were solved (worked example B5) (44 s) |
+| 3. GC 5× noisier than assumed | true reactions + 1 extra | no | reads scatter as chemistry; the "does not fit" warning is the cue that the noise model is wrong |
+| 4. Every run at 300 °C | the true network | yes | rate constants right, activation energies not measurable (stay at the 100 kJ/mol guess; it warns) |
+| 5. Weak side reaction (D < 0.4 mol-%) | one reaction replaced | yes | detected, not identified: its pick and the truth are 4 BIC apart (a tie it did not flag) |
+| 6. Order 0.5 in B (outside 0/1/2) | a different network | no | says nothing fits; typed in as a candidate, the true network fits (BIC 106 against 1147) |
+| 7. Catalyst ageing during the study | true reactions + 1 extra | no | no network without time can fit; ran 2653 s past the 900 s limit (limit checked only between steps) |
+| 8. Two routes to D | the true network | yes | both routes separated by their different response to B (14 s) |
 
 ### 3.10 Optional: the profit vs selectivity trade-off (`smart/pareto.py`)
 
@@ -748,6 +767,7 @@ Options: `--seeds 5` (quicker), `--workers N` (benchmark processes, default
 | `compare_v6.py` | paired v6-vs-v5 comparison on the benchmark cache: table, Wilcoxon test, committee weights, `figures/smart_6_v6_vs_v5.png` |
 | `analysis_v7/` | `compare_v7.py` (the v7 study against v5, v6 and the baselines: `figures/smart_7_campaigns.png`, `figures/smart_7_candidates.png`, `analysis_v7/v7_summary.md`), `gc_accuracy.py` (mechanism vs neural network at predicting the GC of unseen runs), `plot_mechanism.py` (`figures/smart_7_mechanism.png`); `plot_campaigns.py` is the earlier preliminary figure |
 | `discover_reactions.py`, `make_discovery_example.py` | the reaction finder on the command line; the builder of `examples/discovery/` (data files, candidate files, `WORKED_EXAMPLE.md`, `finder_results.json`) |
+| `make_finder_showcase.py`, `finder_showcase_sheet.py` | the reaction-finder showcase: eight theoretical data sets, the finder's results and the data sheet `examples/discovery/showcase/finder_showcase.xlsx` (`--sheet` rebuilds only the workbook) |
 | `smart-advisor-model.md` | the model and protocol in equations: surface-area coordinate, inert knob, constraints, economics, the advisor's loop, the v6 and v7 committees, the network repair, reaction discovery, the trade-off curve, the baselines |
 
 The advisor reuses `bo/gp.py` (the fitted Matérn GP) for its correction term and `bo/loop.py`'s
@@ -1118,6 +1138,7 @@ profit objective and 20 seeds.
 | `analysis_v7/` (`compare_v7.py`, `gc_accuracy.py`, `gc_accuracy.json`, `plot_mechanism.py`, `plot_campaigns.py`, `README.md`) | v7 | the v7 comparison and its figures; mechanism vs neural network at predicting the GC |
 | `discover_reactions.py` | v7 | the reaction finder on the command line |
 | `make_discovery_example.py`, `examples/discovery/` | v7 | builds the 7 example data files, the 4 candidate networks, `WORKED_EXAMPLE.md` and `finder_results.json` |
+| `make_finder_showcase.py`, `finder_showcase_sheet.py`, `examples/discovery/showcase/` | v7 | the showcase: 8 theoretical cases, what the finder returned (good or bad), the data sheet `finder_showcase.xlsx` |
 | `reactor_ui.py`, `ui/` (`index.html`, `app.css`, `app.js`) | v4, v7 | the web interface (v7: reaction finder, v7 advisor, trade-off panel) |
 | `reactor_advisor.py` | v3/v4, v7 | the command-line advisor (`--advisor v7`) |
 | `khare_demo.py` | v3/v4 | the 4-part demo for the supervisors |

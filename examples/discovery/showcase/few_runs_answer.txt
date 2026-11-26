@@ -1,0 +1,10 @@
+# Start of an optimisation campaign (8 runs): the reactions few_runs.csv was calculated from (the answer).
+# Only the 5 shared screening runs and 3 step-limited runs near the base case: a small corner of the window.
+# Rate constants at 300 C per gram of catalyst (100 m2/g) and activation energies:
+#   k1 = 2.5e-06, Ea1 = 70 kJ/mol
+#   k2 = 6e-07, Ea2 = 110 kJ/mol
+#   k3 = 3e-07, Ea3 = 120 kJ/mol
+#   GC noise: 1 x (1 % of the reading + 0.05 mol-%)
+A + B <=> C
+C -> D + B
+C + B -> E

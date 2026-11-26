@@ -1,0 +1,10 @@
+# A GC 5 times noisier than the finder assumes: the reactions noisy_gc.csv was calculated from (the answer).
+# The same 30 runs, but the GC scatter is 5x the noise model the finder uses (1 % of the reading + 0.05 mol-%).
+# Rate constants at 300 C per gram of catalyst (100 m2/g) and activation energies:
+#   k1 = 2.5e-06, Ea1 = 70 kJ/mol
+#   k2 = 6e-07, Ea2 = 110 kJ/mol
+#   k3 = 3e-07, Ea3 = 120 kJ/mol
+#   GC noise: 5 x (1 % of the reading + 0.05 mol-%)
+A + B <=> C
+C -> D + B
+C + B -> E

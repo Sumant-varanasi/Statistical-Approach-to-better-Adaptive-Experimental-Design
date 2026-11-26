@@ -810,6 +810,28 @@ FINDER_EXAMPLES = [
          text="30 runs where the over-reaction C + B → E runs at r = k P_C (zero order in B), with GC noise. "
               "Can the automatic search find the order? (2-3 minutes)"),
 ]
+# The showcase (make_finder_showcase.py): one network, eight ways to make the job harder, with what the finder
+# returned for each, good or bad, in examples/discovery/showcase/finder_showcase.xlsx.
+SHOWCASE = [
+    ("clean", "A designed kinetic study", "30 runs over the whole window, normal GC noise. The finder found the true "
+     "network (about 1.5 minutes)."),
+    ("few_runs", "Start of a campaign (8 runs)", "The 5 screening runs and 3 step-limited runs. The finder found the true "
+     "network (under a minute)."),
+    ("noisy_gc", "A GC 5x noisier than assumed", "The finder found the three true reactions plus an extra one that only "
+     "explains scatter, and says nothing fits within the noise (about 6 minutes)."),
+    ("one_temperature", "Every run at 300 C", "The finder found the true reactions, but activation energies cannot be "
+     "measured at one temperature, and it says so (seconds)."),
+    ("weak_reaction", "A weak side reaction", "D stays below 0.4 mol-%. The finder chose another reaction that makes D; "
+     "the data cannot tell it from the true one (under a minute)."),
+    ("half_order", "A rate law of order 0.5", "Outside the orders the search tries (0, 1, 2). It returns a wrong network "
+     "and says it does not fit; rank the answer file as a candidate to see the truth fit (about 5 minutes)."),
+    ("ageing", "A catalyst that ages", "Half the activity lost over the 30 runs. No network fits and the finder says so; "
+     "this search can run past the time limit (15 minutes or more)."),
+    ("two_routes", "Two routes to the same product", "D made from A directly and from C. The finder separated the two "
+     "routes (seconds)."),
+]
+FINDER_EXAMPLES += [dict(file=f"showcase/{k}.csv", answer=f"showcase/{k}_answer.txt", mode="discover",
+                         title=f"Showcase {i}: {t}", text=x) for i, (k, t, x) in enumerate(SHOWCASE, 1)]
 FINDER_CANDIDATES = [
     dict(key="truth", file="candidates_truth.txt", name="True network"),
     dict(key="close", file="candidates_close.txt", name="Quite close"),
@@ -880,9 +902,14 @@ class Finder:
         return dict(examples=ex, candidates=cands, max_seconds=FINDER_MAX_SECONDS)
 
     def example_file(self, name):
-        if name not in {e["file"] for e in FINDER_EXAMPLES} | {c["file"] for c in FINDER_CANDIDATES} | {"mystery_reactions.txt"}:
+        """The text of one example file, by its name (with or without its folder, e.g. 'showcase/clean.csv' or
+        'clean.csv'); only the files listed above are served."""
+        known = {os.path.basename(p): p for p in [e["file"] for e in FINDER_EXAMPLES] + [e["answer"] for e in FINDER_EXAMPLES]
+                 + [c["file"] for c in FINDER_CANDIDATES] + ["mystery_reactions.txt"]}
+        rel = known.get(os.path.basename(str(name)))
+        if rel is None or str(name) not in (rel, os.path.basename(rel)):
             raise ValueError("no such example file")
-        with open(os.path.join(EX_DIR, name), encoding="utf-8") as fh:
+        with open(os.path.join(EX_DIR, rel), encoding="utf-8") as fh:
             return fh.read()
 
     def _data(self, b):

@@ -1,0 +1,10 @@
+# Two routes to the same product: the reactions two_routes.csv was calculated from (the answer).
+# D is made two ways at once: straight from A, and from C falling apart. Can the data separate them?
+# Rate constants at 300 C per gram of catalyst (100 m2/g) and activation energies:
+#   k1 = 2.5e-06, Ea1 = 70 kJ/mol
+#   k2 = 3e-07, Ea2 = 140 kJ/mol
+#   k3 = 6e-07, Ea3 = 110 kJ/mol
+#   GC noise: 1 x (1 % of the reading + 0.05 mol-%)
+A + B <=> C
+A -> D
+C -> D + B
